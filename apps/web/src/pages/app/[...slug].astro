@@ -1,0 +1,17 @@
+---
+// Catch-all route that mounts the React SPA island for the whole /app/* tree.
+// Client-side routing is handled by React Router inside the island.
+import AppRoot from "../../app/AppRoot";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>go-CRM · Dashboard</title>
+  </head>
+  <body>
+    <!-- client:only ensures the SPA hydrates entirely on the client -->
+    <AppRoot client:only="react" />
+  </body>
+</html>

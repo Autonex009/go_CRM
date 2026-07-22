@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "go-CRM",
+    "slug": "go-crm",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true },
+    "android": {},
+    "updates": { "fallbackToCacheTimeout": 0 }
+  }
+}

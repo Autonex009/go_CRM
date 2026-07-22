@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.astro/
+.expo/
+.turbo/
+
+# Go
+services/bin/
+*.exe
+*.test
+vendor/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
