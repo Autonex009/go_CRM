@@ -2,6 +2,15 @@
 // Catch-all route that mounts the React SPA island for the whole /app/* tree.
 // Client-side routing is handled by React Router inside the island.
 import AppRoot from "../../app/AppRoot";
+
+// Static output requires a getStaticPaths for dynamic routes. We only prerender
+// the /app entry; React Router owns navigation from there (deep links like
+// /app/login are resolved client-side). For direct-load/refresh of a nested
+// path on a static host, configure an SPA rewrite of /app/* -> /app, or switch
+// the Astro output to "server"/"hybrid".
+export function getStaticPaths() {
+  return [{ params: { slug: undefined } }];
+}
 ---
 
 <html lang="en">
