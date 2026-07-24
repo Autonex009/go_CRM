@@ -3,14 +3,11 @@
 // Client-side routing is handled by React Router inside the island.
 import AppRoot from "../../app/AppRoot";
 
-// Static output requires a getStaticPaths for dynamic routes. We only prerender
-// the /app entry; React Router owns navigation from there (deep links like
-// /app/login are resolved client-side). For direct-load/refresh of a nested
-// path on a static host, configure an SPA rewrite of /app/* -> /app, or switch
-// the Astro output to "server"/"hybrid".
-export function getStaticPaths() {
-  return [{ params: { slug: undefined } }];
-}
+// SSR this route (the project uses hybrid output, which prerenders by default).
+// Server-rendering the catch-all means every /app/* path — including a direct
+// load or refresh of a nested route like /app/login — returns the SPA shell,
+// after which React Router takes over client-side navigation.
+export const prerender = false;
 ---
 
 <html lang="en">
