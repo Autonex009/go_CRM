@@ -3,5 +3,8 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "jsxImportSource": "react"
-  }
+  },
+  // dist/ holds Astro's build output; type-checking generated bundles only
+  // produces noise about their internals.
+  "exclude": ["dist", "node_modules"]
 }

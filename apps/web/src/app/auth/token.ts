@@ -2,6 +2,8 @@
 export interface JwtClaims {
   sub: string;
   email: string;
+  /** Organization id — the gateway scopes every query by it. */
+  org: string;
   iss: string;
   iat: number;
   exp: number;
