@@ -2,15 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 
-import { Alert } from "../components/AuthLayout";
-import { Field, SelectField, TextareaField } from "../components/Field";
-import { Modal } from "../components/Modal";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
+import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField } from "../ui";
 import type { Lead, LeadInput } from "./api";
 import { leadFormSchema, toPayload, type LeadFormValues } from "./schemas";
-import { LEAD_SOURCES, LEAD_STAGES, stageLabel, type LeadStage } from "./stages";
+import { LEAD_SOURCES, LEAD_STAGES, STAGE_META, stageLabel, type LeadStage } from "./stages";
 
 interface LeadDialogProps {
   /** Existing lead to edit, or null to create. */
@@ -23,18 +21,16 @@ interface LeadDialogProps {
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-export function LeadDialog({
-  lead,
-  defaultStage,
-  onClose,
-  onSubmit,
-  onDelete,
-}: LeadDialogProps) {
+export function LeadDialog({ lead, defaultStage, onClose, onSubmit, onDelete }: LeadDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   // Populates the owner picker. Members are stable, so this is usually a cache
   // hit shared with the Team page.
-  const members = useQuery({ queryKey: ["members"], queryFn: orgApi.members });
+  const members = useQuery({
+    queryKey: ["members"],
+    queryFn: orgApi.members,
+    staleTime: 5 * 60_000,
+  });
 
   const {
     register,
@@ -72,18 +68,25 @@ export function LeadDialog({
       onClose={onClose}
       headerAction={
         onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="text-sm font-medium text-red-600 transition hover:text-red-700"
-          >
-            Delete
-          </button>
+          <Button variant="ghost" size="sm" onClick={onDelete}>
+            <span className="text-danger-600">Delete</span>
+          </Button>
         )
       }
     >
       <form onSubmit={submit} className="flex flex-col gap-md" noValidate>
         {formError && <Alert>{formError}</Alert>}
+
+        {lead && (
+          <div className="flex items-center gap-sm">
+            <Badge tone={STAGE_META[lead.stage].tone} dot>
+              {stageLabel(lead.stage)}
+            </Badge>
+            <span className="text-xs text-neutral-400">
+              Created {new Date(lead.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+        )}
 
         <div className="grid gap-md sm:grid-cols-2">
           <Field label="Name" error={errors.firstName?.message} {...register("firstName")} />
@@ -134,20 +137,12 @@ export function LeadDialog({
         <TextareaField label="Notes" rows={3} error={errors.notes?.message} {...register("notes")} />
 
         <div className="flex justify-end gap-sm">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-neutral-900/15 px-md py-sm text-sm font-medium text-neutral-900 transition hover:bg-neutral-50"
-          >
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="rounded-md bg-brand-600 px-md py-sm text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-          >
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving…" : lead ? "Save changes" : "Create lead"}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

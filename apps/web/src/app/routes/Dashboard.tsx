@@ -1,11 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuthStore } from "../auth/store";
-import { Alert } from "../components/AuthLayout";
-import { STAGE_META, formatValue, stageLabel } from "../leads/stages";
+import { STAGE_META, formatCompact, formatValue, stageLabel } from "../leads/stages";
 import { ApiError } from "../lib/api";
 import { dashboardApi, type StageSummary } from "../lib/dashboard";
+import {
+  Alert,
+  Card,
+  CardHeader,
+  Dot,
+  EmptyState,
+  Icon,
+  PageHeader,
+  Skeleton,
+  StatTile,
+  buttonClass,
+} from "../ui";
 
 /**
  * Portal landing page. One request to /api/v1/dashboard rather than fanning out
@@ -13,19 +25,35 @@ import { dashboardApi, type StageSummary } from "../lib/dashboard";
  */
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
-  const query = useQuery({ queryKey: ["dashboard"], queryFn: dashboardApi.summary });
+  const query = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: dashboardApi.summary,
+    // Counts don't need to be to-the-second; this avoids a refetch every time
+    // the user tabs back to the dashboard.
+    staleTime: 30_000,
+  });
   const data = query.data;
 
-  const firstName = user?.name?.split(" ")[0] ?? user?.email?.split("@")[0];
+  const firstName = user?.name?.trim().split(" ")[0] ?? user?.email?.split("@")[0];
+
+  const conversion = useMemo(() => {
+    if (!data || data.leads === 0) return undefined;
+    const won = data.stages.find((s) => s.stage === "won")?.count ?? 0;
+    return `${Math.round((won / data.leads) * 100)}%`;
+  }, [data]);
 
   return (
     <section className="flex flex-col gap-lg">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">
-          {firstName ? `Welcome back, ${firstName}` : "Dashboard"}
-        </h1>
-        <p className="mt-xs text-sm text-neutral-500">Your workspace at a glance.</p>
-      </header>
+      <PageHeader
+        title={firstName ? `Welcome back, ${firstName}` : "Dashboard"}
+        subtitle="Your pipeline at a glance."
+        action={
+          <Link to="/leads" className={buttonClass({ variant: "secondary" })}>
+            <Icon name="leads" size={16} />
+            Open board
+          </Link>
+        }
+      />
 
       {query.isError && (
         <Alert>
@@ -33,62 +61,120 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
+      <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
+        <StatTile
+          accent
           label="Open pipeline"
-          value={data ? formatValue(data.openPipeline) : "—"}
+          icon="trend"
+          value={data ? formatValue(data.openPipeline) : undefined}
           hint="Not yet won or lost"
           to="/leads"
         />
-        <Stat label="Leads" value={data ? String(data.leads) : "—"} to="/leads" />
-        <Stat label="Contacts" value={data ? String(data.contacts) : "—"} to="/contacts" />
-        <Stat label="Team" value={data ? String(data.members) : "—"} to="/team" />
+        <StatTile
+          label="Leads"
+          icon="leads"
+          value={data ? String(data.leads) : undefined}
+          hint={conversion ? `${conversion} won` : undefined}
+          to="/leads"
+        />
+        <StatTile
+          label="Contacts"
+          icon="contacts"
+          value={data ? String(data.contacts) : undefined}
+          to="/contacts"
+        />
+        <StatTile
+          label="Team"
+          icon="team"
+          value={data ? String(data.members) : undefined}
+          to="/team"
+        />
       </div>
 
-      <div className="rounded-lg border border-neutral-900/10 bg-white p-lg">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-neutral-900">Pipeline by stage</h2>
-          <Link to="/leads" className="text-sm font-medium text-brand-600 hover:text-brand-700">
-            Open board →
-          </Link>
-        </div>
+      <div className="grid gap-md lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader
+            title="Pipeline by stage"
+            subtitle="Share of leads currently sitting in each stage"
+            action={
+              <Link
+                to="/leads"
+                className="text-xs font-medium text-brand-600 transition-colors hover:text-brand-700"
+              >
+                Open board →
+              </Link>
+            }
+          />
 
-        {query.isPending ? (
-          <p className="mt-md text-sm text-neutral-500">Loading…</p>
-        ) : data && data.leads > 0 ? (
-          <StageBreakdown stages={data.stages} total={data.leads} wonValue={data.wonValue} />
-        ) : (
-          <p className="mt-md text-sm text-neutral-500">
-            No leads yet.{" "}
-            <Link to="/leads" className="font-medium text-brand-600 hover:text-brand-700">
-              Add your first one
-            </Link>{" "}
-            to start tracking the pipeline.
+          {query.isPending ? (
+            <div className="mt-lg flex flex-col gap-sm">
+              <Skeleton className="h-[10px] w-full" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-[18px] w-full" />
+              ))}
+            </div>
+          ) : data && data.leads > 0 ? (
+            <Funnel stages={data.stages} total={data.leads} />
+          ) : (
+            <div className="mt-lg">
+              <EmptyState
+                icon="leads"
+                title="No leads yet"
+                description="Add your first lead to start tracking the pipeline."
+                action={
+                  <Link to="/leads">
+                    <span className="text-xs font-medium text-brand-600 hover:text-brand-700">
+                      Go to the board →
+                    </span>
+                  </Link>
+                }
+              />
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader title="Won" subtitle="Closed value so far" />
+          <p className="mt-lg text-2xl font-semibold tabular-nums tracking-[-0.02em] text-neutral-900">
+            {data ? formatValue(data.wonValue) : "—"}
           </p>
-        )}
+          {data && (
+            <dl className="mt-lg flex flex-col gap-sm border-t border-neutral-200 pt-md text-xs">
+              {(["won", "lost"] as const).map((stage) => {
+                const row = data.stages.find((s) => s.stage === stage);
+                return (
+                  <div key={stage} className="flex items-center gap-sm">
+                    <Dot tone={STAGE_META[stage].tone} />
+                    <dt className="text-neutral-600">{stageLabel(stage)}</dt>
+                    <dd className="ml-auto tabular-nums text-neutral-500">
+                      {row?.count ?? 0} · {formatCompact(row?.value ?? 0)}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          )}
+        </Card>
       </div>
     </section>
   );
 }
 
-function StageBreakdown({
-  stages,
-  total,
-  wonValue,
-}: {
-  stages: StageSummary[];
-  total: number;
-  wonValue: number;
-}) {
+/**
+ * Stacked bar + per-stage rows, in plain CSS.
+ *
+ * No charting library: recharts/chart.js would add 100–300 kB and a canvas or SVG
+ * render pass for what two flex containers and a width percentage express exactly.
+ */
+function Funnel({ stages, total }: { stages: StageSummary[]; total: number }) {
   return (
     <>
-      {/* Single stacked bar: proportion of the pipeline sitting in each stage. */}
-      <div className="mt-md flex h-[8px] gap-[2px] overflow-hidden rounded-full">
+      <div className="mt-lg flex h-[10px] gap-[2px] overflow-hidden rounded-full bg-neutral-100">
         {stages.map((s) =>
           s.count === 0 ? null : (
             <div
               key={s.stage}
-              className={STAGE_META[s.stage].dot}
+              className={STAGE_META[s.stage].bar}
               style={{ width: `${(s.count / total) * 100}%` }}
               title={`${stageLabel(s.stage)}: ${s.count}`}
             />
@@ -96,50 +182,31 @@ function StageBreakdown({
         )}
       </div>
 
-      <ul className="mt-md grid gap-sm sm:grid-cols-2 lg:grid-cols-3">
-        {stages.map((s) => (
-          <li key={s.stage} className="flex items-center gap-sm text-sm">
-            <span className={`h-[6px] w-[6px] rounded-full ${STAGE_META[s.stage].dot}`} />
-            <span className="text-neutral-900">{stageLabel(s.stage)}</span>
-            <span className="ml-auto tabular-nums text-neutral-500">
-              {s.count}
-              {s.value > 0 && ` · ${formatValue(s.value)}`}
-            </span>
-          </li>
-        ))}
+      <ul className="mt-lg flex flex-col gap-sm">
+        {stages.map((s) => {
+          const share = total === 0 ? 0 : Math.round((s.count / total) * 100);
+          return (
+            <li key={s.stage} className="flex items-center gap-md text-xs">
+              <span className="flex w-[104px] shrink-0 items-center gap-sm">
+                <Dot tone={STAGE_META[s.stage].tone} />
+                <span className="font-medium text-neutral-700">{stageLabel(s.stage)}</span>
+              </span>
+
+              {/* Track + fill: one div each, no per-bar component. */}
+              <span className="h-[6px] flex-1 overflow-hidden rounded-full bg-neutral-100">
+                <span
+                  className={`block h-full rounded-full ${STAGE_META[s.stage].bar}`}
+                  style={{ width: `${share}%` }}
+                />
+              </span>
+
+              <span className="w-[88px] shrink-0 text-right tabular-nums text-neutral-500">
+                {s.count} · {formatCompact(s.value)}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-
-      {wonValue > 0 && (
-        <p className="mt-md border-t border-neutral-900/10 pt-md text-sm text-neutral-500">
-          Won so far:{" "}
-          <span className="font-semibold text-neutral-900">{formatValue(wonValue)}</span>
-        </p>
-      )}
     </>
-  );
-}
-
-interface StatProps {
-  label: string;
-  value: string;
-  to?: string;
-  hint?: string;
-}
-
-function Stat({ label, value, to, hint }: StatProps) {
-  const body = (
-    <>
-      <p className="text-sm font-medium text-neutral-500">{label}</p>
-      <p className="mt-xs text-xl font-bold tabular-nums text-neutral-900">{value}</p>
-      {hint && <p className="mt-xs text-xs text-neutral-500">{hint}</p>}
-    </>
-  );
-
-  const className = "rounded-lg border border-neutral-900/10 bg-white p-lg";
-  if (!to) return <div className={className}>{body}</div>;
-  return (
-    <Link to={to} className={`${className} block transition hover:border-brand-500`}>
-      {body}
-    </Link>
   );
 }

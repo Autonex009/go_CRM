@@ -18,14 +18,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Alert } from "../components/AuthLayout";
+import { ApiError } from "../lib/api";
 import { LeadCard, SortableLeadCard } from "../leads/LeadCard";
 import { LeadDialog } from "../leads/LeadDialog";
 import { leadsApi, type Lead, type LeadInput } from "../leads/api";
-import { LEAD_STAGES, STAGE_META, formatValue, type LeadStage } from "../leads/stages";
-import { ApiError } from "../lib/api";
+import { LEAD_STAGES, STAGE_META, formatCompact, type LeadStage } from "../leads/stages";
+import { Alert, Button, Dot, Icon, PageHeader, Skeleton } from "../ui";
 
 /** Columns keyed by stage, in board order. */
 type BoardState = Record<LeadStage, Lead[]>;
@@ -62,8 +62,8 @@ export default function Leads() {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ lead: Lead | null; stage: LeadStage } | null>(null);
 
-  // The board is local state during a drag, so it can't be stomped by a refetch
-  // mid-gesture; it re-syncs from the query whenever the server data settles.
+  // The board is local state during a drag, so a background refetch can't yank a
+  // card out from under the pointer; it re-syncs once server data settles.
   const dragging = useRef(false);
   useEffect(() => {
     if (query.data && !dragging.current) {
@@ -72,8 +72,7 @@ export default function Leads() {
   }, [query.data]);
 
   const sensors = useSensors(
-    // A few pixels of travel before a drag starts, so clicking a card to open it
-    // still works.
+    // A few pixels of travel before a drag starts, so click-to-open still works.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
@@ -83,35 +82,46 @@ export default function Leads() {
     [activeId, board],
   );
 
+  const totals = useMemo(() => {
+    let count = 0;
+    let open = 0;
+    for (const stage of LEAD_STAGES) {
+      count += board[stage].length;
+      if (stage !== "won" && stage !== "lost") {
+        for (const lead of board[stage]) open += lead.value ?? 0;
+      }
+    }
+    return { count, open };
+  }, [board]);
+
+  const invalidate = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["leads"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  }, [queryClient]);
+
   const move = useMutation({
     mutationFn: ({ id, stage, index }: { id: string; stage: LeadStage; index: number }) =>
       leadsApi.move(id, stage, index),
     onError: (err) => {
       setMoveError(err instanceof ApiError ? err.message : "Could not move that lead");
       // Local state and the server have diverged — the server wins.
-      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      invalidate();
     },
     onSuccess: () => {
       setMoveError(null);
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      invalidate();
     },
   });
 
   const save = useMutation({
     mutationFn: ({ id, input }: { id?: string; input: LeadInput }) =>
       id ? leadsApi.update(id, input) : leadsApi.create(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["leads"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-    },
+    onSuccess: invalidate,
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => leadsApi.remove(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["leads"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-    },
+    onSuccess: invalidate,
   });
 
   const onDragStart = ({ active }: DragStartEvent) => {
@@ -146,7 +156,6 @@ export default function Leads() {
     dragging.current = false;
     setActiveId(null);
     if (!over) {
-      // Dropped outside any column — discard the optimistic reshuffle.
       setBoard(group(query.data?.leads ?? []));
       return;
     }
@@ -169,24 +178,26 @@ export default function Leads() {
     move.mutate({ id, stage, index: index < 0 ? ordered.length : index });
   };
 
-  const total = LEAD_STAGES.reduce((n, s) => n + board[s].length, 0);
+  const openLead = useCallback(
+    (lead: Lead) => setDialog({ lead, stage: lead.stage }),
+    [],
+  );
 
   return (
     <section className="flex flex-col gap-lg">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">Leads</h1>
-          <p className="mt-xs text-sm text-neutral-500">
-            {total === 0 ? "No leads yet" : `${total} in the pipeline`} · drag a card to move it
-          </p>
-        </div>
-        <button
-          onClick={() => setDialog({ lead: null, stage: "new" })}
-          className="rounded-md bg-brand-600 px-md py-sm text-sm font-semibold text-white transition hover:bg-brand-700"
-        >
-          New lead
-        </button>
-      </header>
+      <PageHeader
+        title="Leads"
+        subtitle={
+          query.isPending
+            ? "Loading pipeline…"
+            : `${totals.count} in the pipeline · ${formatCompact(totals.open)} open value`
+        }
+        action={
+          <Button icon="plus" onClick={() => setDialog({ lead: null, stage: "new" })}>
+            New lead
+          </Button>
+        }
+      />
 
       {moveError && <Alert>{moveError}</Alert>}
       {query.isError && (
@@ -196,7 +207,7 @@ export default function Leads() {
       )}
 
       {query.isPending ? (
-        <p className="text-sm text-neutral-500">Loading board…</p>
+        <BoardSkeleton />
       ) : (
         <DndContext
           sensors={sensors}
@@ -210,21 +221,27 @@ export default function Leads() {
             setBoard(group(query.data?.leads ?? []));
           }}
         >
-          {/* Horizontal scroll rather than squeezing six columns onto a phone. */}
-          <div className="-mx-lg flex gap-md overflow-x-auto px-lg pb-md">
+          {/* Horizontal scroll rather than squeezing six columns onto a phone.
+              Negative margin lets the strip bleed to the viewport edge. */}
+          <div className="-mx-md flex gap-md overflow-x-auto px-md pb-sm sm:-mx-lg sm:px-lg">
             {LEAD_STAGES.map((stage) => (
               <Column
                 key={stage}
                 stage={stage}
                 leads={board[stage]}
-                onAdd={() => setDialog({ lead: null, stage })}
-                onOpen={(lead) => setDialog({ lead, stage })}
+                onAdd={setDialog}
+                onOpen={openLead}
               />
             ))}
           </div>
 
-          {/* Follows the pointer; the card left behind stays faint. */}
-          <DragOverlay>{activeLead && <LeadCard lead={activeLead} overlay />}</DragOverlay>
+          <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.16,1,0.3,1)" }}>
+            {activeLead && (
+              <div className="w-[264px]">
+                <LeadCard lead={activeLead} overlay />
+              </div>
+            )}
+          </DragOverlay>
         </DndContext>
       )}
 
@@ -250,51 +267,87 @@ export default function Leads() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+
 interface ColumnProps {
   stage: LeadStage;
   leads: Lead[];
-  onAdd: () => void;
+  onAdd: (d: { lead: null; stage: LeadStage }) => void;
   onOpen: (lead: Lead) => void;
 }
 
-function Column({ stage, leads, onAdd, onOpen }: ColumnProps) {
-  // Droppable on the column itself, so an empty column is still a target.
+const Column = memo(function Column({ stage, leads, onAdd, onOpen }: ColumnProps) {
+  // Droppable on the column body, so an empty column is still a target.
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const meta = STAGE_META[stage];
-  const value = leads.reduce((sum, l) => sum + (l.value ?? 0), 0);
+
+  const value = useMemo(() => leads.reduce((sum, l) => sum + (l.value ?? 0), 0), [leads]);
+  const ids = useMemo(() => leads.map((l) => l.id), [leads]);
 
   return (
-    <div className="flex w-[260px] shrink-0 flex-col gap-sm">
-      <header className="flex items-center justify-between px-xs">
-        <div className="flex items-center gap-sm">
-          <span className={`h-[6px] w-[6px] rounded-full ${meta.dot}`} />
-          <h2 className="text-sm font-semibold text-neutral-900">{meta.label}</h2>
-          <span className="text-xs tabular-nums text-neutral-500">{leads.length}</span>
+    <div className="flex w-[264px] shrink-0 flex-col">
+      {/* Funnel rule: the board reads as stages left to right. */}
+      <span className={`h-[3px] rounded-full ${meta.bar}`} />
+
+      <header className="flex items-center justify-between gap-sm px-xs py-sm">
+        <div className="flex min-w-0 items-center gap-sm">
+          <Dot tone={meta.tone} />
+          <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-neutral-600">
+            {meta.label}
+          </h2>
+          <span className="rounded-full bg-neutral-100 px-xs text-xs font-medium tabular-nums text-neutral-500">
+            {leads.length}
+          </span>
         </div>
         {value > 0 && (
-          <span className="text-xs tabular-nums text-neutral-500">{formatValue(value)}</span>
+          <span className="shrink-0 text-xs font-medium tabular-nums text-neutral-500">
+            {formatCompact(value)}
+          </span>
         )}
       </header>
 
       <div
         ref={setNodeRef}
-        className={`flex min-h-[120px] flex-col gap-sm rounded-lg border p-sm transition ${
-          isOver ? "border-brand-500 bg-brand-50/40" : "border-neutral-900/10 bg-neutral-50"
+        className={`flex min-h-[140px] flex-1 flex-col gap-sm rounded-lg border p-sm transition-colors duration-100 ${
+          isOver ? "border-brand-400 bg-brand-50/60" : "border-neutral-200 bg-neutral-100/60"
         }`}
       >
-        <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (
-            <SortableLeadCard key={lead.id} lead={lead} onOpen={() => onOpen(lead)} />
+            <SortableLeadCard key={lead.id} lead={lead} onOpen={onOpen} />
           ))}
         </SortableContext>
 
         <button
-          onClick={onAdd}
-          className="rounded-md px-sm py-xs text-left text-xs font-medium text-neutral-500 transition hover:bg-white hover:text-neutral-900"
+          type="button"
+          onClick={() => onAdd({ lead: null, stage })}
+          className="flex h-[32px] items-center justify-center gap-xs rounded-md text-xs font-medium text-neutral-500 transition-colors duration-100 hover:bg-white hover:text-neutral-900"
         >
-          + Add lead
+          <Icon name="plus" size={13} />
+          Add lead
         </button>
       </div>
+    </div>
+  );
+});
+
+/** Mirrors the real board's geometry so nothing shifts when data lands. */
+function BoardSkeleton() {
+  return (
+    <div className="-mx-md flex gap-md overflow-hidden px-md sm:-mx-lg sm:px-lg">
+      {LEAD_STAGES.map((stage, column) => (
+        <div key={stage} className="flex w-[264px] shrink-0 flex-col">
+          <span className={`h-[3px] rounded-full ${STAGE_META[stage].bar} opacity-40`} />
+          <div className="px-xs py-sm">
+            <Skeleton className="h-[14px] w-[88px]" />
+          </div>
+          <div className="flex flex-col gap-sm rounded-lg border border-neutral-200 bg-neutral-100/60 p-sm">
+            {Array.from({ length: column % 2 === 0 ? 2 : 1 }).map((_, i) => (
+              <Skeleton key={i} className="h-[86px] w-full" />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

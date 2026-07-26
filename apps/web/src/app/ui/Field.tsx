@@ -6,13 +6,18 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 
-/** Shared input chrome, so text/select/textarea can't drift apart visually. */
-const controlClass =
-  "rounded-md border border-neutral-900/15 bg-white px-md py-sm text-sm text-neutral-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 aria-[invalid=true]:border-red-500";
+/**
+ * Form controls. One `control` string shared by input/select/textarea, so they
+ * can't drift apart and the browser reuses a single style rule for all of them.
+ */
+const control =
+  "w-full rounded-md border border-neutral-200 bg-white px-md text-sm text-neutral-900 transition-colors duration-100 placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-500/20";
+
+const inputHeight = "h-[36px]";
 
 function Label({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="text-sm font-medium text-neutral-900">
+    <label htmlFor={htmlFor} className="text-xs font-medium text-neutral-600">
       {children}
     </label>
   );
@@ -20,7 +25,7 @@ function Label({ htmlFor, children }: { htmlFor?: string; children: ReactNode })
 
 function ErrorText({ id, children }: { id?: string; children: ReactNode }) {
   return (
-    <p id={id} className="text-sm text-red-600">
+    <p id={id} className="text-xs text-danger-600">
       {children}
     </p>
   );
@@ -31,9 +36,8 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
-/** Labeled text input with inline validation message. */
 export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { label, error, id, name, ...props },
+  { label, error, id, name, className = "", ...props },
   ref,
 ) {
   const inputId = id ?? name;
@@ -48,7 +52,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
         ref={ref}
         aria-invalid={error ? true : undefined}
         aria-describedby={errorId}
-        className={controlClass}
+        className={`${control} ${inputHeight} ${className}`}
         {...props}
       />
       {error && <ErrorText id={errorId}>{error}</ErrorText>}
@@ -61,9 +65,8 @@ interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
 }
 
-/** Labeled `<select>` matching Field's chrome. */
 export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(function SelectField(
-  { label, error, id, name, children, ...props },
+  { label, error, id, name, children, className = "", ...props },
   ref,
 ) {
   const inputId = id ?? name;
@@ -78,7 +81,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         ref={ref}
         aria-invalid={error ? true : undefined}
         aria-describedby={errorId}
-        className={controlClass}
+        className={`${control} ${inputHeight} ${className}`}
         {...props}
       >
         {children}
@@ -93,9 +96,8 @@ interface TextareaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement>
   error?: string;
 }
 
-/** Labeled `<textarea>` matching Field's chrome. */
 export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>(
-  function TextareaField({ label, error, id, name, ...props }, ref) {
+  function TextareaField({ label, error, id, name, className = "", ...props }, ref) {
     const inputId = id ?? name;
     const errorId = error ? `${inputId}-error` : undefined;
 
@@ -108,7 +110,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
           ref={ref}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId}
-          className={`${controlClass} resize-y`}
+          className={`${control} resize-y py-sm ${className}`}
           {...props}
         />
         {error && <ErrorText id={errorId}>{error}</ErrorText>}

@@ -3,12 +3,12 @@ import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { loginSchema, type LoginInput } from "@go-crm/schemas";
 
+import { AuthLayout } from "../auth/AuthLayout";
+import { SsoButtons } from "../auth/SsoButtons";
 import { useAuthStore, useIsAuthenticated } from "../auth/store";
 import { ApiError, authApi } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
-import { Alert, AuthLayout, Divider } from "../components/AuthLayout";
-import { Field } from "../components/Field";
-import { SsoButtons } from "../components/SsoButtons";
+import { Alert, Button, Divider, Field } from "../ui";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -56,13 +56,9 @@ export default function Login() {
           error={errors.password?.message}
           {...register("password")}
         />
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-brand-600 px-md py-sm text-sm font-semibold text-white transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:opacity-60"
-        >
+        <Button type="submit" disabled={isSubmitting} className="mt-xs w-full">
           {isSubmitting ? "Signing in…" : "Sign in"}
-        </button>
+        </Button>
       </form>
 
       <div className="my-lg">

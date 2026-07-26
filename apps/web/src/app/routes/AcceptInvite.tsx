@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { AuthLayout } from "../auth/AuthLayout";
 import { useAuthStore } from "../auth/store";
-import { Alert, AuthLayout } from "../components/AuthLayout";
-import { Field } from "../components/Field";
 import { ApiError } from "../lib/api";
 import { orgApi } from "../org/api";
+import { Alert, Button, Field } from "../ui";
 
 /**
  * Reads the invite token from the URL fragment once, then strips it.
  *
- * The key is `invite`, not `token`: `bootstrapAuth()` claims `#token=` on boot
- * as an SSO access token, and would swallow this before the page rendered.
+ * The key is `invite`, not `token`: `bootstrapAuth()` claims `#token=` on boot as
+ * an SSO access token, and would swallow this before the page rendered.
  */
 function captureInviteToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -89,13 +89,9 @@ export default function AcceptInvite() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-brand-600 px-md py-sm text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-        >
+        <Button type="submit" disabled={submitting} className="mt-xs w-full">
           {submitting ? "Joining…" : "Join workspace"}
-        </button>
+        </Button>
       </form>
     </AuthLayout>
   );

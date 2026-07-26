@@ -1,25 +1,28 @@
 import { LEAD_STAGES, type LeadStage } from "@go-crm/schemas";
 
+import type { Tone } from "../ui";
+
 export { LEAD_STAGES };
 export type { LeadStage };
 
 interface StageMeta {
   label: string;
-  /** Small colour chip on the column header — the only colour on the board. */
-  dot: string;
+  tone: Tone;
+  /** Top rule on the column, so the board reads left-to-right as a funnel. */
+  bar: string;
 }
 
 /**
- * Display metadata per stage. Kept out of the shared package because it is
- * presentation, not contract; the server owns which stages exist.
+ * Display metadata per stage. Presentation only — the server owns which stages
+ * exist; this maps them onto design-system tones.
  */
 export const STAGE_META: Record<LeadStage, StageMeta> = {
-  new: { label: "New", dot: "bg-neutral-500" },
-  contacted: { label: "Contacted", dot: "bg-brand-500" },
-  qualified: { label: "Qualified", dot: "bg-brand-600" },
-  proposal: { label: "Proposal", dot: "bg-amber-500" },
-  won: { label: "Won", dot: "bg-emerald-500" },
-  lost: { label: "Lost", dot: "bg-red-500" },
+  new: { label: "New", tone: "neutral", bar: "bg-neutral-300" },
+  contacted: { label: "Contacted", tone: "info", bar: "bg-info-500" },
+  qualified: { label: "Qualified", tone: "brand", bar: "bg-brand-500" },
+  proposal: { label: "Proposal", tone: "warning", bar: "bg-warning-500" },
+  won: { label: "Won", tone: "success", bar: "bg-success-500" },
+  lost: { label: "Lost", tone: "danger", bar: "bg-danger-500" },
 };
 
 export function stageLabel(stage: string): string {
@@ -38,23 +41,32 @@ export const LEAD_SOURCES = [
 ] as const;
 
 /**
+ * One shared formatter instance rather than a new Intl.NumberFormat per call —
+ * constructing one is comparatively expensive and a board can format hundreds of
+ * values per render.
+ */
+const compact = new Intl.NumberFormat(undefined, {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+const plain = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+
+/**
  * Values have no currency column yet, so they are formatted as plain grouped
  * numbers rather than asserting a currency the data doesn't carry.
  */
 export function formatValue(value: number | null | undefined): string {
   if (value === null || value === undefined) return "—";
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+  return plain.format(value);
+}
+
+/** Compact form for tight spots: column headers and card badges. */
+export function formatCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || value === 0) return "—";
+  return compact.format(value);
 }
 
 /** "Ada Lovelace" from the card's parts, falling back to the first name. */
 export function fullName(firstName: string, lastName?: string | null): string {
   return lastName ? `${firstName} ${lastName}` : firstName;
-}
-
-/** Initials for the owner avatar chip. */
-export function initials(nameOrEmail: string): string {
-  const parts = nameOrEmail.trim().split(/[\s@._-]+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
 }
