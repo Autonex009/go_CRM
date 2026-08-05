@@ -49,31 +49,9 @@ export const LEAD_SOURCES = [
   "Other",
 ] as const;
 
-/**
- * One shared formatter instance rather than a new Intl.NumberFormat per call —
- * constructing one is comparatively expensive and a board can format hundreds of
- * values per render.
- */
-const compact = new Intl.NumberFormat(undefined, {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const plain = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-
-/**
- * Values have no currency column yet, so they are formatted as plain grouped
- * numbers rather than asserting a currency the data doesn't carry.
- */
-export function formatValue(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return plain.format(value);
-}
-
-/** Compact form for tight spots: column headers and card badges. */
-export function formatCompact(value: number | null | undefined): string {
-  if (value === null || value === undefined || value === 0) return "—";
-  return compact.format(value);
-}
+// Money formatting moved to lib/money.ts once amounts gained a currency
+// (migration 000006) — it needs the workspace's code, which this module has no
+// business knowing about.
 
 /** "Ada Lovelace" from the card's parts, falling back to the first name. */
 export function fullName(firstName: string, lastName?: string | null): string {

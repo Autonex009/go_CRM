@@ -3,7 +3,9 @@ import { useState } from "react";
 
 import { useAuthStore } from "../auth/store";
 import { ApiError } from "../lib/api";
+import { COMMON_CURRENCIES } from "../lib/money";
 import { memberLabel, orgApi, type NewInvitation } from "../org/api";
+import { useWorkspaceStore } from "../org/workspace";
 import {
   Alert,
   Avatar,
@@ -13,6 +15,7 @@ import {
   CardHeader,
   Field,
   PageHeader,
+  SelectField,
   Skeleton,
 } from "../ui";
 
@@ -55,6 +58,8 @@ export default function Team() {
         title="Team"
         subtitle="People in your workspace. Anyone here can be assigned leads."
       />
+
+      <WorkspaceSettings />
 
       <div className="grid gap-md lg:grid-cols-2">
         <Card padded={false}>
@@ -161,6 +166,93 @@ export default function Team() {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Workspace name and currency. Currency lives here because it is org-wide: every
+ * amount on every board is denominated in it, so it isn't a per-record choice.
+ */
+function WorkspaceSettings() {
+  const queryClient = useQueryClient();
+  const workspace = useQuery({
+    queryKey: ["workspace"],
+    queryFn: orgApi.workspace,
+    staleTime: 10 * 60_000,
+  });
+
+  const [name, setName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const save = useMutation({
+    mutationFn: (patch: { name?: string; currency?: string }) => orgApi.updateWorkspace(patch),
+    onSuccess: (updated) => {
+      // Refresh the store every money formatter reads from, plus anything showing
+      // an amount.
+      useWorkspaceStore.getState().set({ name: updated.name, currency: updated.currency });
+      void queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      setError(null);
+      setSaved(true);
+    },
+    onError: (err) => {
+      setSaved(false);
+      setError(err instanceof ApiError ? err.message : "Could not save settings");
+    },
+  });
+
+  const current = workspace.data;
+  // `null` means untouched, so the field follows the server until edited.
+  const nameValue = name ?? current?.name ?? "";
+
+  return (
+    <Card>
+      <CardHeader
+        title="Workspace"
+        subtitle="The name and currency used across every board and total."
+      />
+
+      {error && (
+        <div className="mt-md">
+          <Alert>{error}</Alert>
+        </div>
+      )}
+
+      <div className="mt-md grid items-end gap-md sm:grid-cols-[1fr_160px_auto]">
+        <Field
+          label="Name"
+          name="workspaceName"
+          value={nameValue}
+          onChange={(e) => {
+            setName(e.target.value);
+            setSaved(false);
+          }}
+        />
+        <SelectField
+          label="Currency"
+          name="workspaceCurrency"
+          value={current?.currency ?? "USD"}
+          disabled={!current || save.isPending}
+          onChange={(e) => save.mutate({ currency: e.target.value })}
+        >
+          {/* Any 3-letter code is accepted by the API; these are the shortcuts. */}
+          {COMMON_CURRENCIES.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+          {current && !COMMON_CURRENCIES.includes(current.currency as never) && (
+            <option value={current.currency}>{current.currency}</option>
+          )}
+        </SelectField>
+        <Button
+          disabled={save.isPending || !current || nameValue.trim() === current.name}
+          onClick={() => save.mutate({ name: nameValue.trim() })}
+        >
+          {save.isPending ? "Saving…" : saved ? "Saved" : "Save"}
+        </Button>
+      </div>
+    </Card>
   );
 }
 

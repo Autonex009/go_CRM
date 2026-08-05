@@ -1,6 +1,7 @@
 import { memo } from "react";
 
-import { formatCompact } from "../leads/stages";
+import { formatMoneyCompact } from "../lib/money";
+import { useCurrency } from "../org/workspace";
 import { Avatar, Badge, Icon } from "../ui";
 import type { Deal } from "./api";
 import { daysUntil, formatDate, isClosed } from "./stages";
@@ -16,6 +17,7 @@ interface DealCardProps {
  * on a deals board the number is the point.
  */
 export const DealCard = memo(function DealCard({ deal, overlay = false }: DealCardProps) {
+  const currency = useCurrency();
   const owner = deal.ownerName?.trim() || deal.ownerEmail;
   const days = isClosed(deal.stage) ? null : daysUntil(deal.expectedCloseDate);
 
@@ -30,7 +32,7 @@ export const DealCard = memo(function DealCard({ deal, overlay = false }: DealCa
       <div className="flex items-start justify-between gap-sm">
         <p className="text-sm font-medium leading-tight text-fg">{deal.title}</p>
         <span className="shrink-0 text-sm font-semibold tabular-nums text-fg">
-          {formatCompact(deal.amount)}
+          {formatMoneyCompact(deal.amount, currency)}
         </span>
       </div>
 

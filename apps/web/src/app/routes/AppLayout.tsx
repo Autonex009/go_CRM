@@ -2,6 +2,7 @@ import { memo, useCallback } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuthStore } from "../auth/store";
+import { useWorkspaceSync } from "../org/workspace";
 import { useAppStore } from "../store";
 import { Avatar, Icon, IconButton, ThemeToggle, type IconName } from "../ui";
 
@@ -33,6 +34,10 @@ const TITLES: Record<string, string> = Object.fromEntries(
  * costs zero React renders.
  */
 export default function AppLayout() {
+  // Loads the workspace once (name + currency) and hydrates the store every
+  // money-formatting component reads from.
+  useWorkspaceSync();
+
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const drawerOpen = useAppStore((s) => s.drawerOpen);
   const setDrawerOpen = useAppStore((s) => s.setDrawerOpen);

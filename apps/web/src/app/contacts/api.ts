@@ -5,11 +5,17 @@ import type { NewContactInput } from "./schemas";
 export interface Contact {
   id: string;
   firstName: string;
-  lastName: string;
-  email: string;
+  /** Optional since migration 000006 — see contactSchema in shared/schemas. */
+  lastName: string | null;
+  email: string | null;
   phone: string | null;
   accountId: string | null;
   createdAt: string;
+}
+
+/** "Ada Lovelace", or just "Ada" when there's no surname on file. */
+export function contactName(contact: Pick<Contact, "firstName" | "lastName">): string {
+  return contact.lastName ? `${contact.firstName} ${contact.lastName}` : contact.firstName;
 }
 
 /** Mirrors contacts.Page — one page plus the totals the list UI needs. */

@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { LeadCard } from "../leads/LeadCard";
 import { LeadDialog } from "../leads/LeadDialog";
 import { leadsApi, type Lead, type LeadInput } from "../leads/api";
-import { LEAD_COLUMNS, formatCompact, type LeadStage } from "../leads/stages";
+import { LEAD_COLUMNS, type LeadStage } from "../leads/stages";
+import { formatMoneyCompact } from "../lib/money";
+import { useCurrency } from "../org/workspace";
 import { ApiError } from "../lib/api";
 import { Alert, BoardSkeleton, Button, KanbanBoard, PageHeader } from "../ui";
 
@@ -14,6 +17,8 @@ import { Alert, BoardSkeleton, Button, KanbanBoard, PageHeader } from "../ui";
  */
 export default function Leads() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const currency = useCurrency();
   const query = useQuery({ queryKey: ["leads"], queryFn: leadsApi.board });
 
   const [moveError, setMoveError] = useState<string | null>(null);
@@ -59,6 +64,18 @@ export default function Leads() {
     onSuccess: invalidate,
   });
 
+  const convert = useMutation({
+    mutationFn: (id: string) => leadsApi.convert(id),
+    onSuccess: () => {
+      // Conversion touches three boards' worth of data.
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["deals"] });
+      void queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      // Land the user on the deal that was just created.
+      navigate("/deals");
+    },
+  });
+
   // Stable callbacks, so the memoised board and cards aren't invalidated on
   // every parent render.
   const onMove = useCallback(
@@ -76,8 +93,8 @@ export default function Leads() {
   );
   const columnSummary = useCallback((items: Lead[]) => {
     const value = items.reduce((sum, l) => sum + (l.value ?? 0), 0);
-    return value > 0 ? formatCompact(value) : null;
-  }, []);
+    return value > 0 ? formatMoneyCompact(value, currency) : null;
+  }, [currency]);
 
   return (
     <section className="flex flex-col gap-lg">
@@ -86,7 +103,7 @@ export default function Leads() {
         subtitle={
           query.isPending
             ? "Loading pipeline…"
-            : `${totals.count} in the pipeline · ${formatCompact(totals.open)} open value`
+            : `${totals.count} in the pipeline · ${formatMoneyCompact(totals.open, currency)} open`
         }
         action={
           <Button icon="plus" onClick={() => setDialog({ lead: null, stage: "new" })}>
@@ -123,6 +140,9 @@ export default function Leads() {
           defaultStage={dialog.stage}
           onClose={() => setDialog(null)}
           onSubmit={(input) => save.mutateAsync({ id: dialog.lead?.id, input })}
+          onConvert={
+            dialog.lead ? () => convert.mutateAsync(dialog.lead!.id) : undefined
+          }
           onDelete={
             dialog.lead
               ? () => {

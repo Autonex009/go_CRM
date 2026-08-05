@@ -5,7 +5,8 @@ import { DealCard } from "../deals/DealCard";
 import { DealDialog } from "../deals/DealDialog";
 import { dealsApi, type Deal, type DealInput } from "../deals/api";
 import { DEAL_COLUMNS, type DealStage } from "../deals/stages";
-import { formatCompact } from "../leads/stages";
+import { formatMoneyCompact } from "../lib/money";
+import { useCurrency } from "../org/workspace";
 import { ApiError } from "../lib/api";
 import { Alert, BoardSkeleton, Button, KanbanBoard, PageHeader } from "../ui";
 
@@ -15,6 +16,7 @@ import { Alert, BoardSkeleton, Button, KanbanBoard, PageHeader } from "../ui";
  */
 export default function Deals() {
   const queryClient = useQueryClient();
+  const currency = useCurrency();
   const query = useQuery({ queryKey: ["deals"], queryFn: dealsApi.board });
 
   const [moveError, setMoveError] = useState<string | null>(null);
@@ -79,8 +81,8 @@ export default function Deals() {
   );
   const columnSummary = useCallback((items: Deal[]) => {
     const amount = items.reduce((sum, d) => sum + d.amount, 0);
-    return amount > 0 ? formatCompact(amount) : null;
-  }, []);
+    return amount > 0 ? formatMoneyCompact(amount, currency) : null;
+  }, [currency]);
 
   return (
     <section className="flex flex-col gap-lg">
@@ -89,9 +91,10 @@ export default function Deals() {
         subtitle={
           query.isPending
             ? "Loading pipeline…"
-            : `${totals.count} deal${totals.count === 1 ? "" : "s"} · ${formatCompact(
+            : `${totals.count} deal${totals.count === 1 ? "" : "s"} · ${formatMoneyCompact(
                 totals.open,
-              )} open · ${formatCompact(totals.won)} won`
+                currency,
+              )} open · ${formatMoneyCompact(totals.won, currency)} won`
         }
         action={
           <Button icon="plus" onClick={() => setDialog({ deal: null, stage: "lead" })}>

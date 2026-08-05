@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { contactsApi } from "../contacts/api";
+import { contactName, contactsApi } from "../contacts/api";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
@@ -135,7 +135,7 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
           <option value="">—</option>
           {(contacts.data?.items ?? []).map((c) => (
             <option key={c.id} value={c.id}>
-              {c.firstName} {c.lastName}
+              {contactName(c)}
             </option>
           ))}
         </SelectField>

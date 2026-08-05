@@ -18,11 +18,21 @@ interface LeadDialogProps {
   onClose: () => void;
   onSubmit: (input: LeadInput) => Promise<unknown>;
   onDelete?: () => void;
+  /** Convert to a deal. Absent in create mode. */
+  onConvert?: () => Promise<unknown>;
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-export function LeadDialog({ lead, defaultStage, onClose, onSubmit, onDelete }: LeadDialogProps) {
+export function LeadDialog({
+  lead,
+  defaultStage,
+  onClose,
+  onSubmit,
+  onDelete,
+  onConvert,
+}: LeadDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
 
   // Populates the owner picker. Members are stable, so this is usually a cache
   // hit shared with the Team page.
@@ -78,13 +88,54 @@ export function LeadDialog({ lead, defaultStage, onClose, onSubmit, onDelete }: 
         {formError && <Alert>{formError}</Alert>}
 
         {lead && (
-          <div className="flex items-center gap-sm">
+          <div className="flex flex-wrap items-center gap-sm">
             <Badge tone={STAGE_META[lead.stage].tone} dot>
               {stageLabel(lead.stage)}
             </Badge>
-            <span className="text-xs text-fg-subtle">
-              Created {new Date(lead.createdAt).toLocaleDateString()}
-            </span>
+            {lead.convertedAt ? (
+              <Badge tone="success" dot>
+                Converted {new Date(lead.convertedAt).toLocaleDateString()}
+              </Badge>
+            ) : (
+              <span className="text-xs text-fg-subtle">
+                Created {new Date(lead.createdAt).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Conversion is the one action here that creates other records, so it
+            gets its own panel rather than sitting among the fields. */}
+        {lead && onConvert && !lead.convertedAt && (
+          <div className="flex flex-wrap items-center justify-between gap-sm rounded-md border border-line bg-surface-muted/60 p-md">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-fg">Ready to move forward?</p>
+              <p className="mt-[2px] text-xs text-fg-muted">
+                Creates a contact and a deal, and marks this lead won.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="deals"
+              disabled={converting}
+              onClick={async () => {
+                setFormError(null);
+                setConverting(true);
+                try {
+                  await onConvert();
+                  onClose();
+                } catch (err) {
+                  setFormError(
+                    err instanceof ApiError ? err.message : "Could not convert this lead",
+                  );
+                } finally {
+                  setConverting(false);
+                }
+              }}
+            >
+              {converting ? "Converting…" : "Convert to deal"}
+            </Button>
           </div>
         )}
 

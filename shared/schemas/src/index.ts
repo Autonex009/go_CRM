@@ -5,12 +5,17 @@ import { z } from "zod";
  * Mirror the backend domain contracts here.
  */
 
+/**
+ * Only the first name is required. Surname and email became optional in
+ * migration 000006 so a lead — which only requires a first name — can be
+ * converted into a contact; mononyms and phone-only contacts are also just real.
+ */
 export const contactSchema = z.object({
   id: z.string().uuid().optional(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().optional(),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().max(100).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().max(40).optional(),
   accountId: z.string().uuid().optional(),
 });
 export type Contact = z.infer<typeof contactSchema>;

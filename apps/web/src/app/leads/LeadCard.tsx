@@ -2,7 +2,9 @@ import { memo } from "react";
 
 import { Avatar, Badge, Icon } from "../ui";
 import type { Lead } from "./api";
-import { formatCompact, fullName } from "./stages";
+import { formatMoneyCompact } from "../lib/money";
+import { useCurrency } from "../org/workspace";
+import { fullName } from "./stages";
 
 interface LeadCardProps {
   lead: Lead;
@@ -19,6 +21,7 @@ interface LeadCardProps {
  * with it, only the cards whose props actually changed.
  */
 export const LeadCard = memo(function LeadCard({ lead, overlay = false }: LeadCardProps) {
+  const currency = useCurrency();
   const owner = lead.ownerName?.trim() || lead.ownerEmail;
 
   return (
@@ -35,7 +38,7 @@ export const LeadCard = memo(function LeadCard({ lead, overlay = false }: LeadCa
         </p>
         {lead.value !== null && lead.value > 0 && (
           <span className="shrink-0 rounded-sm bg-surface-muted px-xs py-[1px] text-xs font-semibold tabular-nums text-fg">
-            {formatCompact(lead.value)}
+            {formatMoneyCompact(lead.value, currency)}
           </span>
         )}
       </div>

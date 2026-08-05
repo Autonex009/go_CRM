@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { contactsApi, PAGE_SIZE, type Contact } from "../contacts/api";
+import { contactName, contactsApi, PAGE_SIZE, type Contact } from "../contacts/api";
 import { newContactSchema, type NewContactInput } from "../contacts/schemas";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
@@ -101,7 +101,7 @@ export default function Contacts() {
                     contact={contact}
                     disabled={remove.isPending}
                     onDelete={() => {
-                      if (window.confirm(`Delete ${contact.firstName} ${contact.lastName}?`)) {
+                      if (window.confirm(`Delete ${contactName(contact)}?`)) {
                         remove.mutate(contact.id);
                       }
                     }}
@@ -153,7 +153,7 @@ function Row({
   onDelete: () => void;
   disabled: boolean;
 }) {
-  const name = `${contact.firstName} ${contact.lastName}`;
+  const name = contactName(contact);
   return (
     <tr className="border-b border-line transition-colors duration-100 last:border-0 hover:bg-surface-hover">
       <td className="px-lg py-sm">
@@ -162,7 +162,7 @@ function Row({
           <span className="font-medium text-fg">{name}</span>
         </span>
       </td>
-      <td className="px-lg py-sm text-fg-muted">{contact.email}</td>
+      <td className="px-lg py-sm text-fg-muted">{contact.email ?? "—"}</td>
       <td className="px-lg py-sm text-fg-muted">{contact.phone ?? "—"}</td>
       <td className="px-lg py-sm text-right">
         <Button variant="ghost" size="sm" onClick={onDelete} disabled={disabled}>

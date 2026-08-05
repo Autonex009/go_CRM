@@ -4,9 +4,11 @@ import { Link } from "react-router-dom";
 
 import { useAuthStore } from "../auth/store";
 import { STAGE_META as DEAL_META, stageLabel as dealStageLabel } from "../deals/stages";
-import { STAGE_META as LEAD_META, formatCompact, formatValue, stageLabel as leadStageLabel } from "../leads/stages";
+import { STAGE_META as LEAD_META, stageLabel as leadStageLabel } from "../leads/stages";
 import { ApiError } from "../lib/api";
 import { dashboardApi, type Pipeline } from "../lib/dashboard";
+import { formatMoney, formatMoneyCompact } from "../lib/money";
+import { useCurrency } from "../org/workspace";
 import {
   Alert,
   Card,
@@ -27,6 +29,7 @@ import {
  */
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
+  const currency = useCurrency();
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: dashboardApi.summary,
@@ -68,14 +71,14 @@ export default function Dashboard() {
           accent
           label="Open deals"
           icon="trend"
-          value={data ? formatValue(data.deals.open) : undefined}
+          value={data ? formatMoney(data.deals.open, currency) : undefined}
           hint={winRate ?? "Not yet won or lost"}
           to="/deals"
         />
         <StatTile
           label="Lead pipeline"
           icon="leads"
-          value={data ? formatValue(data.leads.open) : undefined}
+          value={data ? formatMoney(data.leads.open, currency) : undefined}
           hint={data ? `${data.leads.total} leads` : undefined}
           to="/leads"
         />
@@ -95,6 +98,7 @@ export default function Dashboard() {
 
       <div className="grid gap-md lg:grid-cols-2">
         <PipelineCard
+          currency={currency}
           title="Deals by stage"
           subtitle="Where revenue is sitting"
           to="/deals"
@@ -106,6 +110,7 @@ export default function Dashboard() {
           emptyText="No deals yet. Create one to start tracking revenue."
         />
         <PipelineCard
+          currency={currency}
           title="Leads by stage"
           subtitle="Share of leads in each stage"
           to="/leads"
@@ -122,6 +127,7 @@ export default function Dashboard() {
 }
 
 interface PipelineCardProps {
+  currency: string;
   title: string;
   subtitle: string;
   to: string;
@@ -139,6 +145,7 @@ interface PipelineCardProps {
  * have different stages but an identical summary shape.
  */
 function PipelineCard({
+  currency,
   title,
   subtitle,
   to,
@@ -172,7 +179,7 @@ function PipelineCard({
           ))}
         </div>
       ) : pipeline && pipeline.total > 0 ? (
-        <Funnel pipeline={pipeline} meta={meta} label={label} />
+        <Funnel pipeline={pipeline} meta={meta} label={label} currency={currency} />
       ) : (
         <div className="mt-lg">
           <EmptyState icon={emptyIcon} title="Nothing here yet" description={emptyText} />
@@ -192,7 +199,8 @@ function Funnel({
   pipeline,
   meta,
   label,
-}: Pick<PipelineCardProps, "meta" | "label"> & { pipeline: Pipeline }) {
+  currency,
+}: Pick<PipelineCardProps, "meta" | "label" | "currency"> & { pipeline: Pipeline }) {
   const { stages, total, won } = pipeline;
 
   return (
@@ -229,7 +237,7 @@ function Funnel({
               </span>
 
               <span className="w-[84px] shrink-0 text-right tabular-nums text-fg-muted">
-                {s.count} · {formatCompact(s.value)}
+                {s.count} · {formatMoneyCompact(s.value, currency)}
               </span>
             </li>
           );
@@ -238,7 +246,7 @@ function Funnel({
 
       {won > 0 && (
         <p className="mt-md border-t border-line pt-md text-xs text-fg-muted">
-          Won so far: <span className="font-semibold text-fg">{formatValue(won)}</span>
+          Won so far: <span className="font-semibold text-fg">{formatMoney(won, currency)}</span>
         </p>
       )}
     </>

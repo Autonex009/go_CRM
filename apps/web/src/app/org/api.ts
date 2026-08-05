@@ -24,9 +24,22 @@ export interface NewInvitation extends Invitation {
   inviteUrl: string;
 }
 
+/** Mirrors org.Workspace — the organization's own settings. */
+export interface Workspace {
+  id: string;
+  name: string;
+  /** ISO 4217 code every amount in this workspace is denominated in. */
+  currency: string;
+}
+
 const BASE = "/api/v1/org";
 
 export const orgApi = {
+  workspace: () => apiFetch<Workspace>(BASE),
+
+  updateWorkspace: (patch: { name?: string; currency?: string }) =>
+    apiFetch<Workspace>(BASE, { method: "PATCH", body: JSON.stringify(patch) }),
+
   members: () => apiFetch<Member[]>(`${BASE}/members`),
 
   invitations: () => apiFetch<Invitation[]>(`${BASE}/invitations`),
