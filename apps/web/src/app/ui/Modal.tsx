@@ -41,7 +41,7 @@ export function Modal({ title, onClose, children, headerAction, size = "lg" }: M
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center overflow-y-auto bg-neutral-900/30 p-md backdrop-blur-[2px] sm:p-xl"
+      className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center overflow-y-auto bg-overlay/40 p-md backdrop-blur-[2px] sm:p-xl"
       onClick={onClose}
     >
       <div
@@ -49,10 +49,10 @@ export function Modal({ title, onClose, children, headerAction, size = "lg" }: M
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`w-full animate-scale-in rounded-xl border border-neutral-200 bg-white shadow-lg ${SIZES[size]}`}
+        className={`w-full animate-scale-in rounded-xl border border-line bg-surface shadow-lg ${SIZES[size]}`}
       >
-        <header className="flex items-center justify-between gap-md border-b border-neutral-200 px-lg py-md">
-          <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
+        <header className="flex items-center justify-between gap-md border-b border-line px-lg py-md">
+          <h2 className="text-sm font-semibold text-fg">{title}</h2>
           <div className="flex items-center gap-sm">
             {headerAction}
             <IconButton name="close" label="Close" onClick={onClose} />

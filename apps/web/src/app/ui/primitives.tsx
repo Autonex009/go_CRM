@@ -19,7 +19,7 @@ interface CardProps {
 export function Card({ children, className = "", padded = true, as: Tag = "div" }: CardProps) {
   return (
     <Tag
-      className={`rounded-lg border border-neutral-200 bg-white shadow-sm ${
+      className={`rounded-lg border border-line bg-surface shadow-sm ${
         padded ? "p-lg" : ""
       } ${className}`}
     >
@@ -43,8 +43,8 @@ export function CardHeader({
   return (
     <div className={`flex items-start justify-between gap-md ${className}`}>
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
-        {subtitle && <p className="mt-[2px] text-xs text-neutral-500">{subtitle}</p>}
+        <h2 className="text-sm font-semibold text-fg">{title}</h2>
+        {subtitle && <p className="mt-[2px] text-xs text-fg-muted">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -67,8 +67,8 @@ export function PageHeader({
   return (
     <header className="flex flex-wrap items-end justify-between gap-md">
       <div className="min-w-0">
-        <h1 className="text-lg font-semibold tracking-[-0.01em] text-neutral-900">{title}</h1>
-        {subtitle && <p className="mt-xs text-sm text-neutral-500">{subtitle}</p>}
+        <h1 className="text-lg font-semibold tracking-[-0.01em] text-fg">{title}</h1>
+        {subtitle && <p className="mt-xs text-sm text-fg-muted">{subtitle}</p>}
       </div>
       {action}
     </header>
@@ -81,15 +81,22 @@ export function PageHeader({
 
 type Tone = "neutral" | "brand" | "success" | "warning" | "danger" | "info";
 
+/**
+ * Tone → semantic pair. Each tone has a soft fill and a readable foreground in
+ * both themes, which is the whole reason these are variables: a light-mode chip
+ * fill (#ecfdf5) is unreadable on a dark surface, so the variable flips instead
+ * of the class.
+ */
 const TONES: Record<Tone, string> = {
-  neutral: "bg-neutral-100 text-neutral-600",
-  brand: "bg-brand-50 text-brand-700",
-  success: "bg-success-50 text-success-700",
-  warning: "bg-warning-50 text-warning-700",
-  danger: "bg-danger-50 text-danger-700",
-  info: "bg-info-50 text-info-700",
+  neutral: "bg-surface-muted text-fg-muted",
+  brand: "bg-accent-soft text-accent-on",
+  success: "bg-ok-soft text-ok-fg",
+  warning: "bg-warn-soft text-warn-fg",
+  danger: "bg-bad-soft text-bad-fg",
+  info: "bg-infoTone-soft text-infoTone-fg",
 };
 
+/** Solid dots stay on the fixed ramps — a 500 reads on both canvases. */
 const DOTS: Record<Tone, string> = {
   neutral: "bg-neutral-400",
   brand: "bg-brand-500",
@@ -141,14 +148,15 @@ export function initials(nameOrEmail: string): string {
 
 /**
  * Deterministic tint per person, so the same user is always the same colour
- * without storing one. Cheap string hash over a fixed palette.
+ * without storing one. Cheap string hash over the tone palette, which means the
+ * tints follow the theme too.
  */
 const AVATAR_TINTS = [
-  "bg-brand-100 text-brand-700",
-  "bg-info-50 text-info-700",
-  "bg-success-50 text-success-700",
-  "bg-warning-50 text-warning-700",
-  "bg-danger-50 text-danger-700",
+  "bg-accent-soft text-accent-on",
+  "bg-infoTone-soft text-infoTone-fg",
+  "bg-ok-soft text-ok-fg",
+  "bg-warn-soft text-warn-fg",
+  "bg-bad-soft text-bad-fg",
 ];
 
 function tintFor(key: string): string {
@@ -188,14 +196,11 @@ export const Avatar = memo(function Avatar({
 /* Feedback                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** Inline error banner. Replaces the old auth-only Alert. */
 export function Alert({ children, tone = "danger" }: { children: ReactNode; tone?: Tone }) {
   const styles =
-    tone === "danger"
-      ? "border-danger-500/30 bg-danger-50 text-danger-700"
-      : "border-brand-500/30 bg-brand-50 text-brand-700";
+    tone === "danger" ? "bg-bad-soft text-bad-fg" : "bg-accent-soft text-accent-on";
   return (
-    <p role="alert" className={`rounded-md border px-md py-sm text-sm ${styles}`}>
+    <p role="alert" className={`rounded-md px-md py-sm text-sm ${styles}`}>
       {children}
     </p>
   );
@@ -213,14 +218,14 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50/60 px-lg py-xl text-center">
+    <div className="flex flex-col items-center rounded-lg border border-dashed border-line-strong bg-surface-muted/50 px-lg py-xl text-center">
       {icon && (
-        <span className="mb-md flex h-[36px] w-[36px] items-center justify-center rounded-full bg-white text-neutral-400 shadow-sm">
+        <span className="mb-md flex h-[36px] w-[36px] items-center justify-center rounded-full border border-line bg-surface text-fg-subtle">
           <Icon name={icon} size={18} />
         </span>
       )}
-      <p className="text-sm font-medium text-neutral-900">{title}</p>
-      {description && <p className="mt-xs max-w-[36ch] text-xs text-neutral-500">{description}</p>}
+      <p className="text-sm font-medium text-fg">{title}</p>
+      {description && <p className="mt-xs max-w-[36ch] text-xs text-fg-muted">{description}</p>}
       {action && <div className="mt-md">{action}</div>}
     </div>
   );
@@ -235,20 +240,20 @@ export function Skeleton({ className = "" }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`relative block overflow-hidden rounded-md bg-neutral-100 ${className}`}
+      className={`relative block overflow-hidden rounded-md bg-surface-muted ${className}`}
     >
-      <span className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+      <span className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-surface-hover to-transparent" />
     </span>
   );
 }
 
 export function Divider({ children }: { children?: ReactNode }) {
-  if (!children) return <hr className="border-neutral-200" />;
+  if (!children) return <hr className="border-line" />;
   return (
-    <div className="flex items-center gap-md text-xs uppercase tracking-wide text-neutral-400">
-      <span className="h-px flex-1 bg-neutral-200" />
+    <div className="flex items-center gap-md text-xs uppercase tracking-wide text-fg-subtle">
+      <span className="h-px flex-1 bg-line" />
       {children}
-      <span className="h-px flex-1 bg-neutral-200" />
+      <span className="h-px flex-1 bg-line" />
     </div>
   );
 }

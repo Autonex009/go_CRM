@@ -11,10 +11,63 @@ const px = (values: Record<string, number>) =>
  * Everything here is compile-time: Tailwind emits only the classes actually used,
  * so a richer token set costs nothing at runtime.
  */
+/**
+ * Semantic aliases backed by CSS custom properties (apps/web/src/styles/theme.css).
+ *
+ * Components style against these, never against a raw ramp, so a theme switch is
+ * a variable swap rather than a second set of `dark:` classes on every element.
+ * `<alpha-value>` keeps modifiers like `bg-surface/60` working.
+ */
+const semantic = {
+  canvas: "rgb(var(--canvas) / <alpha-value>)",
+  surface: {
+    DEFAULT: "rgb(var(--surface) / <alpha-value>)",
+    muted: "rgb(var(--surface-muted) / <alpha-value>)",
+    hover: "rgb(var(--surface-hover) / <alpha-value>)",
+  },
+  line: {
+    DEFAULT: "rgb(var(--line) / <alpha-value>)",
+    strong: "rgb(var(--line-strong) / <alpha-value>)",
+  },
+  fg: {
+    DEFAULT: "rgb(var(--fg) / <alpha-value>)",
+    muted: "rgb(var(--fg-muted) / <alpha-value>)",
+    subtle: "rgb(var(--fg-subtle) / <alpha-value>)",
+  },
+  accent: {
+    DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+    hover: "rgb(var(--accent-hover) / <alpha-value>)",
+    soft: "rgb(var(--accent-soft) / <alpha-value>)",
+    on: "rgb(var(--accent-on) / <alpha-value>)",
+  },
+  ok: {
+    soft: "rgb(var(--ok-soft) / <alpha-value>)",
+    fg: "rgb(var(--ok-fg) / <alpha-value>)",
+  },
+  warn: {
+    soft: "rgb(var(--warn-soft) / <alpha-value>)",
+    fg: "rgb(var(--warn-fg) / <alpha-value>)",
+  },
+  bad: {
+    soft: "rgb(var(--bad-soft) / <alpha-value>)",
+    fg: "rgb(var(--bad-fg) / <alpha-value>)",
+    solid: "rgb(var(--bad-solid) / <alpha-value>)",
+  },
+  infoTone: {
+    soft: "rgb(var(--info-soft) / <alpha-value>)",
+    fg: "rgb(var(--info-fg) / <alpha-value>)",
+  },
+  overlay: "rgb(var(--overlay) / <alpha-value>)",
+} as const;
+
 const preset: Partial<Config> = {
+  // Class strategy, not media: the app offers an explicit light/dark/system
+  // choice, which a media query alone can't express.
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
+        ...semantic,
         brand: colors.brand,
         neutral: colors.neutral,
         success: colors.success,

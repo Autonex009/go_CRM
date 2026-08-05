@@ -72,9 +72,9 @@ export default function Register() {
       </div>
       <SsoButtons />
 
-      <p className="mt-lg text-center text-sm text-neutral-500">
+      <p className="mt-lg text-center text-sm text-fg-muted">
         Already have an account?{" "}
-        <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">
+        <Link to="/login" className="font-medium text-accent hover:text-accent-on">
           Sign in
         </Link>
       </p>

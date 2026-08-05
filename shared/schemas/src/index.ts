@@ -15,12 +15,25 @@ export const contactSchema = z.object({
 });
 export type Contact = z.infer<typeof contactSchema>;
 
+/**
+ * The deal lifecycle, in pipeline order. Deliberately shorter than LEAD_STAGES —
+ * a deal has no "contacted" step. Must stay in sync with
+ * services/internal/deals/service.go (Stages) and the CHECK constraint in
+ * migration 000005.
+ */
+export const DEAL_STAGES = ["lead", "qualified", "proposal", "won", "lost"] as const;
+export type DealStage = (typeof DEAL_STAGES)[number];
+
 export const dealSchema = z.object({
   id: z.string().uuid().optional(),
-  title: z.string().min(1),
+  title: z.string().min(1).max(160),
+  description: z.string().max(5000).optional(),
   amount: z.number().nonnegative(),
-  stage: z.enum(["lead", "qualified", "proposal", "won", "lost"]),
-  accountId: z.string().uuid(),
+  stage: z.enum(DEAL_STAGES),
+  ownerUserId: z.string().uuid().optional(),
+  contactId: z.string().uuid().optional(),
+  expectedCloseDate: z.string().optional(),
+  accountId: z.string().uuid().optional(),
 });
 export type Deal = z.infer<typeof dealSchema>;
 

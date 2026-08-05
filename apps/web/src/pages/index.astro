@@ -1,17 +1,41 @@
 ---
-// Static, SEO-friendly marketing landing page.
+// Static, SEO-friendly marketing landing page. Ships zero client JS beyond the
+// theme boot script in the layout.
+import Base from "../layouts/Base.astro";
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>go-CRM</title>
-  </head>
-  <body>
-    <main>
-      <h1>go-CRM</h1>
-      <p>Marketing page. The dashboard lives at <a href="/app">/app</a>.</p>
-    </main>
-  </body>
-</html>
+<Base title="go-CRM">
+  <main class="mx-auto flex min-h-screen max-w-[640px] flex-col justify-center px-lg">
+    <span class="flex items-center gap-sm">
+      <span
+        class="flex h-[30px] w-[30px] items-center justify-center rounded-md bg-accent text-sm font-bold text-white"
+      >
+        g
+      </span>
+      <span class="text-sm font-semibold tracking-[-0.01em] text-fg">go-CRM</span>
+    </span>
+
+    <h1 class="mt-xl text-3xl font-semibold tracking-[-0.02em] text-fg">
+      The CRM your team actually keeps open.
+    </h1>
+    <p class="mt-md text-base text-fg-muted">
+      Leads on a board that moves the way your pipeline does. Contacts, deals and the people
+      who own them — in one workspace.
+    </p>
+
+    <div class="mt-xl flex flex-wrap gap-sm">
+      <a
+        href="/app"
+        class="inline-flex h-[36px] items-center rounded-md bg-accent px-lg text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+      >
+        Open the app
+      </a>
+      <a
+        href="/app/register"
+        class="inline-flex h-[36px] items-center rounded-md border border-line bg-surface px-lg text-sm font-medium text-fg transition-colors hover:bg-surface-hover"
+      >
+        Create an account
+      </a>
+    </div>
+  </main>
+</Base>

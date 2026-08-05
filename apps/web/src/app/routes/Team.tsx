@@ -64,7 +64,7 @@ export default function Team() {
               subtitle={members.data ? `${members.data.length} in this workspace` : undefined}
             />
           </div>
-          <ul className="border-t border-neutral-200">
+          <ul className="border-t border-line">
             {members.isPending &&
               Array.from({ length: 2 }).map((_, i) => (
                 <li key={i} className="px-lg py-md">
@@ -74,12 +74,12 @@ export default function Team() {
             {(members.data ?? []).map((m) => (
               <li
                 key={m.id}
-                className="flex items-center gap-md border-b border-neutral-200 px-lg py-md last:border-0"
+                className="flex items-center gap-md border-b border-line px-lg py-md last:border-0"
               >
                 <Avatar name={memberLabel(m)} title={m.email} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-neutral-900">{memberLabel(m)}</p>
-                  {m.name && <p className="truncate text-xs text-neutral-500">{m.email}</p>}
+                  <p className="truncate text-sm font-medium text-fg">{memberLabel(m)}</p>
+                  {m.name && <p className="truncate text-xs text-fg-muted">{m.email}</p>}
                 </div>
                 {m.id === currentUserId && (
                   <span className="ml-auto">
@@ -133,15 +133,15 @@ export default function Team() {
               <div className="px-lg py-md">
                 <CardHeader title="Pending invitations" />
               </div>
-              <ul className="border-t border-neutral-200">
+              <ul className="border-t border-line">
                 {pending.map((inv) => (
                   <li
                     key={inv.id}
-                    className="flex items-center justify-between gap-md border-b border-neutral-200 px-lg py-md last:border-0"
+                    className="flex items-center justify-between gap-md border-b border-line px-lg py-md last:border-0"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-neutral-900">{inv.email}</p>
-                      <p className="text-xs text-neutral-500">
+                      <p className="truncate text-sm text-fg">{inv.email}</p>
+                      <p className="text-xs text-fg-muted">
                         Expires {new Date(inv.expiresAt).toLocaleDateString()}
                       </p>
                     </div>
@@ -151,7 +151,7 @@ export default function Team() {
                       onClick={() => revoke.mutate(inv.id)}
                       disabled={revoke.isPending}
                     >
-                      <span className="text-danger-600">Revoke</span>
+                      <span className="text-bad-fg">Revoke</span>
                     </Button>
                   </li>
                 ))}
@@ -185,15 +185,15 @@ function InviteLink({
   };
 
   return (
-    <div className="mt-md rounded-md border border-brand-200 bg-brand-50/60 p-md">
-      <p className="text-sm font-medium text-neutral-900">
+    <div className="mt-md rounded-md border border-accent/30 bg-accent-soft/60 p-md">
+      <p className="text-sm font-medium text-fg">
         Invitation for {invitation.email} created
       </p>
-      <p className="mt-xs text-xs text-neutral-500">
+      <p className="mt-xs text-xs text-fg-muted">
         Shown once — copy it now, it can&apos;t be retrieved later.
       </p>
       <div className="mt-sm flex items-center gap-sm">
-        <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-sm border border-neutral-200 bg-white px-sm py-xs text-xs text-neutral-700">
+        <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-sm border border-line bg-surface px-sm py-xs text-xs text-fg">
           {invitation.inviteUrl}
         </code>
         <Button variant="secondary" size="sm" icon={copied ? "check" : undefined} onClick={copy}>

@@ -1,0 +1,47 @@
+---
+// Shared document shell. Owns the theme boot so both the marketing page and the
+// app shell resolve the theme identically.
+import "../styles/theme.css";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+
+    {/*
+      Theme applied before first paint.
+
+      This has to be an inline, blocking script: if the class were set from React
+      (or any deferred script) the browser would paint the light theme first and
+      a dark-mode user would see a white flash on every navigation. `is:inline`
+      keeps Astro from bundling it into a module.
+
+      Reads a plain localStorage string rather than a serialized store, so the
+      shape stays trivial for this script to parse — see app/ui/theme.ts.
+    */}
+    <script is:inline>
+      (() => {
+        try {
+          const stored = localStorage.getItem("gocrm.theme") || "system";
+          const dark =
+            stored === "dark" ||
+            (stored === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch {
+          /* Private mode / storage disabled: fall back to the light default. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

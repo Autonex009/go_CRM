@@ -11,13 +11,13 @@ import type {
  * can't drift apart and the browser reuses a single style rule for all of them.
  */
 const control =
-  "w-full rounded-md border border-neutral-200 bg-white px-md text-sm text-neutral-900 transition-colors duration-100 placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 aria-[invalid=true]:border-danger-500 aria-[invalid=true]:ring-danger-500/20";
+  "w-full rounded-md border border-line bg-surface px-md text-sm text-fg transition-colors duration-100 placeholder:text-fg-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 aria-[invalid=true]:border-bad-solid aria-[invalid=true]:ring-bad-solid/25";
 
 const inputHeight = "h-[36px]";
 
 function Label({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="text-xs font-medium text-neutral-600">
+    <label htmlFor={htmlFor} className="text-xs font-medium text-fg-muted">
       {children}
     </label>
   );
@@ -25,7 +25,7 @@ function Label({ htmlFor, children }: { htmlFor?: string; children: ReactNode })
 
 function ErrorText({ id, children }: { id?: string; children: ReactNode }) {
   return (
-    <p id={id} className="text-xs text-danger-600">
+    <p id={id} className="text-xs text-bad-fg">
       {children}
     </p>
   );

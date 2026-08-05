@@ -9,6 +9,14 @@ export { Icon, type IconName } from "./Icon";
 export { Modal } from "./Modal";
 export { StatTile } from "./StatTile";
 export {
+  KanbanBoard,
+  type KanbanColumnDef,
+  type KanbanItem,
+} from "./kanban/KanbanBoard";
+export { BoardSkeleton } from "./kanban/BoardSkeleton";
+export { ThemeToggle } from "./ThemeToggle";
+export { useSystemThemeSync, useThemeStore, type Theme } from "./theme";
+export {
   Alert,
   Avatar,
   Badge,

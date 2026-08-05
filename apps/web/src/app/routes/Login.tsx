@@ -66,9 +66,9 @@ export default function Login() {
       </div>
       <SsoButtons />
 
-      <p className="mt-lg text-center text-sm text-neutral-500">
+      <p className="mt-lg text-center text-sm text-fg-muted">
         Don&apos;t have an account?{" "}
-        <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
+        <Link to="/register" className="font-medium text-accent hover:text-accent-on">
           Create one
         </Link>
       </p>

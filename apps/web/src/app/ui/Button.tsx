@@ -9,17 +9,14 @@ type Size = "sm" | "md";
 /**
  * Variant styles as a static lookup, not a runtime string builder.
  *
- * These are plain constants so Tailwind's scanner sees every class literally and
- * the browser reuses the same style rules across every button on the page —
- * nothing is computed per render.
+ * Every colour is a semantic token, so these strings serve light and dark mode
+ * without a single `dark:` variant — the theme swaps the CSS variables underneath.
  */
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    "bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800 disabled:bg-brand-300",
-  secondary:
-    "bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-50 hover:border-neutral-300 active:bg-neutral-100",
-  ghost: "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900",
-  danger: "bg-white text-danger-600 border border-danger-500/30 hover:bg-danger-50",
+  primary: "bg-accent text-white shadow-sm hover:bg-accent-hover active:bg-accent-hover",
+  secondary: "bg-surface text-fg border border-line hover:bg-surface-hover hover:border-line-strong",
+  ghost: "text-fg-muted hover:bg-surface-hover hover:text-fg",
+  danger: "bg-bad-soft text-bad-fg hover:bg-bad-soft/70",
 };
 
 const SIZES: Record<Size, string> = {
@@ -28,7 +25,7 @@ const SIZES: Record<Size, string> = {
 };
 
 const BASE =
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-70";
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 disabled:cursor-not-allowed disabled:opacity-60";
 
 interface CommonProps {
   variant?: Variant;

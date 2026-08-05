@@ -30,12 +30,12 @@ export const StatTile = memo(function StatTile({
   const body = (
     <>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+        <span className="text-xs font-medium uppercase tracking-wide text-fg-muted">
           {label}
         </span>
         <span
           className={`flex h-[28px] w-[28px] items-center justify-center rounded-md ${
-            accent ? "bg-white/15 text-white" : "bg-neutral-100 text-neutral-500"
+            accent ? "bg-white/20 text-white" : "bg-surface-muted text-fg-muted"
           }`}
         >
           <Icon name={icon} size={15} />
@@ -47,7 +47,7 @@ export const StatTile = memo(function StatTile({
       ) : (
         <p
           className={`mt-md text-2xl font-semibold tabular-nums tracking-[-0.02em] ${
-            accent ? "text-white" : "text-neutral-900"
+            accent ? "text-white" : "text-fg"
           }`}
         >
           {value}
@@ -55,14 +55,14 @@ export const StatTile = memo(function StatTile({
       )}
 
       {hint && (
-        <p className={`mt-xs text-xs ${accent ? "text-brand-100" : "text-neutral-500"}`}>{hint}</p>
+        <p className={`mt-xs text-xs ${accent ? "text-accent-on" : "text-fg-muted"}`}>{hint}</p>
       )}
     </>
   );
 
   const surface = accent
-    ? "bg-brand-600 border-brand-600 text-white shadow-md"
-    : "bg-white border-neutral-200 shadow-sm";
+    ? "bg-accent border-brand-600 text-white shadow-md"
+    : "bg-surface border-line shadow-sm";
   const className = `rounded-lg border p-lg transition-shadow duration-100 ${surface}`;
 
   if (!to) return <div className={className}>{body}</div>;

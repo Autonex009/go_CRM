@@ -1,22 +1,27 @@
 import { apiFetch } from "./api";
-import type { LeadStage } from "../leads/stages";
 
 /** Mirrors dashboard.StageSummary. */
 export interface StageSummary {
-  stage: LeadStage;
+  stage: string;
   count: number;
   value: number;
+}
+
+/** Mirrors dashboard.Pipeline — one board's totals. */
+export interface Pipeline {
+  total: number;
+  /** Value of everything not yet won or lost. */
+  open: number;
+  won: number;
+  stages: StageSummary[];
 }
 
 /** Mirrors dashboard.Summary — the whole landing page in one request. */
 export interface Summary {
   contacts: number;
   members: number;
-  leads: number;
-  stages: StageSummary[];
-  /** Value of every lead not yet won or lost. */
-  openPipeline: number;
-  wonValue: number;
+  leads: Pipeline;
+  deals: Pipeline;
 }
 
 export const dashboardApi = {
