@@ -69,7 +69,7 @@ export function LeadDialog({ lead, defaultStage, onClose, onSubmit, onDelete }: 
       headerAction={
         onDelete && (
           <Button variant="ghost" size="sm" onClick={onDelete}>
-            <span className="text-danger-600">Delete</span>
+            <span className="text-bad-fg">Delete</span>
           </Button>
         )
       }
@@ -82,7 +82,7 @@ export function LeadDialog({ lead, defaultStage, onClose, onSubmit, onDelete }: 
             <Badge tone={STAGE_META[lead.stage].tone} dot>
               {stageLabel(lead.stage)}
             </Badge>
-            <span className="text-xs text-neutral-400">
+            <span className="text-xs text-fg-subtle">
               Created {new Date(lead.createdAt).toLocaleDateString()}
             </span>
           </div>
