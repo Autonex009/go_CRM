@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { AccountSelect } from "../accounts/AccountSelect";
 import { contactName, contactsApi } from "../contacts/api";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
@@ -52,6 +53,7 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
       contactId: deal?.contactId ?? "",
       // A native date input needs exactly YYYY-MM-DD.
       expectedCloseDate: deal?.expectedCloseDate?.slice(0, 10) ?? "",
+      accountId: deal?.accountId ?? "",
     },
   });
 
@@ -131,14 +133,18 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
           </SelectField>
         </div>
 
-        <SelectField label="Contact" error={errors.contactId?.message} {...register("contactId")}>
-          <option value="">—</option>
-          {(contacts.data?.items ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {contactName(c)}
-            </option>
-          ))}
-        </SelectField>
+        <div className="grid gap-md sm:grid-cols-2">
+          <SelectField label="Contact" error={errors.contactId?.message} {...register("contactId")}>
+            <option value="">—</option>
+            {(contacts.data?.items ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {contactName(c)}
+              </option>
+            ))}
+          </SelectField>
+
+          <AccountSelect error={errors.accountId?.message} {...register("accountId")} />
+        </div>
 
         <TextareaField
           label="Description"

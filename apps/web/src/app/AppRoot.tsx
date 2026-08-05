@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { bootstrapAuth } from "./auth/bootstrap";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import AcceptInvite from "./routes/AcceptInvite";
+import Accounts from "./routes/Accounts";
 import AppLayout from "./routes/AppLayout";
 import Contacts from "./routes/Contacts";
 import Dashboard from "./routes/Dashboard";
@@ -45,6 +46,7 @@ export default function AppRoot() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/leads" element={<Leads />} />
               <Route path="/deals" element={<Deals />} />
+              <Route path="/accounts" element={<Accounts />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/team" element={<Team />} />
               {/* Add quotes, invoices routes here */}

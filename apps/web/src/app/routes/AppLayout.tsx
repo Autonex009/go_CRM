@@ -1,6 +1,7 @@
 import { memo, useCallback } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
+import { endSession } from "../auth/session";
 import { useAuthStore } from "../auth/store";
 import { useWorkspaceSync } from "../org/workspace";
 import { useAppStore } from "../store";
@@ -17,6 +18,7 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: "dashboard", end: true },
   { to: "/leads", label: "Leads", icon: "leads", end: false },
   { to: "/deals", label: "Deals", icon: "deals", end: false },
+  { to: "/accounts", label: "Accounts", icon: "building", end: false },
   { to: "/contacts", label: "Contacts", icon: "contacts", end: false },
   { to: "/team", label: "Team", icon: "team", end: false },
 ];
@@ -167,13 +169,15 @@ const Sidebar = memo(function Sidebar({
 const Topbar = memo(function Topbar({ title }: { title: string }) {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+
   const setDrawerOpen = useAppStore((s) => s.setDrawerOpen);
 
-  const onSignOut = useCallback(() => {
-    logout();
+  const onSignOut = useCallback(async () => {
+    // Revokes the refresh token server-side, so the session is dead even if a
+    // copy of the cookie survives somewhere.
+    await endSession();
     navigate("/login", { replace: true });
-  }, [logout, navigate]);
+  }, [navigate]);
 
   const label = user?.name?.trim() || user?.email || "";
 

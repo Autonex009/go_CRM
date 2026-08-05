@@ -59,7 +59,8 @@ export default function AcceptInvite() {
     setError(null);
     try {
       const { token: access, user } = await orgApi.accept(token, name, password);
-      // Accepting signs the teammate straight in — no round trip to the login form.
+      // Accepting signs the teammate straight in — no round trip to the login
+      // form. The refresh cookie came back on the same response.
       setSession(access, user);
       navigate("/", { replace: true });
     } catch (err) {

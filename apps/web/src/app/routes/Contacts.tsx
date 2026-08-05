@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { AccountSelect } from "../accounts/AccountSelect";
 import { contactName, contactsApi, PAGE_SIZE, type Contact } from "../contacts/api";
 import { newContactSchema, type NewContactInput } from "../contacts/schemas";
 import { ApiError } from "../lib/api";
@@ -228,6 +229,8 @@ function NewContactDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
             {...register("phone")}
           />
         </div>
+
+        <AccountSelect error={errors.accountId?.message} {...register("accountId")} />
 
         <div className="flex justify-end gap-sm">
           <Button variant="secondary" onClick={onClose}>

@@ -23,6 +23,7 @@ export const dealFormSchema = z.object({
   contactId: z.string().optional(),
   // A native date input gives "" or YYYY-MM-DD.
   expectedCloseDate: z.string().optional(),
+  accountId: z.string().optional(),
 });
 
 export type DealFormValues = z.infer<typeof dealFormSchema>;
@@ -42,5 +43,6 @@ export function toPayload(values: DealFormValues): DealInput {
     ownerUserId: text(values.ownerUserId),
     contactId: text(values.contactId),
     expectedCloseDate: text(values.expectedCloseDate),
+    accountId: text(values.accountId),
   };
 }

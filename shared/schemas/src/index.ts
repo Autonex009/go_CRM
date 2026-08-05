@@ -6,6 +6,22 @@ import { z } from "zod";
  */
 
 /**
+ * An "account" is a company the tenant sells to — not the tenant itself, which is
+ * an organization. Only the name is required; the rest is filled in as you learn
+ * about the company.
+ */
+export const accountSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1).max(160),
+  website: z.string().max(255).optional(),
+  industry: z.string().max(80).optional(),
+  phone: z.string().max(40).optional(),
+  notes: z.string().max(5000).optional(),
+  ownerUserId: z.string().uuid().optional(),
+});
+export type Account = z.infer<typeof accountSchema>;
+
+/**
  * Only the first name is required. Surname and email became optional in
  * migration 000006 so a lead — which only requires a first name — can be
  * converted into a contact; mononyms and phone-only contacts are also just real.

@@ -37,6 +37,7 @@ export interface DealInput {
   contactId?: string;
   /** Date-only ISO string (YYYY-MM-DD) or omitted. */
   expectedCloseDate?: string;
+  accountId?: string;
 }
 
 const BASE = "/api/v1/deals";

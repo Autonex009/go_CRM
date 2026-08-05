@@ -1,3 +1,4 @@
+import { refreshSession } from "../auth/session";
 import { useAuthStore } from "../auth/store";
 import type { AuthResponse } from "../auth/types";
 import { API_URL, AUTH_BASE } from "./config";
@@ -35,26 +36,20 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
   return data as T;
 }
 
+/**
+ * Public auth calls. `credentials: "include"` so the refresh cookie the server
+ * sets on login/register is actually stored by the browser.
+ */
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
   return request<T>(`${AUTH_BASE}${path}`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
 }
 
-/**
- * Authenticated call to the gateway: attaches the bearer token from the session
- * store to `path` (an absolute API path such as "/api/v1/contacts").
- *
- * On 401 it clears the session rather than redirecting by hand — ProtectedRoute
- * is subscribed to the store, so the next render sends the user to /login. That
- * also covers the case an idle tab can't detect on its own: a token that expired
- * while nothing was rendering.
- */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = useAuthStore.getState().token;
-
+function buildInit(init: RequestInit, token: string | null): RequestInit {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (init.body !== undefined) {
@@ -63,14 +58,32 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
+  return { ...init, credentials: "include", headers };
+}
+
+/**
+ * Authenticated call to the gateway: attaches the bearer token from the session
+ * store to `path` (an absolute API path such as "/api/v1/contacts").
+ *
+ * On 401 it tries **one** silent refresh and replays the request. That is what
+ * makes a 15-minute access token invisible: the token expiring mid-session costs
+ * one extra round-trip, not a trip to the login screen. If the refresh fails the
+ * session is cleared, and ProtectedRoute — subscribed to the store — redirects on
+ * the next render.
+ */
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const url = `${API_URL}${path}`;
 
   try {
-    return await request<T>(`${API_URL}${path}`, { ...init, headers });
+    return await request<T>(url, buildInit(init, useAuthStore.getState().token));
   } catch (err) {
-    if (err instanceof ApiError && err.status === 401) {
-      useAuthStore.getState().logout();
-    }
-    throw err;
+    if (!(err instanceof ApiError) || err.status !== 401) throw err;
+
+    // Single-flight inside refreshSession, so parallel 401s rotate once.
+    const recovered = await refreshSession();
+    if (!recovered) throw err;
+
+    return request<T>(url, buildInit(init, useAuthStore.getState().token));
   }
 }
 
@@ -84,7 +97,8 @@ export const authApi = {
 /**
  * Full-page navigation target that starts the provider redirect flow. The
  * gateway redirects to the provider and, after the callback, back to
- * `/app#token=<jwt>` (captured by captureTokenFromHash).
+ * `/app#token=<jwt>` (captured by captureTokenFromHash) with the refresh cookie
+ * already set.
  */
 export function ssoUrl(provider: "google" | "github"): string {
   return `${AUTH_BASE}/sso/${provider}`;
