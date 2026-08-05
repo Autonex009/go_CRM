@@ -7,10 +7,12 @@ import AcceptInvite from "./routes/AcceptInvite";
 import AppLayout from "./routes/AppLayout";
 import Contacts from "./routes/Contacts";
 import Dashboard from "./routes/Dashboard";
+import Deals from "./routes/Deals";
 import Leads from "./routes/Leads";
 import Login from "./routes/Login";
 import Register from "./routes/Register";
 import Team from "./routes/Team";
+import { useSystemThemeSync } from "./ui";
 
 // SSO returns with the token in the URL fragment; capture it before the first
 // render so an authenticated return doesn't flash the login screen.
@@ -23,6 +25,10 @@ const queryClient = new QueryClient();
  * TanStack Query provides server-state; React Router owns /app/* navigation.
  */
 export default function AppRoot() {
+  // The theme class is already on <html> from the inline boot script; this only
+  // keeps it in step if the OS preference changes while "system" is selected.
+  useSystemThemeSync();
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename="/app">
@@ -38,9 +44,10 @@ export default function AppRoot() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/leads" element={<Leads />} />
+              <Route path="/deals" element={<Deals />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/team" element={<Team />} />
-              {/* Add deals, quotes, invoices routes here */}
+              {/* Add quotes, invoices routes here */}
             </Route>
           </Route>
 

@@ -86,7 +86,7 @@ export default function Contacts() {
         <Card padded={false} className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+              <thead className="border-b border-line bg-canvas text-xs uppercase tracking-wide text-fg-muted">
                 <tr>
                   <th className="px-lg py-sm font-medium">Name</th>
                   <th className="px-lg py-sm font-medium">Email</th>
@@ -115,7 +115,7 @@ export default function Contacts() {
 
       {total > PAGE_SIZE && (
         <nav className="flex items-center justify-between text-sm">
-          <span className="text-xs text-neutral-500 tabular-nums">
+          <span className="text-xs text-fg-muted tabular-nums">
             {offset + 1}–{offset + showing} of {total}
           </span>
           <div className="flex gap-sm">
@@ -155,18 +155,18 @@ function Row({
 }) {
   const name = `${contact.firstName} ${contact.lastName}`;
   return (
-    <tr className="border-b border-neutral-200 transition-colors duration-100 last:border-0 hover:bg-neutral-50">
+    <tr className="border-b border-line transition-colors duration-100 last:border-0 hover:bg-surface-hover">
       <td className="px-lg py-sm">
         <span className="flex items-center gap-sm">
           <Avatar name={name} size="xs" />
-          <span className="font-medium text-neutral-900">{name}</span>
+          <span className="font-medium text-fg">{name}</span>
         </span>
       </td>
-      <td className="px-lg py-sm text-neutral-500">{contact.email}</td>
-      <td className="px-lg py-sm text-neutral-500">{contact.phone ?? "—"}</td>
+      <td className="px-lg py-sm text-fg-muted">{contact.email}</td>
+      <td className="px-lg py-sm text-fg-muted">{contact.phone ?? "—"}</td>
       <td className="px-lg py-sm text-right">
         <Button variant="ghost" size="sm" onClick={onDelete} disabled={disabled}>
-          <span className="text-danger-600">Delete</span>
+          <span className="text-bad-fg">Delete</span>
         </Button>
       </td>
     </tr>

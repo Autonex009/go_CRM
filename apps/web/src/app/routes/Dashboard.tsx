@@ -3,9 +3,10 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuthStore } from "../auth/store";
-import { STAGE_META, formatCompact, formatValue, stageLabel } from "../leads/stages";
+import { STAGE_META as DEAL_META, stageLabel as dealStageLabel } from "../deals/stages";
+import { STAGE_META as LEAD_META, formatCompact, formatValue, stageLabel as leadStageLabel } from "../leads/stages";
 import { ApiError } from "../lib/api";
-import { dashboardApi, type StageSummary } from "../lib/dashboard";
+import { dashboardApi, type Pipeline } from "../lib/dashboard";
 import {
   Alert,
   Card,
@@ -17,6 +18,7 @@ import {
   Skeleton,
   StatTile,
   buttonClass,
+  type Tone,
 } from "../ui";
 
 /**
@@ -28,18 +30,18 @@ export default function Dashboard() {
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: dashboardApi.summary,
-    // Counts don't need to be to-the-second; this avoids a refetch every time
-    // the user tabs back to the dashboard.
+    // Counts don't need to be to-the-second; avoids a refetch every time the
+    // user tabs back to the dashboard.
     staleTime: 30_000,
   });
   const data = query.data;
 
   const firstName = user?.name?.trim().split(" ")[0] ?? user?.email?.split("@")[0];
 
-  const conversion = useMemo(() => {
-    if (!data || data.leads === 0) return undefined;
-    const won = data.stages.find((s) => s.stage === "won")?.count ?? 0;
-    return `${Math.round((won / data.leads) * 100)}%`;
+  const winRate = useMemo(() => {
+    if (!data || data.deals.total === 0) return undefined;
+    const won = data.deals.stages.find((s) => s.stage === "won")?.count ?? 0;
+    return `${Math.round((won / data.deals.total) * 100)}% won`;
   }, [data]);
 
   return (
@@ -48,9 +50,9 @@ export default function Dashboard() {
         title={firstName ? `Welcome back, ${firstName}` : "Dashboard"}
         subtitle="Your pipeline at a glance."
         action={
-          <Link to="/leads" className={buttonClass({ variant: "secondary" })}>
-            <Icon name="leads" size={16} />
-            Open board
+          <Link to="/deals" className={buttonClass({ variant: "secondary" })}>
+            <Icon name="deals" size={16} />
+            Open deals
           </Link>
         }
       />
@@ -64,17 +66,17 @@ export default function Dashboard() {
       <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
           accent
-          label="Open pipeline"
+          label="Open deals"
           icon="trend"
-          value={data ? formatValue(data.openPipeline) : undefined}
-          hint="Not yet won or lost"
-          to="/leads"
+          value={data ? formatValue(data.deals.open) : undefined}
+          hint={winRate ?? "Not yet won or lost"}
+          to="/deals"
         />
         <StatTile
-          label="Leads"
+          label="Lead pipeline"
           icon="leads"
-          value={data ? String(data.leads) : undefined}
-          hint={conversion ? `${conversion} won` : undefined}
+          value={data ? formatValue(data.leads.open) : undefined}
+          hint={data ? `${data.leads.total} leads` : undefined}
           to="/leads"
         />
         <StatTile
@@ -91,72 +93,92 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-md lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader
-            title="Pipeline by stage"
-            subtitle="Share of leads currently sitting in each stage"
-            action={
-              <Link
-                to="/leads"
-                className="text-xs font-medium text-brand-600 transition-colors hover:text-brand-700"
-              >
-                Open board →
-              </Link>
-            }
-          />
-
-          {query.isPending ? (
-            <div className="mt-lg flex flex-col gap-sm">
-              <Skeleton className="h-[10px] w-full" />
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-[18px] w-full" />
-              ))}
-            </div>
-          ) : data && data.leads > 0 ? (
-            <Funnel stages={data.stages} total={data.leads} />
-          ) : (
-            <div className="mt-lg">
-              <EmptyState
-                icon="leads"
-                title="No leads yet"
-                description="Add your first lead to start tracking the pipeline."
-                action={
-                  <Link to="/leads">
-                    <span className="text-xs font-medium text-brand-600 hover:text-brand-700">
-                      Go to the board →
-                    </span>
-                  </Link>
-                }
-              />
-            </div>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader title="Won" subtitle="Closed value so far" />
-          <p className="mt-lg text-2xl font-semibold tabular-nums tracking-[-0.02em] text-neutral-900">
-            {data ? formatValue(data.wonValue) : "—"}
-          </p>
-          {data && (
-            <dl className="mt-lg flex flex-col gap-sm border-t border-neutral-200 pt-md text-xs">
-              {(["won", "lost"] as const).map((stage) => {
-                const row = data.stages.find((s) => s.stage === stage);
-                return (
-                  <div key={stage} className="flex items-center gap-sm">
-                    <Dot tone={STAGE_META[stage].tone} />
-                    <dt className="text-neutral-600">{stageLabel(stage)}</dt>
-                    <dd className="ml-auto tabular-nums text-neutral-500">
-                      {row?.count ?? 0} · {formatCompact(row?.value ?? 0)}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
-          )}
-        </Card>
+      <div className="grid gap-md lg:grid-cols-2">
+        <PipelineCard
+          title="Deals by stage"
+          subtitle="Where revenue is sitting"
+          to="/deals"
+          pipeline={data?.deals}
+          loading={query.isPending}
+          meta={DEAL_META}
+          label={dealStageLabel}
+          emptyIcon="deals"
+          emptyText="No deals yet. Create one to start tracking revenue."
+        />
+        <PipelineCard
+          title="Leads by stage"
+          subtitle="Share of leads in each stage"
+          to="/leads"
+          pipeline={data?.leads}
+          loading={query.isPending}
+          meta={LEAD_META}
+          label={leadStageLabel}
+          emptyIcon="leads"
+          emptyText="No leads yet. Add your first one to start tracking the pipeline."
+        />
       </div>
     </section>
+  );
+}
+
+interface PipelineCardProps {
+  title: string;
+  subtitle: string;
+  to: string;
+  pipeline?: Pipeline;
+  loading: boolean;
+  /** Stage → tone/bar map for whichever pipeline this is. */
+  meta: Record<string, { tone: Tone; bar: string }>;
+  label: (stage: string) => string;
+  emptyIcon: "leads" | "deals";
+  emptyText: string;
+}
+
+/**
+ * One pipeline breakdown. Shared by the deals and leads cards — the two boards
+ * have different stages but an identical summary shape.
+ */
+function PipelineCard({
+  title,
+  subtitle,
+  to,
+  pipeline,
+  loading,
+  meta,
+  label,
+  emptyIcon,
+  emptyText,
+}: PipelineCardProps) {
+  return (
+    <Card>
+      <CardHeader
+        title={title}
+        subtitle={subtitle}
+        action={
+          <Link
+            to={to}
+            className="text-xs font-medium text-accent transition-colors hover:text-accent-on"
+          >
+            Open board →
+          </Link>
+        }
+      />
+
+      {loading ? (
+        <div className="mt-lg flex flex-col gap-sm">
+          <Skeleton className="h-[10px] w-full" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-[18px] w-full" />
+          ))}
+        </div>
+      ) : pipeline && pipeline.total > 0 ? (
+        <Funnel pipeline={pipeline} meta={meta} label={label} />
+      ) : (
+        <div className="mt-lg">
+          <EmptyState icon={emptyIcon} title="Nothing here yet" description={emptyText} />
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -166,17 +188,23 @@ export default function Dashboard() {
  * No charting library: recharts/chart.js would add 100–300 kB and a canvas or SVG
  * render pass for what two flex containers and a width percentage express exactly.
  */
-function Funnel({ stages, total }: { stages: StageSummary[]; total: number }) {
+function Funnel({
+  pipeline,
+  meta,
+  label,
+}: Pick<PipelineCardProps, "meta" | "label"> & { pipeline: Pipeline }) {
+  const { stages, total, won } = pipeline;
+
   return (
     <>
-      <div className="mt-lg flex h-[10px] gap-[2px] overflow-hidden rounded-full bg-neutral-100">
+      <div className="mt-lg flex h-[10px] gap-[2px] overflow-hidden rounded-full bg-surface-muted">
         {stages.map((s) =>
           s.count === 0 ? null : (
             <div
               key={s.stage}
-              className={STAGE_META[s.stage].bar}
+              className={meta[s.stage]?.bar}
               style={{ width: `${(s.count / total) * 100}%` }}
-              title={`${stageLabel(s.stage)}: ${s.count}`}
+              title={`${label(s.stage)}: ${s.count}`}
             />
           ),
         )}
@@ -187,26 +215,32 @@ function Funnel({ stages, total }: { stages: StageSummary[]; total: number }) {
           const share = total === 0 ? 0 : Math.round((s.count / total) * 100);
           return (
             <li key={s.stage} className="flex items-center gap-md text-xs">
-              <span className="flex w-[104px] shrink-0 items-center gap-sm">
-                <Dot tone={STAGE_META[s.stage].tone} />
-                <span className="font-medium text-neutral-700">{stageLabel(s.stage)}</span>
+              <span className="flex w-[92px] shrink-0 items-center gap-sm">
+                <Dot tone={meta[s.stage]?.tone ?? "neutral"} />
+                <span className="truncate font-medium text-fg-muted">{label(s.stage)}</span>
               </span>
 
               {/* Track + fill: one div each, no per-bar component. */}
-              <span className="h-[6px] flex-1 overflow-hidden rounded-full bg-neutral-100">
+              <span className="h-[6px] flex-1 overflow-hidden rounded-full bg-surface-muted">
                 <span
-                  className={`block h-full rounded-full ${STAGE_META[s.stage].bar}`}
+                  className={`block h-full rounded-full ${meta[s.stage]?.bar ?? ""}`}
                   style={{ width: `${share}%` }}
                 />
               </span>
 
-              <span className="w-[88px] shrink-0 text-right tabular-nums text-neutral-500">
+              <span className="w-[84px] shrink-0 text-right tabular-nums text-fg-muted">
                 {s.count} · {formatCompact(s.value)}
               </span>
             </li>
           );
         })}
       </ul>
+
+      {won > 0 && (
+        <p className="mt-md border-t border-line pt-md text-xs text-fg-muted">
+          Won so far: <span className="font-semibold text-fg">{formatValue(won)}</span>
+        </p>
+      )}
     </>
   );
 }

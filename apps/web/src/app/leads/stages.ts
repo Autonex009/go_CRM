@@ -1,6 +1,6 @@
 import { LEAD_STAGES, type LeadStage } from "@go-crm/schemas";
 
-import type { Tone } from "../ui";
+import type { KanbanColumnDef, Tone } from "../ui";
 
 export { LEAD_STAGES };
 export type { LeadStage };
@@ -28,6 +28,15 @@ export const STAGE_META: Record<LeadStage, StageMeta> = {
 export function stageLabel(stage: string): string {
   return STAGE_META[stage as LeadStage]?.label ?? stage;
 }
+
+/**
+ * Column definitions for the shared KanbanBoard. Module-level constant, not
+ * built per render, so the board's identity checks stay stable.
+ */
+export const LEAD_COLUMNS: readonly KanbanColumnDef[] = LEAD_STAGES.map((stage) => ({
+  key: stage,
+  ...STAGE_META[stage],
+}));
 
 /** Lead sources offered in the form. Free text on the server, a list here. */
 export const LEAD_SOURCES = [
