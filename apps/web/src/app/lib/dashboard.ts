@@ -22,6 +22,10 @@ export interface Summary {
   members: number;
   leads: Pipeline;
   deals: Pipeline;
+  /** Reuses Pipeline: open = draft+sent, won = accepted value. */
+  quotes: Pipeline;
+  /** Billing is not a pipeline — what matters is money owed. */
+  invoices: { total: number; outstanding: number; overdue: number; paid: number };
 }
 
 export const dashboardApi = {

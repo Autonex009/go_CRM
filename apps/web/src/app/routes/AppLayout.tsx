@@ -18,6 +18,8 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: "dashboard", end: true },
   { to: "/leads", label: "Leads", icon: "leads", end: false },
   { to: "/deals", label: "Deals", icon: "deals", end: false },
+  { to: "/quotes", label: "Quotes", icon: "deals", end: false },
+  { to: "/invoices", label: "Invoices", icon: "building", end: false },
   { to: "/accounts", label: "Accounts", icon: "building", end: false },
   { to: "/contacts", label: "Contacts", icon: "contacts", end: false },
   { to: "/team", label: "Team", icon: "team", end: false },

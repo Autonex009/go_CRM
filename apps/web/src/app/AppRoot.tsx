@@ -9,8 +9,12 @@ import AppLayout from "./routes/AppLayout";
 import Contacts from "./routes/Contacts";
 import Dashboard from "./routes/Dashboard";
 import Deals from "./routes/Deals";
+import InvoiceEditor from "./routes/InvoiceEditor";
+import Invoices from "./routes/Invoices";
 import Leads from "./routes/Leads";
 import Login from "./routes/Login";
+import QuoteEditor from "./routes/QuoteEditor";
+import Quotes from "./routes/Quotes";
 import Register from "./routes/Register";
 import Team from "./routes/Team";
 import { useSystemThemeSync } from "./ui";
@@ -46,10 +50,16 @@ export default function AppRoot() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/leads" element={<Leads />} />
               <Route path="/deals" element={<Deals />} />
+              <Route path="/quotes" element={<Quotes />} />
+              {/* new + :id share one editor; the route decides which */}
+              <Route path="/quotes/new" element={<QuoteEditor />} />
+              <Route path="/quotes/:id" element={<QuoteEditor />} />
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/invoices/new" element={<InvoiceEditor />} />
+              <Route path="/invoices/:id" element={<InvoiceEditor />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/team" element={<Team />} />
-              {/* Add quotes, invoices routes here */}
             </Route>
           </Route>
 
