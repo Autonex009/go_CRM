@@ -83,16 +83,26 @@ export default function Dashboard() {
           to="/leads"
         />
         <StatTile
-          label="Contacts"
-          icon="contacts"
-          value={data ? String(data.contacts) : undefined}
-          to="/contacts"
+          label="Quotes out"
+          icon="building"
+          value={data ? formatMoney(data.quotes.open, currency) : undefined}
+          hint={
+            data ? `${data.quotes.total} quote${data.quotes.total === 1 ? "" : "s"}` : undefined
+          }
+          to="/quotes"
         />
         <StatTile
-          label="Team"
-          icon="team"
-          value={data ? String(data.members) : undefined}
-          to="/team"
+          label="Outstanding"
+          icon="building"
+          value={data ? formatMoney(data.invoices.outstanding, currency) : undefined}
+          hint={
+            data && data.invoices.overdue > 0
+              ? `${formatMoney(data.invoices.overdue, currency)} overdue`
+              : data
+                ? `${formatMoney(data.invoices.paid, currency)} collected`
+                : undefined
+          }
+          to="/invoices"
         />
       </div>
 
