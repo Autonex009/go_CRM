@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { AccountSelect } from "../accounts/AccountSelect";
+import { Timeline } from "../activities/Timeline";
 import { contactName, contactsApi } from "../contacts/api";
 import { dealsApi } from "../deals/api";
 import { LineItems } from "../documents/LineItems";
@@ -496,6 +497,8 @@ export default function InvoiceEditor() {
           </ul>
         </Card>
       )}
+
+      {!isNew && id && <Timeline scope={{ invoiceId: id }} />}
 
       <Card>
         <TextareaField

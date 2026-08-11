@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { useAuthStore } from "../auth/store";
 import { STAGE_META as DEAL_META, stageLabel as dealStageLabel } from "../deals/stages";
-import { STAGE_META as LEAD_META, stageLabel as leadStageLabel } from "../leads/stages";
+import { STAGE_META as LEAD_META, stageLabel as leadStageLabel } from "../leads/api";
 import { ApiError } from "../lib/api";
 import { dashboardApi, type Pipeline } from "../lib/dashboard";
 import { formatMoney, formatMoneyCompact } from "../lib/money";

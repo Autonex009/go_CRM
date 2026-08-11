@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { AccountSelect } from "../accounts/AccountSelect";
+import { Timeline } from "../activities/Timeline";
 import { contactName, contactsApi } from "../contacts/api";
 import { dealsApi } from "../deals/api";
 import { invoicesApi } from "../invoices/api";
@@ -423,6 +424,8 @@ export default function QuoteEditor() {
           </div>
         </dl>
       </Card>
+
+      {!isNew && id && <Timeline scope={{ quoteId: id }} />}
 
       <Card>
         <TextareaField
