@@ -42,7 +42,12 @@ export function toPayload(values: DealFormValues): DealInput {
     stage: values.stage,
     ownerUserId: text(values.ownerUserId),
     contactId: text(values.contactId),
-    expectedCloseDate: text(values.expectedCloseDate),
+    // The server decodes this into a *time.Time, which only parses RFC3339 — a
+    // bare "2026-09-11" from the date input is rejected outright. Same suffix as
+    // the quote, invoice and payment forms.
+    expectedCloseDate: values.expectedCloseDate?.trim()
+      ? `${values.expectedCloseDate.trim()}T00:00:00Z`
+      : undefined,
     accountId: text(values.accountId),
   };
 }

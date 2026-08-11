@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { bootstrapAuth } from "./auth/bootstrap";
@@ -33,6 +34,13 @@ export default function AppRoot() {
   // The theme class is already on <html> from the inline boot script; this only
   // keeps it in step if the OS preference changes while "system" is selected.
   useSystemThemeSync();
+
+  // Drop the shell's boot spinner now that there is a real screen behind it.
+  // In an effect rather than during render: the removal has to happen after the
+  // first paint, or the app flashes an empty frame where the spinner had been.
+  useEffect(() => {
+    document.getElementById("app-boot")?.remove();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
