@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { AccountSelect } from "../accounts/AccountSelect";
+import { Timeline } from "../activities/Timeline";
 import { contactName, contactsApi } from "../contacts/api";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
@@ -152,6 +153,9 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
           error={errors.description?.message}
           {...register("description")}
         />
+
+        {/* Existing deals carry a history; a new one has nothing to show yet. */}
+        {deal && <Timeline scope={{ dealId: deal.id }} />}
 
         <div className="flex justify-end gap-sm">
           <Button variant="secondary" onClick={onClose}>
