@@ -190,6 +190,7 @@ export default function Leads() {
               ? "No leads match this filter right now."
               : "A lead is a person you're reaching out to, before there's a deal."
           }
+          hints={filter ? undefined : ["Follow-up dates", "One-click next step", "Convert to a deal"]}
           action={
             <Button icon="plus" size="sm" onClick={() => setDialog({ lead: null })}>
               New lead

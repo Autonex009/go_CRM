@@ -90,6 +90,7 @@ export default function Quotes() {
           icon="building"
           title={status ? `No ${STATUS_META[status].label.toLowerCase()} quotes` : "No quotes yet"}
           description="A quote is a priced document you send to a customer — line items, discounts and tax."
+          hints={["Line items & discounts", "Tax and totals", "Accepted → invoice"]}
           action={
             <Link to="/quotes/new" className={buttonClass({ size: "sm" })}>
               <Icon name="plus" size={14} />

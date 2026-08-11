@@ -211,22 +211,61 @@ export function EmptyState({
   title,
   description,
   action,
+  hints,
+  size = "md",
 }: {
   icon?: IconName;
   title: string;
   description?: string;
   action?: ReactNode;
+  /**
+   * What will show up here once there is something to show. An empty page that
+   * explains what belongs on it reads as designed; one that just says "no data"
+   * reads as unfinished.
+   */
+  hints?: string[];
+  /** `sm` for an empty state sitting inside a card, `md` for a whole page. */
+  size?: "sm" | "md";
 }) {
+  const large = size === "md";
+
   return (
-    <div className="flex flex-col items-center rounded-lg border border-dashed border-line-strong bg-surface-muted/50 px-lg py-xl text-center">
+    <div
+      className={`flex flex-col items-center rounded-lg border border-dashed border-line-strong bg-surface-muted/40 text-center ${
+        large ? "px-lg py-2xl" : "px-md py-lg"
+      }`}
+    >
       {icon && (
-        <span className="mb-md flex h-[36px] w-[36px] items-center justify-center rounded-full border border-line bg-surface text-fg-subtle">
-          <Icon name={icon} size={18} />
+        <span
+          className={`flex items-center justify-center rounded-full border border-line bg-surface text-fg-subtle ${
+            large ? "mb-md h-[44px] w-[44px]" : "mb-sm h-[32px] w-[32px]"
+          }`}
+        >
+          <Icon name={icon} size={large ? 20 : 16} />
         </span>
       )}
-      <p className="text-sm font-medium text-fg">{title}</p>
-      {description && <p className="mt-xs max-w-[36ch] text-xs text-fg-muted">{description}</p>}
-      {action && <div className="mt-md">{action}</div>}
+
+      <p className={`font-semibold text-fg ${large ? "text-base" : "text-sm"}`}>{title}</p>
+      {description && (
+        <p className={`mt-xs text-fg-muted ${large ? "max-w-[46ch] text-sm" : "max-w-[38ch] text-xs"}`}>
+          {description}
+        </p>
+      )}
+
+      {hints && hints.length > 0 && (
+        <ul className="mt-md flex flex-wrap justify-center gap-xs">
+          {hints.map((hint) => (
+            <li
+              key={hint}
+              className="rounded-full border border-line bg-surface px-md py-xs text-xs text-fg-muted"
+            >
+              {hint}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {action && <div className="mt-lg">{action}</div>}
     </div>
   );
 }
@@ -244,6 +283,25 @@ export function Skeleton({ className = "" }: { className?: string }) {
     >
       <span className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-surface-hover to-transparent" />
     </span>
+  );
+}
+
+/**
+ * Indeterminate progress, for the two cases a Skeleton can't cover: the height
+ * isn't known yet (app boot), or the content is already on screen and merely
+ * refreshing, where swapping it for grey blocks would be a downgrade.
+ *
+ * A rotating ring with one coloured edge — a single element and one transform,
+ * animated on the compositor, rather than an SVG of dashes redrawn each frame.
+ */
+export function Spinner({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <span
+      role="status"
+      aria-label="Loading"
+      style={{ width: size, height: size, borderWidth: size <= 16 ? 2 : 3 }}
+      className={`inline-block shrink-0 animate-spin rounded-full border-line border-t-accent ${className}`}
+    />
   );
 }
 

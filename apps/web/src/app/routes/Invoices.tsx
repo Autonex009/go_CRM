@@ -100,6 +100,7 @@ export default function Invoices() {
           icon="building"
           title={status ? `No ${filterLabel(status).toLowerCase()} invoices` : "No invoices yet"}
           description="Raise one from an accepted quote, or create a standalone invoice."
+          hints={["Part payments", "Outstanding balance", "Overdue tracking"]}
           action={
             <Link to="/invoices/new" className={buttonClass({ size: "sm" })}>
               <Icon name="plus" size={14} />
