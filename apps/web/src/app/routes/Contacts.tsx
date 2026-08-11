@@ -77,6 +77,7 @@ export default function Contacts() {
           icon="contacts"
           title="No contacts yet"
           description="Contacts are the people behind your deals. Add one to get started."
+          hints={["Linked to a company", "Deal history", "Full timeline"]}
           action={
             <Button icon="plus" size="sm" onClick={() => setCreating(true)}>
               New contact

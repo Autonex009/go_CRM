@@ -97,6 +97,7 @@ export default function Accounts() {
           icon="building"
           title="No accounts yet"
           description="Accounts are the companies behind your contacts and deals."
+          hints={["Leads per company", "Linked contacts", "Deal history"]}
           action={
             <Button icon="plus" size="sm" onClick={() => setDialog({ account: null })}>
               New account

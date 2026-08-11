@@ -1,11 +1,12 @@
-import { memo, useCallback } from "react";
+import { useIsFetching } from "@tanstack/react-query";
+import { memo, useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { endSession } from "../auth/session";
 import { useAuthStore } from "../auth/store";
 import { useWorkspaceSync } from "../org/workspace";
 import { useAppStore } from "../store";
-import { Avatar, Icon, IconButton, ThemeToggle, type IconName } from "../ui";
+import { Avatar, Icon, IconButton, Spinner, ThemeToggle, type IconName } from "../ui";
 
 interface NavItem {
   to: string;
@@ -194,6 +195,7 @@ const Topbar = memo(function Topbar({ title }: { title: string }) {
         className="lg:hidden"
       />
       <h1 className="truncate text-sm font-semibold tracking-[-0.01em]">{title}</h1>
+      <BusyIndicator />
 
       <div className="ml-auto flex items-center gap-sm">
         <ThemeToggle />
@@ -208,3 +210,32 @@ const Topbar = memo(function Topbar({ title }: { title: string }) {
     </header>
   );
 });
+
+/**
+ * Shows that something is loading in the background — a refetch on window focus,
+ * a mutation settling, a page's first query.
+ *
+ * Its own component on purpose: `useIsFetching` re-renders on every change to
+ * the in-flight count, and keeping that inside Topbar would re-render the title,
+ * avatar and theme toggle on every request. Here it re-renders one span.
+ *
+ * The 300 ms delay is the point of it. A fetch that resolves quickly should show
+ * nothing at all; flashing a spinner for 80 ms reads as a glitch, not as
+ * progress. Only a wait long enough to notice gets an indicator.
+ */
+function BusyIndicator() {
+  const fetching = useIsFetching();
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!fetching) {
+      setVisible(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setVisible(true), 300);
+    return () => window.clearTimeout(timer);
+  }, [fetching]);
+
+  if (!visible) return null;
+  return <Spinner size={14} className="opacity-70" />;
+}

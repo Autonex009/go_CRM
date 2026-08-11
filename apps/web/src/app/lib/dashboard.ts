@@ -16,6 +16,26 @@ export interface Pipeline {
   stages: StageSummary[];
 }
 
+/** Mirrors dashboard.Attention — one thing going wrong, or about to. */
+export interface Attention {
+  kind: "lead" | "quote" | "invoice";
+  id: string;
+  label: string;
+  detail: string;
+  /** Negative is overdue, positive is upcoming — one field sorts the queue. */
+  days: number;
+  amount: number;
+}
+
+/** Mirrors dashboard.Recent — a flattened timeline entry. */
+export interface Recent {
+  kind: string;
+  subject: string;
+  body: string;
+  actor: string;
+  at: string;
+}
+
 /** Mirrors dashboard.Summary — the whole landing page in one request. */
 export interface Summary {
   contacts: number;
@@ -26,6 +46,8 @@ export interface Summary {
   quotes: Pipeline;
   /** Billing is not a pipeline — what matters is money owed. */
   invoices: { total: number; outstanding: number; overdue: number; paid: number };
+  attention: Attention[];
+  recent: Recent[];
 }
 
 export const dashboardApi = {
