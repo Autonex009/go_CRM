@@ -1,41 +1,40 @@
 import { useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 
+import { AccountSelect } from "../accounts/AccountSelect";
+import { Timeline } from "../activities/Timeline";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
 import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField } from "../ui";
-import type { Lead, LeadInput } from "./api";
+import { LEAD_STAGES, STAGE_META, stageLabel, type Lead, type LeadInput } from "./api";
 import { leadFormSchema, toPayload, type LeadFormValues } from "./schemas";
-import { LEAD_SOURCES, LEAD_STAGES, STAGE_META, stageLabel, type LeadStage } from "./stages";
+
+/** Lead sources offered in the form. Free text on the server, a list here. */
+const LEAD_SOURCES = [
+  "Website",
+  "Referral",
+  "Cold outreach",
+  "LinkedIn",
+  "Event",
+  "Inbound call",
+  "Partner",
+  "Other",
+] as const;
 
 interface LeadDialogProps {
   /** Existing lead to edit, or null to create. */
   lead: Lead | null;
-  /** Column the new lead starts in (create mode). */
-  defaultStage: LeadStage;
   onClose: () => void;
   onSubmit: (input: LeadInput) => Promise<unknown>;
   onDelete?: () => void;
-  /** Convert to a deal. Absent in create mode. */
-  onConvert?: () => Promise<unknown>;
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-export function LeadDialog({
-  lead,
-  defaultStage,
-  onClose,
-  onSubmit,
-  onDelete,
-  onConvert,
-}: LeadDialogProps) {
+export function LeadDialog({ lead, onClose, onSubmit, onDelete }: LeadDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
-  const [converting, setConverting] = useState(false);
 
-  // Populates the owner picker. Members are stable, so this is usually a cache
-  // hit shared with the Team page.
   const members = useQuery({
     queryKey: ["members"],
     queryFn: orgApi.members,
@@ -51,14 +50,18 @@ export function LeadDialog({
     defaultValues: {
       firstName: lead?.firstName ?? "",
       lastName: lead?.lastName ?? "",
+      title: lead?.title ?? "",
       email: lead?.email ?? "",
       phone: lead?.phone ?? "",
+      linkedinUrl: lead?.linkedinUrl ?? "",
+      accountId: lead?.accountId ?? "",
       company: lead?.company ?? "",
       source: lead?.source ?? "",
       notes: lead?.notes ?? "",
       value: lead?.value ?? undefined,
-      stage: lead?.stage ?? defaultStage,
+      stage: lead?.stage ?? "new",
       ownerUserId: lead?.ownerUserId ?? "",
+      followUpAt: lead?.followUpAt?.slice(0, 10) ?? "",
     },
   });
 
@@ -71,6 +74,8 @@ export function LeadDialog({
       setFormError(err instanceof ApiError ? err.message : "Could not save this lead");
     }
   });
+
+  const converted = Boolean(lead?.convertedAt);
 
   return (
     <Modal
@@ -92,68 +97,42 @@ export function LeadDialog({
             <Badge tone={STAGE_META[lead.stage].tone} dot>
               {stageLabel(lead.stage)}
             </Badge>
-            {lead.convertedAt ? (
-              <Badge tone="success" dot>
-                Converted {new Date(lead.convertedAt).toLocaleDateString()}
-              </Badge>
-            ) : (
+            {converted && (
               <span className="text-xs text-fg-subtle">
-                Created {new Date(lead.createdAt).toLocaleDateString()}
+                Converted {new Date(lead.convertedAt!).toLocaleDateString()}
               </span>
             )}
           </div>
         )}
 
-        {/* Conversion is the one action here that creates other records, so it
-            gets its own panel rather than sitting among the fields. */}
-        {lead && onConvert && !lead.convertedAt && (
-          <div className="flex flex-wrap items-center justify-between gap-sm rounded-md border border-line bg-surface-muted/60 p-md">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-fg">Ready to move forward?</p>
-              <p className="mt-[2px] text-xs text-fg-muted">
-                Creates a contact and a deal, and marks this lead won.
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon="deals"
-              disabled={converting}
-              onClick={async () => {
-                setFormError(null);
-                setConverting(true);
-                try {
-                  await onConvert();
-                  onClose();
-                } catch (err) {
-                  setFormError(
-                    err instanceof ApiError ? err.message : "Could not convert this lead",
-                  );
-                } finally {
-                  setConverting(false);
-                }
-              }}
-            >
-              {converting ? "Converting…" : "Convert to deal"}
-            </Button>
-          </div>
-        )}
-
         <div className="grid gap-md sm:grid-cols-2">
-          <Field label="Name" error={errors.firstName?.message} {...register("firstName")} />
+          <Field label="First name" error={errors.firstName?.message} {...register("firstName")} />
           <Field label="Last name" error={errors.lastName?.message} {...register("lastName")} />
+          <Field
+            label="Job title"
+            placeholder="VP Operations"
+            error={errors.title?.message}
+            {...register("title")}
+          />
           <Field label="Email" type="email" error={errors.email?.message} {...register("email")} />
           <Field label="Phone" type="tel" error={errors.phone?.message} {...register("phone")} />
-          <Field label="Company" error={errors.company?.message} {...register("company")} />
           <Field
-            label="Estimated value"
-            type="number"
-            min={0}
-            step="any"
-            error={errors.value?.message}
-            {...register("value", { valueAsNumber: true })}
+            label="LinkedIn"
+            placeholder="linkedin.com/in/…"
+            error={errors.linkedinUrl?.message}
+            {...register("linkedinUrl")}
           />
+        </div>
 
+        <AccountSelect error={errors.accountId?.message} {...register("accountId")} />
+        <Field
+          label="Company (if not listed above)"
+          placeholder="Typed in now, linked to a company record later"
+          error={errors.company?.message}
+          {...register("company")}
+        />
+
+        <div className="grid gap-md sm:grid-cols-2">
           <SelectField label="Stage" error={errors.stage?.message} {...register("stage")}>
             {LEAD_STAGES.map((stage) => (
               <option key={stage} value={stage}>
@@ -161,6 +140,13 @@ export function LeadDialog({
               </option>
             ))}
           </SelectField>
+
+          <Field
+            label="Follow up on"
+            type="date"
+            error={errors.followUpAt?.message}
+            {...register("followUpAt")}
+          />
 
           <SelectField
             label="Owner"
@@ -183,6 +169,15 @@ export function LeadDialog({
               </option>
             ))}
           </SelectField>
+
+          <Field
+            label="Estimated value"
+            type="number"
+            min={0}
+            step="any"
+            error={errors.value?.message}
+            {...register("value", { valueAsNumber: true })}
+          />
         </div>
 
         <TextareaField label="Notes" rows={3} error={errors.notes?.message} {...register("notes")} />
@@ -196,6 +191,12 @@ export function LeadDialog({
           </Button>
         </div>
       </form>
+
+      {lead && (
+        <div className="mt-lg">
+          <Timeline scope={{ leadId: lead.id }} />
+        </div>
+      )}
     </Modal>
   );
 }
