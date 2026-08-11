@@ -2,11 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
+import { KIND_META, relativeTime, type ActivityKind } from "../activities/api";
 import { useAuthStore } from "../auth/store";
 import { STAGE_META as DEAL_META, stageLabel as dealStageLabel } from "../deals/stages";
 import { STAGE_META as LEAD_META, stageLabel as leadStageLabel } from "../leads/api";
 import { ApiError } from "../lib/api";
-import { dashboardApi, type Pipeline } from "../lib/dashboard";
+import { dashboardApi, type Attention, type Pipeline, type Recent, type Summary } from "../lib/dashboard";
 import { formatMoney, formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
 import {
@@ -20,12 +21,15 @@ import {
   Skeleton,
   StatTile,
   buttonClass,
+  type IconName,
   type Tone,
 } from "../ui";
 
 /**
- * Portal landing page. One request to /api/v1/dashboard rather than fanning out
- * to every module, so the numbers are consistent with each other.
+ * Portal landing page — a command centre rather than a set of counters.
+ *
+ * One request to /api/v1/dashboard rather than fanning out to every module, so
+ * the numbers are consistent with each other and the page costs one round trip.
  */
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
@@ -47,15 +51,21 @@ export default function Dashboard() {
     return `${Math.round((won / data.deals.total) * 100)}% won`;
   }, [data]);
 
+  // A workspace with nothing in it gets the setup guide instead of a wall of
+  // zeroes. Counters that all read 0 tell you nothing and look broken.
+  const untouched =
+    !!data &&
+    data.leads.total + data.deals.total + data.quotes.total + data.invoices.total === 0;
+
   return (
     <section className="flex flex-col gap-lg">
       <PageHeader
         title={firstName ? `Welcome back, ${firstName}` : "Dashboard"}
-        subtitle="Your pipeline at a glance."
+        subtitle={untouched ? "Let's get your workspace set up." : "What needs you today."}
         action={
-          <Link to="/deals" className={buttonClass({ variant: "secondary" })}>
-            <Icon name="deals" size={16} />
-            Open deals
+          <Link to="/leads" className={buttonClass({ variant: "secondary" })}>
+            <Icon name="leads" size={16} />
+            Open leads
           </Link>
         }
       />
@@ -66,88 +76,433 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile
-          accent
-          label="Open deals"
-          icon="trend"
-          value={data ? formatMoney(data.deals.open, currency) : undefined}
-          hint={winRate ?? "Not yet won or lost"}
-          to="/deals"
-        />
-        <StatTile
-          label="Lead pipeline"
-          icon="leads"
-          value={data ? formatMoney(data.leads.open, currency) : undefined}
-          hint={data ? `${data.leads.total} leads` : undefined}
-          to="/leads"
-        />
-        <StatTile
-          label="Quotes out"
-          icon="building"
-          value={data ? formatMoney(data.quotes.open, currency) : undefined}
-          hint={
-            data ? `${data.quotes.total} quote${data.quotes.total === 1 ? "" : "s"}` : undefined
-          }
-          to="/quotes"
-        />
-        <StatTile
-          label="Outstanding"
-          icon="building"
-          value={data ? formatMoney(data.invoices.outstanding, currency) : undefined}
-          hint={
-            data && data.invoices.overdue > 0
-              ? `${formatMoney(data.invoices.overdue, currency)} overdue`
-              : data
-                ? `${formatMoney(data.invoices.paid, currency)} collected`
-                : undefined
-          }
-          to="/invoices"
-        />
-      </div>
+      {query.isPending ? (
+        <DashboardSkeleton />
+      ) : untouched ? (
+        <FirstRun data={data} />
+      ) : (
+        data && (
+          <>
+            <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
+              <StatTile
+                accent
+                label="Open deals"
+                icon="trend"
+                value={formatMoney(data.deals.open, currency)}
+                hint={winRate ?? "Not yet won or lost"}
+                to="/deals"
+              />
+              <StatTile
+                label="Lead pipeline"
+                icon="leads"
+                value={formatMoney(data.leads.open, currency)}
+                hint={`${data.leads.total} lead${data.leads.total === 1 ? "" : "s"}`}
+                to="/leads"
+              />
+              <StatTile
+                label="Quotes out"
+                icon="deals"
+                value={formatMoney(data.quotes.open, currency)}
+                hint={`${data.quotes.total} quote${data.quotes.total === 1 ? "" : "s"}`}
+                to="/quotes"
+              />
+              <StatTile
+                label="Outstanding"
+                icon="building"
+                value={formatMoney(data.invoices.outstanding, currency)}
+                hint={
+                  data.invoices.overdue > 0
+                    ? `${formatMoney(data.invoices.overdue, currency)} overdue`
+                    : `${formatMoney(data.invoices.paid, currency)} collected`
+                }
+                to="/invoices"
+              />
+            </div>
 
-      <div className="grid gap-md lg:grid-cols-2">
-        <PipelineCard
-          currency={currency}
-          title="Deals by stage"
-          subtitle="Where revenue is sitting"
-          to="/deals"
-          pipeline={data?.deals}
-          loading={query.isPending}
-          meta={DEAL_META}
-          label={dealStageLabel}
-          emptyIcon="deals"
-          emptyText="No deals yet. Create one to start tracking revenue."
-        />
-        <PipelineCard
-          currency={currency}
-          title="Leads by stage"
-          subtitle="Share of leads in each stage"
-          to="/leads"
-          pipeline={data?.leads}
-          loading={query.isPending}
-          meta={LEAD_META}
-          label={leadStageLabel}
-          emptyIcon="leads"
-          emptyText="No leads yet. Add your first one to start tracking the pipeline."
-        />
-      </div>
+            {/* 12 columns so the two halves can be uneven: the working lists get
+                more room than the summaries beside them. */}
+            <div className="grid gap-md lg:grid-cols-12">
+              <AttentionCard
+                className="lg:col-span-7"
+                items={data.attention}
+                currency={currency}
+              />
+              <PipelineCard
+                className="lg:col-span-5"
+                currency={currency}
+                title="Lead funnel"
+                subtitle="Where outreach is sitting"
+                to="/leads"
+                pipeline={data.leads}
+                meta={LEAD_META}
+                label={leadStageLabel}
+                emptyIcon="leads"
+                emptyText="No leads yet."
+              />
+              <RecentCard className="lg:col-span-7" items={data.recent} />
+              <PipelineCard
+                className="lg:col-span-5"
+                currency={currency}
+                title="Deals by stage"
+                subtitle="Where revenue is sitting"
+                to="/deals"
+                pipeline={data.deals}
+                meta={DEAL_META}
+                label={dealStageLabel}
+                emptyIcon="deals"
+                emptyText="No deals yet."
+              />
+            </div>
+          </>
+        )
+      )}
     </section>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* First run                                                                  */
+/* -------------------------------------------------------------------------- */
+
+interface Step {
+  label: string;
+  description: string;
+  icon: IconName;
+  to: string;
+  done: boolean;
+}
+
+/**
+ * The setup guide a brand-new workspace opens on.
+ *
+ * Every step's `done` is derived from real data rather than stored progress, so
+ * it cannot disagree with the workspace, and deleting everything honestly puts
+ * the guide back.
+ */
+function FirstRun({ data }: { data: Summary }) {
+  const steps: Step[] = [
+    {
+      label: "Add your first lead",
+      description: "A person you're reaching out to, before there's a deal.",
+      icon: "leads",
+      to: "/leads",
+      done: data.leads.total > 0,
+    },
+    {
+      label: "Log what happened",
+      description: "Outreach, a reply, a booked call — the timeline is the record.",
+      icon: "mail",
+      to: "/leads",
+      done: data.recent.length > 0,
+    },
+    {
+      label: "Convert a lead to a deal",
+      description: "Once a call is done, hand it off with an amount attached.",
+      icon: "deals",
+      to: "/deals",
+      done: data.deals.total > 0,
+    },
+    {
+      label: "Send a quote",
+      description: "Line items, discounts and tax, priced in your currency.",
+      icon: "trend",
+      to: "/quotes",
+      done: data.quotes.total > 0,
+    },
+    {
+      label: "Raise an invoice",
+      description: "Bill a won deal and track what's still owed.",
+      icon: "building",
+      to: "/invoices",
+      done: data.invoices.total > 0,
+    },
+    {
+      label: "Invite your team",
+      description: "Everyone shares one workspace and one pipeline.",
+      icon: "team",
+      to: "/team",
+      done: data.members > 1,
+    },
+  ];
+
+  const done = steps.filter((s) => s.done).length;
+  // The first unfinished step is the one to nudge; everything after it waits.
+  const nextIndex = steps.findIndex((s) => !s.done);
+
+  return (
+    <div className="grid gap-md lg:grid-cols-12">
+      <Card className="lg:col-span-7" padded={false}>
+        <div className="flex items-center justify-between gap-md p-lg pb-md">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-fg">Set up your workspace</h2>
+            <p className="mt-[2px] text-xs text-fg-muted">
+              Each step lights up on its own as you work — nothing to tick off.
+            </p>
+          </div>
+          <span className="shrink-0 text-xs font-medium tabular-nums text-fg-muted">
+            {done} / {steps.length}
+          </span>
+        </div>
+
+        {/* Progress: a track and a fill, two elements, no component. */}
+        <div className="mx-lg h-[4px] overflow-hidden rounded-full bg-surface-muted">
+          <div
+            className="h-full rounded-full bg-accent transition-[width] duration-300"
+            style={{ width: `${(done / steps.length) * 100}%` }}
+          />
+        </div>
+
+        <ol className="mt-md flex flex-col">
+          {steps.map((step, i) => (
+            <li key={step.label}>
+              <Link
+                to={step.to}
+                className={`flex items-start gap-md border-t border-line px-lg py-md transition-colors duration-100 hover:bg-surface-hover ${
+                  i === nextIndex ? "bg-accent-soft/40" : ""
+                }`}
+              >
+                <span
+                  className={`mt-[1px] flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                    step.done
+                      ? "bg-ok-soft text-ok-fg"
+                      : i === nextIndex
+                        ? "bg-accent text-white"
+                        : "bg-surface-muted text-fg-subtle"
+                  }`}
+                >
+                  {step.done ? <Icon name="check" size={13} /> : i + 1}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block text-sm font-medium ${
+                      step.done ? "text-fg-muted line-through" : "text-fg"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  <span className="mt-[1px] block text-xs text-fg-muted">{step.description}</span>
+                </span>
+
+                {!step.done && i === nextIndex && (
+                  <span className="mt-[2px] shrink-0 text-xs font-medium text-accent">Start →</span>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </Card>
+
+      <Card className="lg:col-span-5">
+        <CardHeader
+          title="How the pieces fit"
+          subtitle="One path, from a name to money in the bank."
+        />
+        <ol className="mt-lg flex flex-col gap-md">
+          {FLOW.map((item, i) => (
+            <li key={item.label} className="flex gap-md">
+              <span className="flex flex-col items-center">
+                <span className="flex h-[26px] w-[26px] items-center justify-center rounded-md bg-surface-muted text-fg-muted">
+                  <Icon name={item.icon} size={14} />
+                </span>
+                {i < FLOW.length - 1 && <span className="mt-[2px] h-full w-px flex-1 bg-line" />}
+              </span>
+              <span className="min-w-0 pb-md">
+                <span className="block text-sm font-medium text-fg">{item.label}</span>
+                <span className="mt-[1px] block text-xs text-fg-muted">{item.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </Card>
+    </div>
+  );
+}
+
+/** The product in six lines — shown while there's no data to show instead. */
+const FLOW: { label: string; detail: string; icon: IconName }[] = [
+  { label: "Lead", detail: "Someone worth contacting.", icon: "leads" },
+  { label: "Outreach", detail: "Email, reply, call booked — each one logged.", icon: "mail" },
+  { label: "Deal", detail: "A real opportunity, with an amount and a close date.", icon: "deals" },
+  { label: "Quote", detail: "What you're offering, priced.", icon: "trend" },
+  { label: "Invoice", detail: "What they owe, and what's been paid.", icon: "building" },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Needs attention                                                            */
+/* -------------------------------------------------------------------------- */
+
+const ATTENTION_META: Record<Attention["kind"], { icon: IconName; href: (id: string) => string }> = {
+  lead: { icon: "leads", href: () => "/leads" },
+  quote: { icon: "trend", href: (id) => `/quotes/${id}` },
+  invoice: { icon: "building", href: (id) => `/invoices/${id}` },
+};
+
+/** "3 days overdue" / "Due today" / "in 2 days", plus how loudly to say it. */
+function dueLabel(days: number): { text: string; tone: "bad" | "warn" | "plain" } {
+  if (days < 0) {
+    const n = -days;
+    return { text: `${n} day${n === 1 ? "" : "s"} overdue`, tone: "bad" };
+  }
+  if (days === 0) return { text: "Due today", tone: "warn" };
+  if (days === 1) return { text: "Due tomorrow", tone: "warn" };
+  return { text: `in ${days} days`, tone: "plain" };
+}
+
+function AttentionCard({
+  items,
+  currency,
+  className = "",
+}: {
+  items: Attention[];
+  currency: string;
+  className?: string;
+}) {
+  return (
+    <Card className={className} padded={false}>
+      <CardHeader
+        className="p-lg pb-md"
+        title="Needs attention"
+        subtitle="Overdue and due soon, across everything"
+      />
+
+      {items.length === 0 ? (
+        <div className="px-lg pb-lg">
+          <EmptyState
+            size="sm"
+            icon="check"
+            title="Nothing overdue"
+            description="Every follow-up, quote and invoice is inside its window."
+          />
+        </div>
+      ) : (
+        <ul>
+          {items.map((item) => {
+            const meta = ATTENTION_META[item.kind];
+            const due = dueLabel(item.days);
+            return (
+              <li key={`${item.kind}-${item.id}`}>
+                <Link
+                  to={meta.href(item.id)}
+                  className="flex items-center gap-md border-t border-line px-lg py-sm transition-colors duration-100 hover:bg-surface-hover"
+                >
+                  <span
+                    className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md ${
+                      due.tone === "bad"
+                        ? "bg-bad-soft text-bad-fg"
+                        : due.tone === "warn"
+                          ? "bg-warn-soft text-warn-fg"
+                          : "bg-surface-muted text-fg-muted"
+                    }`}
+                  >
+                    <Icon name={meta.icon} size={14} />
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-fg">{item.label}</span>
+                    {item.detail && (
+                      <span className="block truncate text-xs text-fg-muted">{item.detail}</span>
+                    )}
+                  </span>
+
+                  <span className="shrink-0 text-right">
+                    <span
+                      className={`block text-xs font-medium ${
+                        due.tone === "bad"
+                          ? "text-bad-fg"
+                          : due.tone === "warn"
+                            ? "text-warn-fg"
+                            : "text-fg-muted"
+                      }`}
+                    >
+                      {due.text}
+                    </span>
+                    {item.amount > 0 && (
+                      <span className="block text-xs tabular-nums text-fg-muted">
+                        {formatMoneyCompact(item.amount, currency)}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Recent activity                                                            */
+/* -------------------------------------------------------------------------- */
+
+function RecentCard({ items, className = "" }: { items: Recent[]; className?: string }) {
+  return (
+    <Card className={className} padded={false}>
+      <CardHeader
+        className="p-lg pb-md"
+        title="Recent activity"
+        subtitle="The last things that happened here"
+      />
+
+      {items.length === 0 ? (
+        <div className="px-lg pb-lg">
+          <EmptyState
+            size="sm"
+            icon="leads"
+            title="Nothing logged yet"
+            description="Calls, notes and stage changes will appear here as they happen."
+          />
+        </div>
+      ) : (
+        <ul>
+          {items.map((item, i) => {
+            const meta = KIND_META[item.kind as ActivityKind] ?? KIND_META.system;
+            return (
+              <li
+                key={`${item.at}-${i}`}
+                className="flex items-start gap-md border-t border-line px-lg py-sm"
+              >
+                <span className="mt-[2px] flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-md bg-surface-muted text-fg-muted">
+                  <Icon name={meta.icon} size={13} />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-fg">{item.subject}</span>
+                  {item.body && (
+                    <span className="block truncate text-xs text-fg-muted">{item.body}</span>
+                  )}
+                </span>
+
+                <span className="shrink-0 whitespace-nowrap text-xs text-fg-subtle">
+                  {relativeTime(item.at)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pipelines                                                                  */
+/* -------------------------------------------------------------------------- */
 
 interface PipelineCardProps {
   currency: string;
   title: string;
   subtitle: string;
   to: string;
-  pipeline?: Pipeline;
-  loading: boolean;
+  pipeline: Pipeline;
   /** Stage → tone/bar map for whichever pipeline this is. */
   meta: Record<string, { tone: Tone; bar: string }>;
   label: (stage: string) => string;
   emptyIcon: "leads" | "deals";
   emptyText: string;
+  className?: string;
 }
 
 /**
@@ -160,39 +515,32 @@ function PipelineCard({
   subtitle,
   to,
   pipeline,
-  loading,
   meta,
   label,
   emptyIcon,
   emptyText,
+  className = "",
 }: PipelineCardProps) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader
         title={title}
         subtitle={subtitle}
         action={
           <Link
             to={to}
-            className="text-xs font-medium text-accent transition-colors hover:text-accent-on"
+            className="shrink-0 text-xs font-medium text-accent transition-colors hover:text-accent-on"
           >
-            Open board →
+            Open →
           </Link>
         }
       />
 
-      {loading ? (
-        <div className="mt-lg flex flex-col gap-sm">
-          <Skeleton className="h-[10px] w-full" />
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-[18px] w-full" />
-          ))}
-        </div>
-      ) : pipeline && pipeline.total > 0 ? (
+      {pipeline.total > 0 ? (
         <Funnel pipeline={pipeline} meta={meta} label={label} currency={currency} />
       ) : (
         <div className="mt-lg">
-          <EmptyState icon={emptyIcon} title="Nothing here yet" description={emptyText} />
+          <EmptyState size="sm" icon={emptyIcon} title="Nothing here yet" description={emptyText} />
         </div>
       )}
     </Card>
@@ -259,6 +607,23 @@ function Funnel({
           Won so far: <span className="font-semibold text-fg">{formatMoney(won, currency)}</span>
         </p>
       )}
+    </>
+  );
+}
+
+/** Matches the loaded layout's shape, so the page doesn't jump when data lands. */
+function DashboardSkeleton() {
+  return (
+    <>
+      <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-[112px] w-full" />
+        ))}
+      </div>
+      <div className="grid gap-md lg:grid-cols-12">
+        <Skeleton className="h-[280px] w-full lg:col-span-7" />
+        <Skeleton className="h-[280px] w-full lg:col-span-5" />
+      </div>
     </>
   );
 }

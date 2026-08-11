@@ -17,6 +17,13 @@ const { title } = Astro.props;
     <title>{title}</title>
 
     {/*
+      Without this the browser asks for /favicon.ico, gets a 404, and falls back
+      to a generated letter tile — which is what showed in the tab during a
+      reload. An SVG is one file for every density and can follow the theme.
+    */}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    {/*
       Theme applied before first paint.
 
       This has to be an inline, blocking script: if the class were set from React

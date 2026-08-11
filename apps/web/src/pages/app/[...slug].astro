@@ -12,6 +12,59 @@ export const prerender = false;
 ---
 
 <Base title="go-CRM · Dashboard">
+  {/*
+    Boot indicator.
+
+    `client:only` renders nothing on the server, so between the HTML arriving and
+    the island's JS parsing there is a real gap — a blank page with no sign the
+    app is coming. This fills it, and AppRoot removes it on mount.
+
+    Styled from the theme variables directly rather than with Tailwind classes:
+    this is the first thing painted, so it should not depend on anything but the
+    stylesheet the theme script has already run against.
+  */}
+  <div id="app-boot" class="boot">
+    <span class="boot-ring" role="status" aria-label="Loading go-CRM"></span>
+  </div>
+
   <!-- client:only ensures the SPA hydrates entirely on the client -->
   <AppRoot client:only="react" />
 </Base>
+
+<style>
+  .boot {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background-color: rgb(var(--canvas));
+  }
+
+  .boot-ring {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgb(var(--line));
+    border-top-color: rgb(var(--accent));
+    border-radius: 50%;
+    animation: boot-spin 0.7s linear infinite;
+  }
+
+  @keyframes boot-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Respect a reduced-motion preference: pulse the ring instead of spinning it. */
+  @media (prefers-reduced-motion: reduce) {
+    .boot-ring {
+      animation: boot-pulse 1.2s ease-in-out infinite;
+    }
+  }
+
+  @keyframes boot-pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+</style>

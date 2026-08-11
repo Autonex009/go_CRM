@@ -27,6 +27,7 @@ export {
   EmptyState,
   PageHeader,
   Skeleton,
+  Spinner,
   initials,
   type Tone,
 } from "./primitives";
