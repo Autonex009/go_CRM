@@ -144,7 +144,9 @@ curl -I https://<web-domain>/app/login                    # -> 200, SSR shell
   image only re-installs when a `package.json` changes. Source edits rebuild just
   the last layer.
 - `--mount=type=cache` on the Go module cache, the Go build cache, and the pnpm
-  store — those survive between Railway builds on the same service.
+  store — those survive between Railway builds on the same service. Every cache
+  mount carries an explicit `id=`; Railway's Metal builder rejects the Dockerfile
+  outright without one ("flag ... is missing an id argument").
 - The web install is filtered to `@go-crm/web...`, so the Expo/React Native tree
   in `apps/mobile` is never downloaded.
 - `.dockerignore` keeps `node_modules`, `dist`, `.git` and `EXPLAINER.md` out of
