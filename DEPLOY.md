@@ -143,10 +143,8 @@ curl -I https://<web-domain>/app/login                    # -> 200, SSR shell
   the Go image only re-downloads modules when `go.mod`/`go.sum` change, the web
   image only re-installs when a `package.json` changes. Source edits rebuild just
   the last layer.
-- `--mount=type=cache` on the Go module cache, the Go build cache, and the pnpm
-  store — those survive between Railway builds on the same service. Every cache
-  mount carries an explicit `id=`; Railway's Metal builder rejects the Dockerfile
-  outright without one ("flag ... is missing an id argument").
+- Dependency installs are their own layers, so Railway's layer cache reuses them
+  on every build that does not touch `go.mod`/`go.sum` or a `package.json`.
 - The web install is filtered to `@go-crm/web...`, so the Expo/React Native tree
   in `apps/mobile` is never downloaded.
 - `.dockerignore` keeps `node_modules`, `dist`, `.git` and `EXPLAINER.md` out of
@@ -180,6 +178,36 @@ Right now the browser talks to two origins, so every non-simple API call pays a
 CORS preflight (cached 600s). Putting both behind one domain — `/` to `web`,
 `/api` to `api` — removes preflights entirely and lets you drop `WEB_APP_URL`
 CORS handling. That is a routing change, not a code change, once you own a domain.
+
+## Optional: BuildKit cache mounts
+
+`--mount=type=cache` would add partial reuse on top of layer caching — the case
+where `go.sum` or a `package.json` *did* change and only a few packages are
+actually new. Railway's Metal builder accepts them only in this exact form:
+
+```
+--mount=type=cache,id=s/<service-id>-<identifier>,target=<path>
+```
+
+The service id must be **hardcoded** — the mount flag does no variable
+expansion, so `${RAILWAY_SERVICE_ID}` fails with "cache mount ID is not prefixed
+with cache key". Copy each id from the service's URL
+(`railway.com/project/<project-id>/service/<service-id>`), and note that the two
+Dockerfiles need *different* ids because they are built by different services:
+
+```dockerfile
+# Dockerfile.api — <api-service-id>
+RUN --mount=type=cache,id=s/<api-service-id>-gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=s/<api-service-id>-gobuild,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build ...
+
+# Dockerfile.web — <web-service-id>
+RUN --mount=type=cache,id=s/<web-service-id>-pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter @go-crm/web...
+```
+
+That hardcoding is why it is not the default here: it pins the Dockerfiles to one
+Railway project and breaks plain `docker build` reuse for anyone else.
 
 ## Scaling up
 

@@ -12,26 +12,20 @@ WORKDIR /src
 # Module download is its own layer: it only re-runs when go.mod/go.sum change,
 # which is rarely.
 COPY services/go.mod services/go.sum ./
-# Railway's Metal builder rejects cache mounts without an explicit id.
-RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod \
-    go mod download
+RUN go mod download
 
 COPY services/ ./
 
 # CGO off => a static binary that runs on a bare alpine with no libc surprises.
 # -trimpath drops build paths, -s -w drops the symbol table and DWARF: a
 # noticeably smaller binary, so a faster image pull and cold start.
-RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod \
-    --mount=type=cache,id=go-build,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=linux go build \
       -trimpath -ldflags="-s -w" \
       -o /out/gateway ./cmd/gateway
 
 # golang-migrate, postgres driver only, built statically so the release image can
 # run migrations itself without shipping a second toolchain.
-RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod \
-    --mount=type=cache,id=go-build,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go install -tags 'postgres' \
+RUN CGO_ENABLED=0 go install -tags 'postgres' \
       github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.1
 
 # ---------- runtime ----------

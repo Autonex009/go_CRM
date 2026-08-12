@@ -24,8 +24,7 @@ COPY shared/schemas/package.json       shared/schemas/
 
 # ---------- build deps ----------
 FROM manifests AS deps
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter @go-crm/web...
+RUN pnpm install --frozen-lockfile --filter @go-crm/web...
 
 # ---------- build ----------
 FROM deps AS build
@@ -47,8 +46,7 @@ RUN pnpm --filter @go-crm/web build
 # symlinked layout does not survive copying node_modules between stages unless
 # the paths match exactly, and this keeps devDependencies out of the image.
 FROM manifests AS prod-deps
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --filter @go-crm/web...
+RUN pnpm install --frozen-lockfile --prod --filter @go-crm/web...
 
 # ---------- runtime ----------
 FROM base AS runtime
