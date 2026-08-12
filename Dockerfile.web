@@ -1,0 +1,70 @@
+# syntax=docker/dockerfile:1.7
+#
+# Astro web app (apps/web) for Railway — hybrid output, @astrojs/node standalone.
+# Build context is the repo root because the app depends on the pnpm workspace
+# packages in shared/.
+
+FROM node:20-alpine AS base
+ENV PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH \
+    NODE_ENV=production
+RUN corepack enable
+WORKDIR /app
+
+# ---------- manifests ----------
+# Every workspace manifest, and nothing else: the install layer then only
+# invalidates when a dependency actually changes, not on every source edit.
+# apps/mobile is here purely so --frozen-lockfile can verify the whole lockfile.
+FROM base AS manifests
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json            apps/web/
+COPY apps/mobile/package.json         apps/mobile/
+COPY shared/design-tokens/package.json shared/design-tokens/
+COPY shared/schemas/package.json       shared/schemas/
+
+# ---------- build deps ----------
+FROM manifests AS deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter @go-crm/web...
+
+# ---------- build ----------
+FROM deps AS build
+# PUBLIC_API_URL is inlined into the client bundle by Vite at build time, so it
+# has to be a build arg — setting it only at runtime has no effect on the SPA.
+# Railway forwards service variables into the build only for names declared with
+# ARG, and only in the stage that declares them.
+ARG PUBLIC_API_URL
+ENV PUBLIC_API_URL=$PUBLIC_API_URL
+# Fail loudly. Unset, the SPA silently falls back to http://localhost:8080 and
+# ships a bundle that cannot reach the API from anywhere but your laptop.
+RUN test -n "$PUBLIC_API_URL" || { echo "ERROR: PUBLIC_API_URL must be set as a service variable"; exit 1; }
+COPY shared/   shared/
+COPY apps/web/ apps/web/
+RUN pnpm --filter @go-crm/web build
+
+# ---------- runtime deps ----------
+# A second, production-only install rather than pruning the build tree: pnpm's
+# symlinked layout does not survive copying node_modules between stages unless
+# the paths match exactly, and this keeps devDependencies out of the image.
+FROM manifests AS prod-deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod --filter @go-crm/web...
+
+# ---------- runtime ----------
+FROM base AS runtime
+ENV HOST=0.0.0.0 \
+    PORT=4321
+
+COPY --from=prod-deps /app/node_modules          ./node_modules
+COPY --from=prod-deps /app/apps/web/node_modules ./apps/web/node_modules
+# The @go-crm/* symlinks in node_modules point into shared/, so those directories
+# have to exist: the first copy brings their own installed deps, the second their
+# TypeScript sources.
+COPY --from=prod-deps /app/shared                ./shared
+COPY shared/                                     ./shared/
+COPY --from=build     /app/apps/web/dist         ./apps/web/dist
+
+USER node
+EXPOSE 4321
+# Standalone mode serves the prerendered pages and hashed /_astro assets itself.
+CMD ["node", "apps/web/dist/server/entry.mjs"]

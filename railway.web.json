@@ -1,0 +1,16 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile.web",
+    "watchPatterns": ["apps/web/**", "shared/**", "Dockerfile.web", "railway.web.json"]
+  },
+  "deploy": {
+    "startCommand": "node apps/web/dist/server/entry.mjs",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10,
+    "numReplicas": 1
+  }
+}

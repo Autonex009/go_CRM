@@ -1,0 +1,29 @@
+# Keep the build context small — everything here is either rebuilt inside the
+# image or must never be baked into one.
+.git
+.github
+node_modules
+**/node_modules
+.pnpm-store
+dist
+**/dist
+build
+**/build
+.astro
+**/.astro
+.turbo
+**/.turbo
+.expo
+**/.expo
+apps/mobile/*
+!apps/mobile/package.json
+services/bin
+**/*.log
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+EXPLAINER.md
+README.md
+DEPLOY.md
