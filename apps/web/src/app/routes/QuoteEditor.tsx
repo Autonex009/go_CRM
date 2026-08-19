@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { useAuthStore } from "../auth/store";
+import { API_URL } from "../lib/config";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { Timeline } from "../activities/Timeline";
 import { contactName, contactsApi } from "../contacts/api";
@@ -13,6 +15,7 @@ import { memberLabel, orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
 import { LineItems } from "../documents/LineItems";
 import { emptyDocumentItem } from "../documents/types";
+import { PDFPreviewModal } from "../documents/PDFPreviewModal";
 import {
   isEditable,
   nextStatuses,
@@ -73,11 +76,15 @@ export default function QuoteEditor() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const workspaceCurrency = useCurrency();
+  const token = useAuthStore((s) => s.token);
+
+  const pdfUrl = `/api/v1/quotes/${id}/pdf${token ? `?token=${token}` : ""}`;
 
   const [header, setHeader] = useState<Header>(emptyHeader);
   const [items, setItems] = useState<QuoteItemInput[]>(() => [emptyItem()]);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const query = useQuery({
     queryKey: ["quote", id],
@@ -247,9 +254,19 @@ export default function QuoteEditor() {
               Back
             </Link>
             {!isNew && (
-              <Badge tone={STATUS_META[status].tone} dot>
-                {STATUS_META[status].label}
-              </Badge>
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowPreview(true)}
+                >
+                  <Icon name="printer" size={14} className="mr-1 inline-block" />
+                  Print PO / PDF
+                </Button>
+                <Badge tone={STATUS_META[status].tone} dot>
+                  {STATUS_META[status].label}
+                </Badge>
+              </>
             )}
             {editable && (
               <Button onClick={() => save.mutate()} disabled={save.isPending}>
@@ -438,6 +455,15 @@ export default function QuoteEditor() {
           placeholder="Terms, delivery, anything the customer should see."
         />
       </Card>
+
+      {showPreview && id && (
+        <PDFPreviewModal
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          pdfUrl={`${API_URL}/api/v1/quotes/${id}/pdf`}
+          title={`Purchase Order (PO) Preview — ${quote?.number || ""}`}
+        />
+      )}
     </section>
   );
 }

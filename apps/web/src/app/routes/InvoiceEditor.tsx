@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { useAuthStore } from "../auth/store";
+import { API_URL } from "../lib/config";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { Timeline } from "../activities/Timeline";
 import { contactName, contactsApi } from "../contacts/api";
@@ -9,6 +11,7 @@ import { dealsApi } from "../deals/api";
 import { LineItems } from "../documents/LineItems";
 import { computeTotals } from "../documents/totals";
 import { emptyDocumentItem, type DocumentItemInput } from "../documents/types";
+import { PDFPreviewModal } from "../documents/PDFPreviewModal";
 import { PaymentDialog } from "../invoices/PaymentDialog";
 import {
   canTakePayment,
@@ -72,12 +75,16 @@ export default function InvoiceEditor() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const workspaceCurrency = useCurrency();
+  const token = useAuthStore((s) => s.token);
+
+  const pdfUrl = `/api/v1/invoices/${id}/pdf${token ? `?token=${token}` : ""}`;
 
   const [header, setHeader] = useState<Header>(emptyHeader);
   const [items, setItems] = useState<DocumentItemInput[]>(() => [emptyDocumentItem()]);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const query = useQuery({
     queryKey: ["invoice", id],
@@ -252,9 +259,19 @@ export default function InvoiceEditor() {
               Back
             </Link>
             {!isNew && invoice && (
-              <Badge tone={invoice.overdue ? "danger" : STATUS_META[status].tone} dot>
-                {invoice.overdue ? "Overdue" : STATUS_META[status].label}
-              </Badge>
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowPreview(true)}
+                >
+                  <Icon name="printer" size={14} className="mr-1 inline-block" />
+                  Print / PDF
+                </Button>
+                <Badge tone={invoice.overdue ? "danger" : STATUS_META[status].tone} dot>
+                  {invoice.overdue ? "Overdue" : STATUS_META[status].label}
+                </Badge>
+              </>
             )}
             {editable && (
               <Button onClick={() => save.mutate()} disabled={save.isPending}>
@@ -517,6 +534,15 @@ export default function InvoiceEditor() {
           invoice={invoice}
           onClose={() => setPaying(false)}
           onSubmit={(input) => pay.mutateAsync(input)}
+        />
+      )}
+
+      {showPreview && id && (
+        <PDFPreviewModal
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          pdfUrl={`${API_URL}/api/v1/invoices/${id}/pdf`}
+          title={`Invoice Preview — ${invoice?.number || ""}`}
         />
       )}
     </section>

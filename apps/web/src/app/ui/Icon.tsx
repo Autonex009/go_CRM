@@ -28,7 +28,9 @@ export type IconName =
   | "deals"
   | "sun"
   | "moon"
-  | "monitor";
+  | "monitor"
+  | "printer"
+  | "download";
 
 const PATHS: Record<IconName, string> = {
   dashboard: "M4 13h7V4H4v9Zm0 7h7v-5H4v5Zm9 0h7v-9h-7v9Zm0-16v5h7V4h-7Z",
@@ -54,6 +56,8 @@ const PATHS: Record<IconName, string> = {
   sun: "M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z",
   moon: "M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10Z",
   monitor: "M3 5h18v11H3zM8 20h8M12 16v4",
+  printer: "M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z",
+  download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3",
 };
 
 interface IconProps {
