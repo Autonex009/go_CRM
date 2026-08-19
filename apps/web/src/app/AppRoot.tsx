@@ -11,10 +11,12 @@ import Contacts from "./routes/Contacts";
 import Dashboard from "./routes/Dashboard";
 import Deals from "./routes/Deals";
 import InvoiceEditor from "./routes/InvoiceEditor";
+import InvoicePreview from "./routes/InvoicePreview";
 import Invoices from "./routes/Invoices";
 import Leads from "./routes/Leads";
 import Login from "./routes/Login";
 import QuoteEditor from "./routes/QuoteEditor";
+import QuotePreview from "./routes/QuotePreview";
 import Quotes from "./routes/Quotes";
 import Register from "./routes/Register";
 import Team from "./routes/Team";
@@ -54,6 +56,9 @@ export default function AppRoot() {
 
           {/* Authenticated app: guard first, then the shared portal chrome */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/invoices/:id/preview" element={<InvoicePreview />} />
+            <Route path="/quotes/:id/preview" element={<QuotePreview />} />
+
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/leads" element={<Leads />} />

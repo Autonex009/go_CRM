@@ -29,4 +29,7 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Dummy & Seed Data
+*dummy*
+*seed*.sql
 EXPLAINER.md
