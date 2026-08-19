@@ -1,0 +1,120 @@
+/*
+ * Semantic colour layer.
+ *
+ * Split of responsibilities:
+ *   - shared/design-tokens owns the raw RAMPS (brand-500, neutral-200, …) and is
+ *     consumed by both web and mobile.
+ *   - this file owns the SEMANTIC mapping (what a surface/border/text colour is
+ *     in each theme), because that mapping is web-specific and needs to be a CSS
+ *     custom property to switch without re-rendering React.
+ *
+ * Why variables rather than `dark:` utilities everywhere: a `dark:` variant
+ * duplicates a rule for every utility on every element, which bloats the CSS and
+ * means every new component has to remember both halves. Here a theme switch
+ * rewrites ~20 custom properties and the whole app follows — no React re-render,
+ * no second set of classes to keep in sync.
+ *
+ * Values are space-separated RGB channels so Tailwind can apply alpha via
+ * `rgb(var(--surface) / <alpha-value>)` — e.g. `bg-surface/60`.
+ */
+
+:root {
+  color-scheme: light;
+
+  --canvas: 247 247 248;
+  --surface: 255 255 255;
+  --surface-muted: 244 244 245;
+  --surface-hover: 250 250 250;
+
+  --line: 231 231 234;
+  --line-strong: 212 212 216;
+
+  --fg: 23 23 23;
+  --fg-muted: 82 82 91;
+  --fg-subtle: 161 161 170;
+
+  --accent: 79 70 229;
+  --accent-hover: 67 56 202;
+  --accent-soft: 238 242 255;
+  --accent-on: 67 56 202;
+
+  --ok-soft: 236 253 245;
+  --ok-fg: 4 120 87;
+  --warn-soft: 255 251 235;
+  --warn-fg: 180 83 9;
+  --bad-soft: 254 242 242;
+  --bad-fg: 185 28 28;
+  --bad-solid: 220 38 38;
+  --info-soft: 239 246 255;
+  --info-fg: 29 78 216;
+
+  --overlay: 24 24 27;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Near-black canvas with a lifted surface: on OLED a pure-black background
+     next to white text causes visible smearing when scrolling. */
+  --canvas: 9 9 11;
+  --surface: 19 19 22;
+  --surface-muted: 26 26 30;
+  --surface-hover: 31 31 36;
+
+  --line: 38 38 43;
+  --line-strong: 53 53 60;
+
+  --fg: 244 244 245;
+  --fg-muted: 161 161 170;
+  --fg-subtle: 113 113 122;
+
+  /* One step brighter than light mode: brand-600 is too dark to read against a
+     near-black surface, brand-500 holds contrast. */
+  --accent: 99 102 241;
+  --accent-hover: 79 70 229;
+  --accent-soft: 30 27 56;
+  --accent-on: 165 180 252;
+
+  --ok-soft: 5 46 33;
+  --ok-fg: 110 231 183;
+  --warn-soft: 58 39 8;
+  --warn-fg: 252 211 77;
+  --bad-soft: 58 17 19;
+  --bad-fg: 252 165 165;
+  --bad-solid: 239 68 68;
+  --info-soft: 16 31 66;
+  --info-fg: 147 197 253;
+
+  --overlay: 0 0 0;
+}
+
+/* Themed scrollbars — an untouched light scrollbar on a dark board is the most
+   obvious tell that a dark mode was retrofitted. */
+* {
+  scrollbar-color: rgb(var(--line-strong)) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--line-strong));
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--fg-subtle));
+}
+
+body {
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--fg));
+}
