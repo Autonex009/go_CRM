@@ -1,6 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  TrendingUp,
+  Handshake,
+  FileText,
+  Building2,
+  Users,
+  CheckCircle2,
+  ArrowRight,
+  Sparkles,
+  AlertCircle,
+} from "lucide-react";
 
 import { KIND_META, relativeTime, type ActivityKind } from "../activities/api";
 import { useAuthStore } from "../auth/store";
@@ -17,28 +29,18 @@ import {
   Dot,
   EmptyState,
   Icon,
-  PageHeader,
   Skeleton,
-  StatTile,
   buttonClass,
   type IconName,
   type Tone,
 } from "../ui";
 
-/**
- * Portal landing page — a command centre rather than a set of counters.
- *
- * One request to /api/v1/dashboard rather than fanning out to every module, so
- * the numbers are consistent with each other and the page costs one round trip.
- */
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
   const currency = useCurrency();
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: dashboardApi.summary,
-    // Counts don't need to be to-the-second; avoids a refetch every time the
-    // user tabs back to the dashboard.
     staleTime: 30_000,
   });
   const data = query.data;
@@ -48,27 +50,47 @@ export default function Dashboard() {
   const winRate = useMemo(() => {
     if (!data || data.deals.total === 0) return undefined;
     const won = data.deals.stages.find((s) => s.stage === "won")?.count ?? 0;
-    return `${Math.round((won / data.deals.total) * 100)}% won`;
+    return `${Math.round((won / data.deals.total) * 100)}% win rate`;
   }, [data]);
 
-  // A workspace with nothing in it gets the setup guide instead of a wall of
-  // zeroes. Counters that all read 0 tell you nothing and look broken.
   const untouched =
     !!data &&
     data.leads.total + data.deals.total + data.quotes.total + data.invoices.total === 0;
 
   return (
-    <section className="flex flex-col gap-lg">
-      <PageHeader
-        title={firstName ? `Welcome back, ${firstName}` : "Dashboard"}
-        subtitle={untouched ? "Let's get your workspace set up." : "What needs you today."}
-        action={
-          <Link to="/leads" className={buttonClass({ variant: "secondary" })}>
-            <Icon name="leads" size={16} />
-            Open leads
-          </Link>
-        }
-      />
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="flex flex-col gap-6"
+    >
+      {/* Welcome Banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-6 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-indigo-500" />
+              <h1 className="text-xl font-bold tracking-tight text-fg">
+                {firstName ? `Welcome back, ${firstName}!` : "Dashboard Overview"}
+              </h1>
+            </div>
+            <p className="text-xs text-fg-muted">
+              {untouched
+                ? "Let's get your workspace set up and launch your first pipeline."
+                : "Here is your real-time revenue performance and active pipeline metrics."}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/leads"
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500"
+            >
+              <TrendingUp className="h-4 w-4" />
+              <span>Explore Leads</span>
+            </Link>
+          </div>
+        </div>
+      </div>
 
       {query.isError && (
         <Alert>
@@ -83,45 +105,48 @@ export default function Dashboard() {
       ) : (
         data && (
           <>
-            <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
-              <StatTile
-                accent
-                label="Open deals"
-                icon="trend"
+            {/* KPI Cards Grid */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard
+                title="Open Deals"
                 value={formatMoney(data.deals.open, currency)}
-                hint={winRate ?? "Not yet won or lost"}
+                subtitle={winRate ?? "Active Pipeline"}
+                icon={Handshake}
+                color="indigo"
                 to="/deals"
               />
-              <StatTile
-                label="Lead pipeline"
-                icon="leads"
+              <KpiCard
+                title="Lead Pipeline"
                 value={formatMoney(data.leads.open, currency)}
-                hint={`${data.leads.total} lead${data.leads.total === 1 ? "" : "s"}`}
+                subtitle={`${data.leads.total} total lead${data.leads.total === 1 ? "" : "s"}`}
+                icon={TrendingUp}
+                color="purple"
                 to="/leads"
               />
-              <StatTile
-                label="Quotes out"
-                icon="deals"
+              <KpiCard
+                title="Quotes Active"
                 value={formatMoney(data.quotes.open, currency)}
-                hint={`${data.quotes.total} quote${data.quotes.total === 1 ? "" : "s"}`}
+                subtitle={`${data.quotes.total} quote${data.quotes.total === 1 ? "" : "s"}`}
+                icon={FileText}
+                color="amber"
                 to="/quotes"
               />
-              <StatTile
-                label="Outstanding"
-                icon="building"
+              <KpiCard
+                title="Outstanding Invoices"
                 value={formatMoney(data.invoices.outstanding, currency)}
-                hint={
+                subtitle={
                   data.invoices.overdue > 0
                     ? `${formatMoney(data.invoices.overdue, currency)} overdue`
                     : `${formatMoney(data.invoices.paid, currency)} collected`
                 }
+                icon={Building2}
+                color="emerald"
                 to="/invoices"
               />
             </div>
 
-            {/* 12 columns so the two halves can be uneven: the working lists get
-                more room than the summaries beside them. */}
-            <div className="grid gap-md lg:grid-cols-12">
+            {/* Split Grid */}
+            <div className="grid gap-6 lg:grid-cols-12">
               <AttentionCard
                 className="lg:col-span-7"
                 items={data.attention}
@@ -130,35 +155,77 @@ export default function Dashboard() {
               <PipelineCard
                 className="lg:col-span-5"
                 currency={currency}
-                title="Lead funnel"
-                subtitle="Where outreach is sitting"
+                title="Lead Funnel"
+                subtitle="Stage distribution across outreach"
                 to="/leads"
                 pipeline={data.leads}
                 meta={LEAD_META}
                 label={leadStageLabel}
                 emptyIcon="leads"
-                emptyText="No leads yet."
+                emptyText="No leads registered yet."
               />
               <RecentCard className="lg:col-span-7" items={data.recent} />
               <PipelineCard
                 className="lg:col-span-5"
                 currency={currency}
-                title="Deals by stage"
-                subtitle="Where revenue is sitting"
+                title="Deals by Stage"
+                subtitle="Stage distribution across active revenue"
                 to="/deals"
                 pipeline={data.deals}
                 meta={DEAL_META}
                 label={dealStageLabel}
                 emptyIcon="deals"
-                emptyText="No deals yet."
+                emptyText="No deals in pipeline yet."
               />
             </div>
           </>
         )
       )}
-    </section>
+    </motion.section>
   );
 }
+
+function KpiCard({
+  title,
+  value,
+  subtitle,
+  icon: IconComp,
+  color,
+  to,
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon: React.ElementType;
+  color: "indigo" | "purple" | "amber" | "emerald";
+  to: string;
+}) {
+  const colorMap = {
+    indigo: "from-indigo-500/20 to-indigo-500/5 text-indigo-500 border-indigo-500/20",
+    purple: "from-purple-500/20 to-purple-500/5 text-purple-500 border-purple-500/20",
+    amber: "from-amber-500/20 to-amber-500/5 text-amber-500 border-amber-500/20",
+    emerald: "from-emerald-500/20 to-emerald-500/5 text-emerald-500 border-emerald-500/20",
+  };
+
+  return (
+    <Link
+      to={to}
+      className="group relative overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-fg-muted">{title}</span>
+        <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br border ${colorMap[color]}`}>
+          <IconComp className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="mt-3">
+        <h3 className="text-2xl font-bold tracking-tight text-fg">{value}</h3>
+        <p className="mt-1 text-xs text-fg-muted">{subtitle}</p>
+      </div>
+    </Link>
+  );
+}
+
 
 /* -------------------------------------------------------------------------- */
 /* First run                                                                  */

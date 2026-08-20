@@ -1,25 +1,30 @@
 /*
- * Semantic colour layer.
- *
- * Split of responsibilities:
- *   - shared/design-tokens owns the raw RAMPS (brand-500, neutral-200, …) and is
- *     consumed by both web and mobile.
- *   - this file owns the SEMANTIC mapping (what a surface/border/text colour is
- *     in each theme), because that mapping is web-specific and needs to be a CSS
- *     custom property to switch without re-rendering React.
- *
- * Why variables rather than `dark:` utilities everywhere: a `dark:` variant
- * duplicates a rule for every utility on every element, which bloats the CSS and
- * means every new component has to remember both halves. Here a theme switch
- * rewrites ~20 custom properties and the whole app follows — no React re-render,
- * no second set of classes to keep in sync.
- *
- * Values are space-separated RGB channels so Tailwind can apply alpha via
- * `rgb(var(--surface) / <alpha-value>)` — e.g. `bg-surface/60`.
+ * Semantic colour layer matching crm-portal HSL design tokens & go_CRM RGB values.
  */
 
 :root {
   color-scheme: light;
+
+  --background: 220 38% 97%;
+  --foreground: 224 71% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 71% 4%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 71% 4%;
+  --primary: 238 84% 59%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 28% 93%;
+  --secondary-foreground: 224 71% 4%;
+  --muted: 220 20% 93%;
+  --muted-foreground: 218 15% 45%;
+  --accent-hsl: 238 84% 96%;
+  --accent-foreground: 238 84% 45%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 220 20% 88%;
+  --input: 220 20% 88%;
+  --ring: 238 84% 59%;
+  --radius: 0.75rem;
 
   --canvas: 247 247 248;
   --surface: 255 255 255;
@@ -54,8 +59,26 @@
 .dark {
   color-scheme: dark;
 
-  /* Near-black canvas with a lifted surface: on OLED a pure-black background
-     next to white text causes visible smearing when scrolling. */
+  --background: 224 71% 4%;
+  --foreground: 213 31% 96%;
+  --card: 224 39% 7.5%;
+  --card-foreground: 213 31% 96%;
+  --popover: 224 39% 7.5%;
+  --popover-foreground: 213 31% 96%;
+  --primary: 238 84% 67%;
+  --primary-foreground: 224 71% 4%;
+  --secondary: 222 32% 14%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 222 32% 12%;
+  --muted-foreground: 215 20% 65%;
+  --accent-hsl: 238 40% 16%;
+  --accent-foreground: 238 84% 80%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 222 32% 15%;
+  --input: 222 32% 15%;
+  --ring: 238 84% 67%;
+
   --canvas: 9 9 11;
   --surface: 19 19 22;
   --surface-muted: 26 26 30;
@@ -68,8 +91,6 @@
   --fg-muted: 161 161 170;
   --fg-subtle: 113 113 122;
 
-  /* One step brighter than light mode: brand-600 is too dark to read against a
-     near-black surface, brand-500 holds contrast. */
   --accent: 99 102 241;
   --accent-hover: 79 70 229;
   --accent-soft: 30 27 56;
@@ -88,15 +109,25 @@
   --overlay: 0 0 0;
 }
 
-/* Themed scrollbars — an untouched light scrollbar on a dark board is the most
-   obvious tell that a dark mode was retrofitted. */
+/* Glassmorphism helpers */
+.glass-card {
+  background: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .glass-card {
+  background: hsl(var(--card) / 0.75);
+}
+
+/* Themed scrollbars */
 * {
   scrollbar-color: rgb(var(--line-strong)) transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -105,9 +136,7 @@
 
 ::-webkit-scrollbar-thumb {
   background-color: rgb(var(--line-strong));
-  border: 3px solid transparent;
   border-radius: 9999px;
-  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -118,3 +147,4 @@ body {
   background-color: rgb(var(--canvas));
   color: rgb(var(--fg));
 }
+
