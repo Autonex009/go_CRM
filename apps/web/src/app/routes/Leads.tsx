@@ -1,9 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Search, UploadCloud, Plus, GitBranch } from "lucide-react";
 
+import { MermaidDiagram } from "../components/ui/MermaidDiagram";
+import { leadLifecycleChart } from "../lib/pipeline-charts";
 import { ConvertDialog } from "../leads/ConvertDialog";
 import { LeadDialog } from "../leads/LeadDialog";
+import { ImportWizardModal } from "../leads/ImportWizardModal";
 import {
   FUNNEL_STAGES,
   LEAD_STAGES,
@@ -34,7 +38,7 @@ import {
 const FILTERS: { key: string; label: string; tone?: "overdue" | "due" }[] = [
   { key: "overdue", label: "Overdue", tone: "overdue" },
   { key: "due_today", label: "Due today", tone: "due" },
-  { key: "", label: "All" },
+  { key: "", label: "All Leads" },
   ...LEAD_STAGES.filter((s) => s !== "converted" && s !== "dropped").map((s) => ({
     key: s,
     label: STAGE_META[s].label,
@@ -47,10 +51,12 @@ export default function Leads() {
   const navigate = useNavigate();
 
   const [filter, setFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [offset, setOffset] = useState(0);
   const [dialog, setDialog] = useState<{ lead: Lead | null } | null>(null);
   const [converting, setConverting] = useState<Lead | null>(null);
   const [booking, setBooking] = useState<Lead | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const query = useQuery({
@@ -62,7 +68,18 @@ export default function Leads() {
   const page = query.data;
   const counts = page?.counts ?? {};
   const total = page?.total ?? 0;
-  const showing = page?.items.length ?? 0;
+  const rawItems = page?.items ?? [];
+
+  const filteredItems = rawItems.filter((l) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      leadName(l).toLowerCase().includes(q) ||
+      (leadCompany(l) ?? "").toLowerCase().includes(q) ||
+      (l.title ?? "").toLowerCase().includes(q)
+    );
+  });
+  const showing = filteredItems.length;
 
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -93,7 +110,6 @@ export default function Leads() {
       invalidate();
       void queryClient.invalidateQueries({ queryKey: ["deals"] });
       void queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      // Land on the deal that was just created — the point of converting.
       navigate("/deals");
       void result;
     },
@@ -111,7 +127,6 @@ export default function Leads() {
       setConverting(lead);
       return;
     }
-    // Booking a call has to ask when, or the lead drops out of the urgency sort.
     if (action.needsDate) {
       setBooking(lead);
       return;
@@ -119,52 +134,111 @@ export default function Leads() {
     advance.mutate({ id: lead.id, toStage: action.toStage });
   };
 
+  const handleNodeClick = (nodeId: string) => {
+    if (nodeId === "CV" || nodeId === "D") {
+      navigate("/deals");
+      return;
+    }
+    const nodeMap: Record<string, string> = {
+      NW: "new",
+      CT: "contacted",
+      RP: "replied",
+      CB: "call_booked",
+      CD: "call_done",
+      CV: "converted",
+      DP: "dropped",
+    };
+    const targetStage = nodeMap[nodeId];
+    if (targetStage) {
+      setFilter(targetStage);
+      setOffset(0);
+    }
+  };
+
   return (
-    <section className="flex flex-col gap-lg">
+    <section className="flex flex-col gap-6">
       <PageHeader
-        title="Leads"
-        subtitle="Outreach only — a lead hands off to a deal rather than closing."
+        title="Leads Pipeline"
+        subtitle="Manage prospects, outreach stages, and convert leads into active deals."
         action={
-          <Button icon="plus" onClick={() => setDialog({ lead: null })}>
-            New lead
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-fg hover:bg-surface-hover transition shadow-xs"
+            >
+              <UploadCloud className="h-4 w-4 text-indigo-500" />
+              <span>Import CSV</span>
+            </button>
+            <button
+              onClick={() => setDialog({ lead: null })}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 transition shadow-md"
+            >
+              <Plus className="h-4 w-4" />
+              <span>New Lead</span>
+            </button>
+          </div>
         }
       />
 
+      {/* Lead Lifecycle Collapsible Chart */}
+      <details className="group rounded-2xl border border-line bg-surface shadow-xs transition-all">
+        <summary className="flex cursor-pointer items-center gap-2.5 p-4 font-bold text-sm select-none hover:text-indigo-600 transition-colors text-fg">
+          <GitBranch className="h-4 w-4 text-indigo-600" />
+          <span>Lead Lifecycle & Conversion Pipeline</span>
+        </summary>
+        <div className="border-t border-line p-4 bg-surface-muted/30">
+          <MermaidDiagram
+            chart={leadLifecycleChart(counts as Record<string, number>)}
+            onNodeClick={handleNodeClick}
+          />
+        </div>
+      </details>
+
       <FunnelStrip counts={counts} onPick={(s) => { setFilter(s); setOffset(0); }} />
 
-      <div className="flex flex-wrap gap-xs">
-        {FILTERS.map((f) => {
-          const n = f.key === "" ? undefined : counts[f.key];
-          const active = filter === f.key;
-          return (
-            <button
-              key={f.key || "all"}
-              type="button"
-              onClick={() => {
-                setFilter(f.key);
-                setOffset(0);
-              }}
-              className={`rounded-full px-md py-xs text-xs font-medium transition-colors duration-100 ${
-                active
-                  ? f.tone === "overdue"
-                    ? "bg-bad-solid text-white"
-                    : f.tone === "due"
-                      ? "bg-warning-500 text-white"
-                      : "bg-accent text-white"
-                  : f.tone === "overdue" && n
-                    ? "bg-bad-soft text-bad-fg hover:bg-bad-soft/70"
-                    : f.tone === "due" && n
-                      ? "bg-warn-soft text-warn-fg hover:bg-warn-soft/70"
-                      : "bg-surface-muted text-fg-muted hover:bg-surface-hover hover:text-fg"
-              }`}
-            >
-              {f.label}
-              {n !== undefined && n > 0 && <span className="ml-xs tabular-nums">({n})</span>}
-            </button>
-          );
-        })}
+      {/* Filter and Search Bar Container */}
+      <div className="flex items-center justify-between gap-3 flex-wrap bg-surface p-3.5 rounded-2xl border border-line shadow-xs">
+        <div className="relative flex-1 min-w-48 max-w-sm">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-fg-subtle" />
+          <input
+            type="text"
+            placeholder="Search leads by name, title, company..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-xl border border-line bg-surface-muted/50 pl-9 pr-3 py-2 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+          />
+        </div>
+
+        <div className="flex gap-1 rounded-xl border border-line p-1 bg-surface-muted/60 overflow-x-auto max-w-full">
+          {FILTERS.map((f) => {
+            const n = f.key === "" ? undefined : counts[f.key];
+            const active = filter === f.key;
+            return (
+              <button
+                key={f.key || "all"}
+                type="button"
+                onClick={() => {
+                  setFilter(f.key);
+                  setOffset(0);
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  active
+                    ? f.tone === "overdue"
+                      ? "bg-rose-500 text-white"
+                      : f.tone === "due"
+                        ? "bg-amber-500 text-white"
+                        : "bg-indigo-600 text-white shadow-xs"
+                    : "text-fg-muted hover:text-fg hover:bg-surface"
+                }`}
+              >
+                {f.label}
+                {n !== undefined && n > 0 && <span className="ml-1 opacity-80 tabular-nums">({n})</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
 
       {error && <Alert>{error}</Alert>}
       {query.isError && (
@@ -212,7 +286,7 @@ export default function Leads() {
                 </tr>
               </thead>
               <tbody>
-                {page!.items.map((lead) => (
+                {filteredItems.map((lead) => (
                   <Row
                     key={lead.id}
                     lead={lead}
@@ -226,6 +300,15 @@ export default function Leads() {
           </div>
         </Card>
       )}
+
+      <ImportWizardModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSuccess={() => {
+          setIsImportOpen(false);
+          invalidate();
+        }}
+      />
 
       {total > PAGE_SIZE && (
         <nav className="flex items-center justify-between">
