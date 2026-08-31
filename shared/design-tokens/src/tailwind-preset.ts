@@ -1,4 +1,7 @@
-import type { Config } from "tailwindcss";
+interface Config {
+  darkMode?: string | string[];
+  theme?: Record<string, any>;
+}
 import { colors, fontStack, layout, radius, shadow, spacing } from "./index";
 
 const px = (values: Record<string, number>) =>

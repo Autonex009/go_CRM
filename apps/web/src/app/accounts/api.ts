@@ -62,7 +62,7 @@ export type AccountFormValues = z.infer<typeof accountFormSchema>;
 
 /** Drops empty strings so the request carries only what was filled in. */
 function toPayload(values: AccountFormValues) {
-  const text = (v?: string) => {
+  const text = (v?: string | null) => {
     const t = v?.trim();
     return t ? t : undefined;
   };
@@ -72,7 +72,7 @@ function toPayload(values: AccountFormValues) {
     industry: text(values.industry),
     phone: text(values.phone),
     notes: text(values.notes),
-    ownerUserId: text(values.ownerUserId),
+    ownerUserId: text(values.ownerUserId ?? values.ownerId),
   };
 }
 
