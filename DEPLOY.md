@@ -20,12 +20,25 @@ Use the **session-mode pooler** connection string, not the direct host:
 postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
-- The direct host (`db.<ref>.supabase.co`) is IPv6-only — avoid the whole class
-  of problem.
-- Port **5432** on the pooler is session mode, which pgx's prepared statements
-  need. If you use port **6543** (transaction mode) instead, you must append
-  `&default_query_exec_mode=exec` or every second query fails.
-- URL-encode `@`, `#`, `:` etc. in the password.
+- The username on the pooler is `postgres.<ref>`, **not** plain `postgres`.
+  Copying the pooler host while keeping the direct-connection username fails
+  authentication.
+- The direct host (`db.<ref>.supabase.co`) is IPv6-only and Railway has no IPv6
+  egress. Using it fails before any SQL runs, with:
+
+  ```
+  error: dial tcp [2406:...]:5432: connect: network is unreachable
+  ```
+
+  A bracketed IPv6 address in that message always means the direct host — switch
+  to the pooler, nothing else is wrong.
+- Port **5432** on the pooler is session mode; use it. Port **6543** is
+  transaction mode, which breaks two things at once: pgx's prepared statements
+  (needs `&default_query_exec_mode=exec`) and golang-migrate's session-level
+  advisory lock, which has no workaround.
+- URL-encode `@`, `#`, `:` etc. in the password. golang-migrate uses lib/pq while
+  the gateway uses pgx, and lib/pq is the stricter parser of the two — a URL the
+  API accepts can still fail in the pre-deploy migration.
 
 ## 2. Create the project and the `api` service
 
@@ -215,3 +228,23 @@ Railway project and breaks plain `docker build` reuse for anyone else.
   (JWT + DB), so replicas need no coordination — just watch the total DB
   connection count (`numReplicas × maxConns`).
 - The pre-deploy migration runs once per deploy regardless of replica count.
+
+## Database lifecycle
+
+`services/migrations/` holds a **squashed** `000001_init` — the whole schema in
+one file, every statement `IF NOT EXISTS`. Two consequences worth knowing before
+you touch it:
+
+- **It only applies cleanly to an empty database.** golang-migrate refuses to run
+  at all against a database whose `schema_migrations` version is absent from the
+  source ("no migration found for version N"), which is what happens to any
+  environment that was migrated before the squash.
+- **Never re-squash a schema that is already deployed.** Because every statement
+  is `IF NOT EXISTS`, running the init against a populated database silently
+  no-ops on existing tables, skips new columns, and *reports success* — the
+  failure surfaces later as missing-column errors at runtime. Add changes as new
+  numbered migrations instead.
+
+Environments must not share a database. Local development and production each get
+their own Supabase project; a local `migrate up` against production is how the
+schema and the migration history drift apart in the first place.
