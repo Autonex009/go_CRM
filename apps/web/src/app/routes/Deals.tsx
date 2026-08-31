@@ -97,7 +97,7 @@ export default function Deals() {
               )} open · ${formatMoneyCompact(totals.won, currency)} won`
         }
         action={
-          <Button icon="plus" onClick={() => setDialog({ deal: null, stage: "lead" })}>
+          <Button icon="plus" onClick={() => setDialog({ deal: null, stage: "discovery" })}>
             New deal
           </Button>
         }
