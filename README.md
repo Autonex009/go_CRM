@@ -27,7 +27,6 @@ go_CRM/
 │   └── migrations/     # golang-migrate SQL migrations
 └── .github/workflows/  # CI
 ```
-
 ## Stack
 
 **Frontend:** Turborepo + pnpm · Astro + React · TailwindCSS · React Router v6 · React Native + Expo · TanStack Query · Zustand · React Hook Form + Zod
