@@ -7,7 +7,7 @@
   },
   "deploy": {
     "startCommand": "/app/gateway",
-    "preDeployCommand": "sh -c 'set -e; migrate -verbose -path /app/migrations -database \"$DATABASE_URL\" up'",
+    "preDeployCommand": "/app/predeploy.sh",
     "healthcheckPath": "/healthz",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",

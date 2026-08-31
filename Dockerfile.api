@@ -42,6 +42,9 @@ WORKDIR /app
 COPY --from=build /out/gateway      /app/gateway
 COPY --from=build /go/bin/migrate   /usr/local/bin/migrate
 COPY services/migrations            /app/migrations
+COPY services/scripts/predeploy.sh  /app/predeploy.sh
+# The exec bit does not survive a checkout on Windows, so set it here.
+RUN chmod +x /app/predeploy.sh
 
 USER app
 EXPOSE 8080
