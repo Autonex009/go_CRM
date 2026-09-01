@@ -90,8 +90,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 export const authApi = {
   login: (email: string, password: string) =>
     postJSON<AuthResponse>("/login", { email, password }),
-  register: (email: string, password: string) =>
-    postJSON<AuthResponse>("/register", { email, password }),
+  register: (email: string, password: string, name?: string) =>
+    postJSON<AuthResponse>("/register", { email, password, name }),
 };
 
 /**
