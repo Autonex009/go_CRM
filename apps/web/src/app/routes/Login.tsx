@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { loginSchema, type LoginInput } from "@go-crm/schemas";
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 
@@ -13,10 +13,14 @@ import { Divider } from "../ui";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlError = searchParams.get("error");
   const setSession = useAuthStore((s) => s.setSession);
   const authenticated = useIsAuthenticated();
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  const displayError = formError || urlError;
 
   const {
     register,
@@ -98,10 +102,10 @@ export default function Login() {
         </div>
 
         {/* Form Error Alert */}
-        {formError && (
+        {displayError && (
           <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs font-semibold text-rose-600 dark:text-rose-400">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{formError}</span>
+            <span>{displayError}</span>
           </div>
         )}
 
