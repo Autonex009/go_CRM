@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AuthLayout } from "../auth/AuthLayout";
 import { SsoButtons } from "../auth/SsoButtons";
@@ -12,9 +12,13 @@ import { Alert, Button, Divider, Field } from "../ui";
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlError = searchParams.get("error");
   const setSession = useAuthStore((s) => s.setSession);
   const authenticated = useIsAuthenticated();
   const [formError, setFormError] = useState<string | null>(null);
+
+  const displayError = formError || urlError;
 
   const {
     register,
@@ -40,7 +44,7 @@ export default function Register() {
   return (
     <AuthLayout title="Create account" subtitle="Start using go-CRM">
       <form onSubmit={onSubmit} className="flex flex-col gap-md" noValidate>
-        {formError && <Alert>{formError}</Alert>}
+        {displayError && <Alert>{displayError}</Alert>}
         <Field
           label="Email"
           type="email"
