@@ -7,6 +7,7 @@ import { z } from "zod";
  */
 export const registerSchema = loginSchema
   .extend({
+    name: z.string().optional(),
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {

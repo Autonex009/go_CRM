@@ -30,10 +30,10 @@ export default function Register() {
     return <Navigate to="/" replace />;
   }
 
-  const onSubmit = handleSubmit(async ({ email, password }) => {
+  const onSubmit = handleSubmit(async ({ name, email, password }) => {
     setFormError(null);
     try {
-      const { token, user } = await authApi.register(email, password);
+      const { token, user } = await authApi.register(email, password, name);
       setSession(token, user);
       navigate("/", { replace: true });
     } catch (err) {
@@ -45,6 +45,14 @@ export default function Register() {
     <AuthLayout title="Create account" subtitle="Start using go-CRM">
       <form onSubmit={onSubmit} className="flex flex-col gap-md" noValidate>
         {displayError && <Alert>{displayError}</Alert>}
+        <Field
+          label="Full Name"
+          type="text"
+          autoComplete="name"
+          placeholder="Jane Doe"
+          error={errors.name?.message}
+          {...register("name")}
+        />
         <Field
           label="Email"
           type="email"
