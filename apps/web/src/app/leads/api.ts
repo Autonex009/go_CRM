@@ -8,22 +8,27 @@ import type { IconName, Tone } from "../ui";
  */
 export const LEAD_STAGES = [
   "new",
-  "contacted",
-  "replied",
-  "call_booked",
-  "call_done",
-  "converted",
-  "dropped",
+  "initial count",
+  "deck sent",
+  "call scheduled",
+  "call done",
+  "proposal sent",
+  "closed",
+  "not interested",
 ] as const;
 export type LeadStage = (typeof LEAD_STAGES)[number];
+
+/** Stages where the work has finished, one way or the other. */
+export const TERMINAL_STAGES: LeadStage[] = ["closed", "not interested"];
 
 /** The stages that form the funnel strip; the two terminal ones sit outside it. */
 export const FUNNEL_STAGES: LeadStage[] = [
   "new",
-  "contacted",
-  "replied",
-  "call_booked",
-  "call_done",
+  "initial count",
+  "deck sent",
+  "call scheduled",
+  "call done",
+  "proposal sent",
 ];
 
 /** Mirrors leads.Lead. */
@@ -159,13 +164,14 @@ interface StageMeta {
 }
 
 export const STAGE_META: Record<LeadStage, StageMeta> = {
-  new: { label: "New", tone: "neutral", bar: "bg-neutral-300" },
-  contacted: { label: "Contacted", tone: "info", bar: "bg-info-500" },
-  replied: { label: "Replied", tone: "brand", bar: "bg-brand-500" },
-  call_booked: { label: "Call booked", tone: "warning", bar: "bg-warning-500" },
-  call_done: { label: "Call done", tone: "success", bar: "bg-success-500" },
-  converted: { label: "Converted", tone: "success", bar: "bg-success-600" },
-  dropped: { label: "Dropped", tone: "danger", bar: "bg-danger-500" },
+  "new": { label: "New", tone: "neutral", bar: "bg-neutral-300" },
+  "initial count": { label: "Initial count", tone: "info", bar: "bg-info-500" },
+  "deck sent": { label: "Deck sent", tone: "brand", bar: "bg-brand-500" },
+  "call scheduled": { label: "Call scheduled", tone: "warning", bar: "bg-warning-500" },
+  "call done": { label: "Call done", tone: "success", bar: "bg-success-500" },
+  "proposal sent": { label: "Proposal sent", tone: "success", bar: "bg-success-600" },
+  "closed": { label: "Closed", tone: "success", bar: "bg-success-600" },
+  "not interested": { label: "Not interested", tone: "danger", bar: "bg-danger-500" },
 };
 
 export function stageLabel(stage: string): string {
@@ -189,11 +195,12 @@ interface NextAction {
 }
 
 export const NEXT_ACTION: Partial<Record<LeadStage, NextAction>> = {
-  new: { label: "Log outreach", toStage: "contacted", icon: "mail" },
-  contacted: { label: "Log reply", toStage: "replied", icon: "mail" },
-  replied: { label: "Book call", toStage: "call_booked", icon: "phone", needsDate: true },
-  call_booked: { label: "Mark call done", toStage: "call_done", icon: "check" },
-  call_done: { label: "Convert to deal", toStage: "converted", icon: "deals", convert: true },
+  "new": { label: "Log initial count", toStage: "initial count", icon: "mail" },
+  "initial count": { label: "Send deck", toStage: "deck sent", icon: "mail" },
+  "deck sent": { label: "Schedule call", toStage: "call scheduled", icon: "phone", needsDate: true },
+  "call scheduled": { label: "Mark call done", toStage: "call done", icon: "check" },
+  "call done": { label: "Send proposal", toStage: "proposal sent", icon: "mail" },
+  "proposal sent": { label: "Mark closed", toStage: "closed", icon: "check" },
 };
 
 /** "3 days overdue" / "Due tomorrow" — the follow-up column's wording. */
@@ -206,7 +213,7 @@ export function followUpLabel(lead: Lead): { text: string; tone: "overdue" | "du
   due.setHours(0, 0, 0, 0);
 
   const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);
-  const finished = lead.stage === "converted" || lead.stage === "dropped";
+  const finished = TERMINAL_STAGES.includes(lead.stage as LeadStage);
 
   if (days < 0) {
     const n = Math.abs(days);
