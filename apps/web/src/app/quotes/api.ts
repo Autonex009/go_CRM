@@ -2,7 +2,7 @@ import type { DocumentItemInput } from "../documents/types";
 import { apiFetch } from "../lib/api";
 import type { Tone } from "../ui";
 
-export const QUOTE_STATUSES = ["draft", "sent", "accepted", "declined", "expired"] as const;
+export const QUOTE_STATUSES = ["draft", "sent", "approved", "rejected", "expired"] as const;
 export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
 
 /** Mirrors quotes.Item. Every money figure except the inputs is server-derived. */
@@ -113,8 +113,8 @@ interface StatusMeta {
 export const STATUS_META: Record<QuoteStatus, StatusMeta> = {
   draft: { label: "Draft", tone: "neutral" },
   sent: { label: "Sent", tone: "info" },
-  accepted: { label: "Accepted", tone: "success" },
-  declined: { label: "Declined", tone: "danger" },
+  approved: { label: "Approved", tone: "success" },
+  rejected: { label: "Rejected", tone: "danger" },
   expired: { label: "Expired", tone: "warning" },
 };
 
@@ -125,9 +125,9 @@ export const STATUS_META: Record<QuoteStatus, StatusMeta> = {
  */
 const TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
   draft: ["sent"],
-  sent: ["accepted", "declined", "expired", "draft"],
-  accepted: [],
-  declined: ["draft"],
+  sent: ["approved", "rejected", "expired", "draft"],
+  approved: [],
+  rejected: ["draft"],
   expired: ["draft"],
 };
 

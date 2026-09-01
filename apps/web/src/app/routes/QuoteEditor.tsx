@@ -293,7 +293,7 @@ export default function QuoteEditor() {
           {nextStatuses(status).map((next) => (
             <Button
               key={next}
-              variant={next === "accepted" ? "primary" : "secondary"}
+              variant={next === "approved" ? "primary" : "secondary"}
               size="sm"
               disabled={transition.isPending}
               onClick={() => transition.mutate(next)}
@@ -301,7 +301,7 @@ export default function QuoteEditor() {
               {next === "draft" ? "Revise (back to draft)" : `Mark ${STATUS_META[next].label}`}
             </Button>
           ))}
-          {status === "accepted" && (
+          {status === "approved" && (
             <Button size="sm" disabled={raiseInvoice.isPending} onClick={() => raiseInvoice.mutate()}>
               {raiseInvoice.isPending ? "Raising…" : "Raise invoice"}
             </Button>

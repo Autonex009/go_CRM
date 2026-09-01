@@ -20,9 +20,8 @@ export const LEAD_STATUSES = [
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const DEAL_STAGES = [
-  "discovery",
-  "site_assessment",
-  "quote_sent",
+  "prospect",
+  "proposal",
   "negotiation",
   "won",
   "lost",
