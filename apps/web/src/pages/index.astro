@@ -1,328 +1,95 @@
 ---
-// Static, high-converting marketing landing page with modern aesthetics.
+// Minimal, sleek marketing landing page for DealBridge CRM.
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="DealBridge CRM | Modern Sales & Pipeline Intelligence">
-  <div class="relative min-h-screen bg-canvas text-fg overflow-hidden">
-    {/* Subtle Background Glows */}
-    <div class="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-indigo-500/20 via-purple-500/15 to-pink-500/10 blur-[120px] dark:from-indigo-600/30 dark:via-purple-600/20 dark:to-emerald-500/10" />
-    <div class="pointer-events-none absolute top-1/3 -right-60 -z-10 h-[400px] w-[500px] rounded-full bg-gradient-to-b from-blue-500/15 to-indigo-500/10 blur-[100px]" />
+<Base title="DealBridge CRM | Minimal Sales & Pipeline Workspace">
+  <main class="relative flex min-h-screen flex-col justify-between bg-canvas text-fg px-4 py-8 sm:px-6 lg:px-8">
+    {/* Subtle Glow Accent */}
+    <div class="pointer-events-none absolute -top-32 left-1/2 -z-10 h-96 w-[600px] -translate-x-1/2 rounded-full bg-indigo-500/10 blur-[100px] dark:bg-indigo-500/15" />
 
-    {/* Navigation Header */}
-    <header class="sticky top-0 z-50 border-b border-line bg-surface/80 backdrop-blur-md">
-      <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <a href="/" class="flex items-center gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface shadow-xs overflow-hidden">
-            <img src="/autonex_ai_logo.jpeg" alt="Autonex AI" class="h-full w-full object-cover" />
-          </div>
-          <div class="flex flex-col">
-            <span class="text-base font-bold tracking-tight text-fg">DealBridge</span>
-            <span class="text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">CRM Portal</span>
-          </div>
-        </a>
-
-        <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-fg-muted">
-          <a href="#features" class="transition-colors hover:text-fg">Features</a>
-          <a href="#pipeline" class="transition-colors hover:text-fg">Pipeline</a>
-          <a href="#integrations" class="transition-colors hover:text-fg">Integrations</a>
-          <a href="#security" class="transition-colors hover:text-fg">Security</a>
-        </nav>
-
-        <div class="flex items-center gap-3">
-          <a
-            href="/app/login"
-            class="hidden sm:inline-flex h-9 items-center rounded-xl border border-line bg-surface px-4 text-xs font-semibold text-fg transition-colors hover:bg-surface-hover"
-          >
-            Sign In
-          </a>
-          <a
-            href="/app"
-            class="inline-flex h-9 items-center rounded-xl bg-indigo-600 px-4 text-xs font-semibold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-500 hover:shadow-indigo-500/30"
-          >
-            Open CRM App →
-          </a>
+    {/* Top Header */}
+    <header class="mx-auto flex w-full max-w-4xl items-center justify-between">
+      <a href="/" class="flex items-center gap-2.5">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface overflow-hidden shadow-xs">
+          <img src="/autonex_ai_logo.jpeg" alt="Autonex AI" class="h-full w-full object-cover" />
         </div>
+        <span class="text-sm font-bold tracking-tight text-fg">DealBridge <span class="text-fg-subtle font-normal">CRM</span></span>
+      </a>
+
+      <div class="flex items-center gap-3">
+        <a
+          href="/app/login"
+          class="text-xs font-semibold text-fg-muted transition-colors hover:text-fg"
+        >
+          Sign In
+        </a>
+        <a
+          href="/app"
+          class="inline-flex h-8 items-center rounded-lg bg-indigo-600 px-3.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-indigo-500"
+        >
+          Open App →
+        </a>
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-4 pt-16 pb-24 sm:px-6 lg:pt-20">
-      {/* Hero Section */}
-      <section class="text-center max-w-4xl mx-auto">
-        <div class="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-6 backdrop-blur-md">
-          <span class="relative flex h-2 w-2">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-          </span>
-          ⚡ Next-Gen CRM & Pipeline Intelligence
+    {/* Hero Content */}
+    <section class="mx-auto my-auto max-w-2xl text-center py-12">
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 shadow-xs mb-6">
+        <span class="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+        Pipeline & Sales Workspace
+      </span>
+
+      <h1 class="text-3xl font-extrabold tracking-tight text-fg sm:text-5xl sm:leading-tight">
+        The CRM your team <br />
+        <span class="text-indigo-600 dark:text-indigo-400">actually keeps open.</span>
+      </h1>
+
+      <p class="mt-4 text-sm sm:text-base text-fg-muted leading-relaxed max-w-xl mx-auto">
+        Kanban pipelines that move the way your team does. Contacts, deals, Google Calendar meeting sync, and tax invoices in one minimal workspace.
+      </p>
+
+      {/* Action Buttons */}
+      <div class="mt-8 flex items-center justify-center gap-3">
+        <a
+          href="/app"
+          class="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-6 text-xs font-semibold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-500"
+        >
+          Launch Workspace
+        </a>
+        <a
+          href="/app/register"
+          class="inline-flex h-10 items-center justify-center rounded-xl border border-line bg-surface px-6 text-xs font-semibold text-fg transition-colors hover:bg-surface-hover"
+        >
+          Create Account
+        </a>
+      </div>
+
+      {/* Minimal Feature Highlights */}
+      <div class="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+        <div class="rounded-xl border border-line bg-surface/70 p-3.5 backdrop-blur-xs">
+          <div class="text-xs font-bold text-fg">📊 Kanban Pipeline</div>
+          <p class="mt-1 text-[11px] text-fg-muted">Drag-and-drop deals with probability & stage velocity.</p>
         </div>
-
-        <h1 class="text-4xl font-extrabold tracking-tight text-fg sm:text-6xl lg:text-7xl leading-[1.1]">
-          The CRM your team <br class="hidden sm:inline" />
-          <span class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 bg-clip-text text-transparent dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400">
-            actually keeps open.
-          </span>
-        </h1>
-
-        <p class="mt-6 text-lg text-fg-muted max-w-2xl mx-auto leading-relaxed sm:text-xl">
-          Kanban pipelines that move at the speed of your sales team. Google Calendar & Slack integration, custom quote approvals, and 1-click tax invoices — in one workspace.
-        </p>
-
-        <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <a
-            href="/app"
-            class="inline-flex h-12 items-center justify-center rounded-2xl bg-indigo-600 px-8 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-500 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            Launch CRM Workspace
-            <svg class="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-          </a>
-          <a
-            href="/app/register"
-            class="inline-flex h-12 items-center justify-center rounded-2xl border border-line bg-surface/80 backdrop-blur-md px-8 text-sm font-semibold text-fg transition-all hover:bg-surface-hover hover:border-line-strong hover:scale-[1.02]"
-          >
-            Create Free Account
-          </a>
+        <div class="rounded-xl border border-line bg-surface/70 p-3.5 backdrop-blur-xs">
+          <div class="text-xs font-bold text-fg">📅 Calendar & Slack</div>
+          <p class="mt-1 text-[11px] text-fg-muted">Direct Google Meet booking & automated team alerts.</p>
         </div>
-
-        {/* Live Metrics Trust Bar */}
-        <div class="mt-12 flex flex-wrap items-center justify-center gap-8 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-          <div class="flex items-center gap-2">
-            <svg class="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            99.9% Uptime SLA
-          </div>
-          <div class="flex items-center gap-2">
-            <svg class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Google & Slack Sync
-          </div>
-          <div class="flex items-center gap-2">
-            <svg class="h-4 w-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-            Multi-Tenant Isolation
-          </div>
-        </div>
-      </section>
-
-      {/* Interactive CRM Dashboard Mockup */}
-      <section id="pipeline" class="mt-16 sm:mt-24">
-        <div class="relative mx-auto max-w-5xl rounded-3xl border border-line bg-surface/90 p-4 sm:p-6 shadow-2xl backdrop-blur-xl ring-1 ring-white/10">
-          {/* Header Controls Mockup */}
-          <div class="flex items-center justify-between border-b border-line pb-4 mb-6">
-            <div class="flex items-center gap-3">
-              <div class="flex gap-1.5">
-                <div class="h-3 w-3 rounded-full bg-rose-500/80" />
-                <div class="h-3 w-3 rounded-full bg-amber-500/80" />
-                <div class="h-3 w-3 rounded-full bg-emerald-500/80" />
-              </div>
-              <span class="text-xs font-bold text-fg-muted tracking-tight">DealBridge Active Pipeline</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="rounded-lg bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                Pipeline Value: $475,000
-              </span>
-            </div>
-          </div>
-
-          {/* Kanban Columns Mockup */}
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Column 1: Discovery */}
-            <div class="rounded-2xl border border-line bg-surface-muted/50 p-3">
-              <div class="flex items-center justify-between mb-3 px-1">
-                <span class="text-xs font-bold text-fg uppercase tracking-wider">Discovery</span>
-                <span class="rounded-md bg-surface px-2 py-0.5 text-[10px] font-bold text-fg-muted border border-line">2</span>
-              </div>
-              <div class="space-y-3">
-                <div class="rounded-xl border border-line bg-surface p-3 shadow-xs">
-                  <div class="text-xs font-bold text-fg">Apex Infrastructure</div>
-                  <div class="mt-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">$120,000 · 40%</div>
-                  <div class="mt-2 flex items-center justify-between text-[10px] text-fg-subtle">
-                    <span>Contact: Sarah C.</span>
-                    <span class="rounded bg-indigo-500/10 px-1.5 py-0.5 text-indigo-500">Call Booked</span>
-                  </div>
-                </div>
-                <div class="rounded-xl border border-line bg-surface p-3 shadow-xs">
-                  <div class="text-xs font-bold text-fg">Nova Analytics</div>
-                  <div class="mt-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">$45,000 · 30%</div>
-                  <div class="mt-2 flex items-center justify-between text-[10px] text-fg-subtle">
-                    <span>Contact: Dave M.</span>
-                    <span class="rounded bg-surface-muted px-1.5 py-0.5">New Lead</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Column 2: Site Assessment */}
-            <div class="rounded-2xl border border-line bg-surface-muted/50 p-3">
-              <div class="flex items-center justify-between mb-3 px-1">
-                <span class="text-xs font-bold text-fg uppercase tracking-wider">Assessment</span>
-                <span class="rounded-md bg-surface px-2 py-0.5 text-[10px] font-bold text-fg-muted border border-line">1</span>
-              </div>
-              <div class="space-y-3">
-                <div class="rounded-xl border border-line bg-surface p-3 shadow-xs">
-                  <div class="text-xs font-bold text-fg">Stark Defense Systems</div>
-                  <div class="mt-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400">$180,000 · 60%</div>
-                  <div class="mt-2 flex items-center justify-between text-[10px] text-fg-subtle">
-                    <span>Contact: Tony S.</span>
-                    <span class="rounded bg-purple-500/10 px-1.5 py-0.5 text-purple-500">Survey Done</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Column 3: Quote Sent */}
-            <div class="rounded-2xl border border-line bg-surface-muted/50 p-3">
-              <div class="flex items-center justify-between mb-3 px-1">
-                <span class="text-xs font-bold text-fg uppercase tracking-wider">Quote Sent</span>
-                <span class="rounded-md bg-surface px-2 py-0.5 text-[10px] font-bold text-fg-muted border border-line">1</span>
-              </div>
-              <div class="space-y-3">
-                <div class="rounded-xl border border-line bg-surface p-3 shadow-xs border-l-4 border-l-amber-500">
-                  <div class="text-xs font-bold text-fg">Wayne Enterprises</div>
-                  <div class="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">$75,000 · 80%</div>
-                  <div class="mt-2 flex items-center justify-between text-[10px] text-fg-subtle">
-                    <span>Quote #QT-2026-04</span>
-                    <span class="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 dark:text-amber-400">Awaiting Sign</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Column 4: Won */}
-            <div class="rounded-2xl border border-line bg-surface-muted/50 p-3">
-              <div class="flex items-center justify-between mb-3 px-1">
-                <span class="text-xs font-bold text-fg uppercase tracking-wider">Won</span>
-                <span class="rounded-md bg-surface px-2 py-0.5 text-[10px] font-bold text-fg-muted border border-line">1</span>
-              </div>
-              <div class="space-y-3">
-                <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3 shadow-xs border-l-4 border-l-emerald-500">
-                  <div class="text-xs font-bold text-fg">Cyberdyne Networks</div>
-                  <div class="mt-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">$55,000 · 100%</div>
-                  <div class="mt-2 flex items-center justify-between text-[10px] text-fg-subtle">
-                    <span>Tax Invoice Issued</span>
-                    <span class="rounded bg-emerald-500/20 px-1.5 py-0.5 text-emerald-600 dark:text-emerald-300 font-bold">Closed Won</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature Grid */}
-      <section id="features" class="mt-24 sm:mt-32">
-        <div class="text-center max-w-2xl mx-auto mb-16">
-          <h2 class="text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">
-            Everything your sales team needs to close faster.
-          </h2>
-          <p class="mt-4 text-base text-fg-muted">
-            Eliminate context switching between disconnected tools. Manage companies, contacts, pipelines, quotes, and tax invoices in a single performant workspace.
-          </p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Card 1 */}
-          <div class="rounded-3xl border border-line bg-surface p-6 shadow-sm hover:shadow-md transition-all">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 mb-5">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            </div>
-            <h3 class="text-lg font-bold text-fg">Kanban Deal Pipeline</h3>
-            <p class="mt-2 text-sm text-fg-muted leading-relaxed">
-              Drag-and-drop deal management with custom stages, deal value estimates, probability scoring, and automated stage change triggers.
-            </p>
-          </div>
-
-          {/* Card 2 */}
-          <div class="rounded-3xl border border-line bg-surface p-6 shadow-sm hover:shadow-md transition-all">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 mb-5">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </div>
-            <h3 class="text-lg font-bold text-fg">Google Calendar Integration</h3>
-            <p class="mt-2 text-sm text-fg-muted leading-relaxed">
-              Schedule meetings directly from lead cards. Automatically generate Google Meet links and sync events seamlessly into your calendar.
-            </p>
-          </div>
-
-          {/* Card 3 */}
-          <div class="rounded-3xl border border-line bg-surface p-6 shadow-sm hover:shadow-md transition-all">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 mb-5">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            </div>
-            <h3 class="text-lg font-bold text-fg">Quotes to Tax Invoices</h3>
-            <p class="mt-2 text-sm text-fg-muted leading-relaxed">
-              Create versioned quotes with line items and manager approvals. Convert won deals directly into compliant tax invoices in 1 click.
-            </p>
-          </div>
-
-          {/* Card 4 */}
-          <div class="rounded-3xl border border-line bg-surface p-6 shadow-sm hover:shadow-md transition-all">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mb-5">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
-            </div>
-            <h3 class="text-lg font-bold text-fg">Slack Channel Sync</h3>
-            <p class="mt-2 text-sm text-fg-muted leading-relaxed">
-              Automatically create deal channels in Slack. Notify your team when high-value leads convert or when deals move to won stage.
-            </p>
-          </div>
-
-          {/* Card 5 */}
-          <div class="rounded-3xl border border-line bg-surface p-6 shadow-sm hover:shadow-md transition-all">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 mb-5">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-            </div>
-            <h3 class="text-lg font-bold text-fg">Company & Contact Hub</h3>
-            <p class="mt-2 text-sm text-fg-muted leading-relaxed">
-              Consolidate client history, associated contacts, deals, activities, and communication timelines under unified company accounts.
-            </p>
-          </div>
-
-          {/* Card 6 */}
-          <div class="rounded-3xl border border-line bg-surface p-6 shadow-sm hover:shadow-md transition-all">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 mb-5">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            </div>
-            <h3 class="text-lg font-bold text-fg">Enterprise Governance</h3>
-            <p class="mt-2 text-sm text-fg-muted leading-relaxed">
-              Immutable audit logs tracking every state mutation, organization-level multi-tenancy, and fine-grained user permissions.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Footer Card */}
-      <section class="mt-24 sm:mt-32">
-        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-6 py-16 text-center text-white shadow-2xl sm:px-12 sm:py-20">
-          <h2 class="text-3xl font-extrabold tracking-tight sm:text-5xl">
-            Ready to streamline your sales pipeline?
-          </h2>
-          <p class="mx-auto mt-4 max-w-xl text-base text-indigo-100 sm:text-lg">
-            Join forward-thinking sales teams using DealBridge CRM to convert more leads into predictable revenue.
-          </p>
-          <div class="mt-8 flex justify-center gap-4">
-            <a
-              href="/app"
-              class="inline-flex h-12 items-center justify-center rounded-2xl bg-white px-8 text-sm font-bold text-indigo-600 shadow-lg transition-transform hover:scale-[1.03] active:scale-[0.98]"
-            >
-              Get Started Now →
-            </a>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    {/* Footer */}
-    <footer class="border-t border-line bg-surface py-8 text-xs text-fg-muted">
-      <div class="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 gap-4">
-        <div class="flex items-center gap-2">
-          <img src="/autonex_ai_logo.jpeg" alt="Autonex AI" class="h-5 w-5 rounded object-cover" />
-          <span class="font-semibold text-fg">DealBridge CRM</span>
-          <span>© 2026 Autonex AI. All rights reserved.</span>
-        </div>
-        <div class="flex gap-6 font-medium">
-          <a href="/app" class="hover:text-fg transition">App Workspace</a>
-          <a href="/app/login" class="hover:text-fg transition">Sign In</a>
-          <a href="/app/register" class="hover:text-fg transition">Register</a>
+        <div class="rounded-xl border border-line bg-surface/70 p-3.5 backdrop-blur-xs">
+          <div class="text-xs font-bold text-fg">📄 Quotes & Invoices</div>
+          <p class="mt-1 text-[11px] text-fg-muted">1-click conversion from won deals to tax invoices.</p>
         </div>
       </div>
+    </section>
+
+    {/* Minimal Footer */}
+    <footer class="mx-auto flex w-full max-w-4xl items-center justify-between text-[11px] text-fg-subtle pt-4 border-t border-line/60">
+      <span>© 2026 Autonex AI</span>
+      <div class="flex gap-4">
+        <a href="/app" class="hover:text-fg transition">App</a>
+        <a href="/app/login" class="hover:text-fg transition">Login</a>
+        <a href="/app/register" class="hover:text-fg transition">Register</a>
+      </div>
     </footer>
-  </div>
+  </main>
 </Base>
