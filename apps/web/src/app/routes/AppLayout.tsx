@@ -181,13 +181,12 @@ const Sidebar = memo(function Sidebar({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
-  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const location = useLocation();
 
   return (
     <>
       {/* Brand Header */}
-      <div className={`flex h-16 items-center border-b border-line px-3.5 ${collapsed ? "justify-between" : "justify-between"}`}>
+      <div className={`flex h-16 items-center border-b border-line px-3.5 ${collapsed ? "justify-center" : "justify-start px-4"}`}>
         <Link to="/" onClick={onNavigate} className="flex items-center gap-2.5 overflow-hidden">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden border border-line bg-surface shadow-xs">
             <img src="/autonex_ai_logo.jpeg" alt="Autonex AI" className="h-full w-full object-cover" />
@@ -203,18 +202,6 @@ const Sidebar = memo(function Sidebar({
             </div>
           )}
         </Link>
-
-        <button
-          onClick={toggleSidebar}
-          className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-fg-muted transition-all duration-150 hover:bg-indigo-500/10 hover:border-indigo-500/30 hover:text-indigo-600 dark:hover:text-indigo-400"
-          title={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </button>
       </div>
 
       {/* Navigation */}
@@ -275,18 +262,8 @@ const Sidebar = memo(function Sidebar({
         ))}
       </nav>
 
-      {/* Footer Workspace Badge / Toggle */}
-      {collapsed ? (
-        <div className="p-2.5 flex justify-center border-t border-line">
-          <button
-            onClick={toggleSidebar}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface text-fg-muted transition-colors hover:bg-indigo-500/10 hover:border-indigo-500/30 hover:text-indigo-600 dark:hover:text-indigo-400"
-            title="Expand sidebar (Ctrl+B)"
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-          </button>
-        </div>
-      ) : (
+      {/* Footer Workspace Badge */}
+      {!collapsed ? (
         <div className="border-t border-line p-3 bg-surface-muted/40">
           <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-2.5">
             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -296,10 +273,15 @@ const Sidebar = memo(function Sidebar({
             </div>
           </div>
         </div>
+      ) : (
+        <div className="border-t border-line p-3.5 flex justify-center">
+          <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" title="Autonex Workspace Active" />
+        </div>
       )}
     </>
   );
 });
+
 
 const Topbar = memo(function Topbar({
   title,
