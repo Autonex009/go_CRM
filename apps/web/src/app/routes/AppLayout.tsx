@@ -20,6 +20,9 @@ import {
   User,
   Shield,
   Menu,
+  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 import { endSession } from "../auth/session";
@@ -85,12 +88,25 @@ export default function AppLayout() {
   useWorkspaceSync();
 
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const drawerOpen = useAppStore((s) => s.drawerOpen);
   const setDrawerOpen = useAppStore((s) => s.setDrawerOpen);
   const closeDrawer = useCallback(() => setDrawerOpen(false), [setDrawerOpen]);
 
   const { pathname } = useLocation();
   const [commandSearchOpen, setCommandSearchOpen] = useState(false);
+
+  // Global Ctrl+B / Cmd+B keyboard shortcut to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleSidebar]);
 
   const getPageTitle = () => {
     if (TITLES[pathname]) return TITLES[pathname];
@@ -171,7 +187,7 @@ const Sidebar = memo(function Sidebar({
   return (
     <>
       {/* Brand Header */}
-      <div className={`flex h-16 items-center border-b border-line px-4 ${collapsed ? "justify-center" : "justify-between"}`}>
+      <div className={`flex h-16 items-center border-b border-line px-3.5 ${collapsed ? "justify-between" : "justify-between"}`}>
         <Link to="/" onClick={onNavigate} className="flex items-center gap-2.5 overflow-hidden">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden border border-line bg-surface shadow-xs">
             <img src="/autonex_ai_logo.jpeg" alt="Autonex AI" className="h-full w-full object-cover" />
@@ -188,25 +204,29 @@ const Sidebar = memo(function Sidebar({
           )}
         </Link>
 
-        {!collapsed && (
-          <button
-            onClick={toggleSidebar}
-            className="hidden md:flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-surface text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-            title="Collapse sidebar"
-          >
+        <button
+          onClick={toggleSidebar}
+          className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-fg-muted transition-all duration-150 hover:bg-indigo-500/10 hover:border-indigo-500/30 hover:text-indigo-600 dark:hover:text-indigo-400"
+          title={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
             <ChevronLeft className="h-4 w-4" />
-          </button>
-        )}
+          )}
+        </button>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
         {NAV_GROUPS.map((group, idx) => (
           <div key={idx} className="space-y-1">
-            {!collapsed && (
+            {!collapsed ? (
               <h3 className="px-3 text-[11px] font-bold uppercase tracking-wider text-fg-subtle/80 mb-1.5">
                 {group.group}
               </h3>
+            ) : (
+              <div className="h-px bg-line/60 my-2 mx-1" />
             )}
             {group.items.map((item) => {
               const IconComp = item.icon;
@@ -221,9 +241,9 @@ const Sidebar = memo(function Sidebar({
                   to={item.to}
                   end={item.end}
                   onClick={onNavigate}
-                  title={collapsed ? item.label : undefined}
+                  title={collapsed ? `${item.label} (${group.group})` : undefined}
                   className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
-                    collapsed ? "justify-center" : ""
+                    collapsed ? "justify-center px-0" : ""
                   } ${
                     isActive
                       ? "bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-500/30"
@@ -241,6 +261,13 @@ const Sidebar = memo(function Sidebar({
                   {isActive && !collapsed && (
                     <span className="h-1.5 w-1.5 rounded-full bg-white" />
                   )}
+
+                  {/* Collapsed Tooltip on Hover */}
+                  {collapsed && (
+                    <div className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-fg shadow-lg group-hover:block whitespace-nowrap">
+                      {item.label}
+                    </div>
+                  )}
                 </NavLink>
               );
             })}
@@ -248,20 +275,18 @@ const Sidebar = memo(function Sidebar({
         ))}
       </nav>
 
-      {collapsed && (
-        <div className="p-3 flex justify-center border-t border-line">
+      {/* Footer Workspace Badge / Toggle */}
+      {collapsed ? (
+        <div className="p-2.5 flex justify-center border-t border-line">
           <button
             onClick={toggleSidebar}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-fg-muted hover:bg-surface-hover hover:text-fg"
-            title="Expand sidebar"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface text-fg-muted transition-colors hover:bg-indigo-500/10 hover:border-indigo-500/30 hover:text-indigo-600 dark:hover:text-indigo-400"
+            title="Expand sidebar (Ctrl+B)"
           >
-            <ChevronRight className="h-4 w-4" />
+            <PanelLeftOpen className="h-4 w-4" />
           </button>
         </div>
-      )}
-
-      {/* Footer Workspace Badge */}
-      {!collapsed && (
+      ) : (
         <div className="border-t border-line p-3 bg-surface-muted/40">
           <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-2.5">
             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -285,6 +310,8 @@ const Topbar = memo(function Topbar({
 }) {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const setDrawerOpen = useAppStore((s) => s.setDrawerOpen);
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -295,19 +322,10 @@ const Topbar = memo(function Topbar({
   }, [navigate]);
 
   const fullName = user?.name?.trim() || user?.email || "User";
-  const getInitials = (name: string) => {
-    if (!name) return "U";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   return (
     <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface/90 backdrop-blur-md px-4 sm:px-6 shadow-xs">
-      {/* Left: Mobile Menu & Breadcrumbs */}
+      {/* Left: Mobile Menu, Desktop Sidebar Toggle & Breadcrumbs */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => setDrawerOpen(true)}
@@ -315,6 +333,16 @@ const Topbar = memo(function Topbar({
         >
           <Menu className="h-4 w-4" />
         </button>
+
+        {/* Desktop Sidebar Toggle Button in Header */}
+        <button
+          onClick={toggleSidebar}
+          className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+          title={sidebarOpen ? "Collapse Sidebar (Ctrl+B)" : "Expand Sidebar (Ctrl+B)"}
+        >
+          {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4 text-indigo-500" />}
+        </button>
+
         <div className="flex items-center gap-2 text-sm font-medium text-fg-muted">
           <span>DealBridge</span>
           <span>/</span>
