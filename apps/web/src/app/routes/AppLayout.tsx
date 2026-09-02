@@ -27,7 +27,9 @@ import {
 
 import { endSession } from "../auth/session";
 import { useAuthStore } from "../auth/store";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { useWorkspaceSync } from "../org/workspace";
+
 import { useAppStore } from "../store";
 import { Avatar, Spinner, ThemeToggle } from "../ui";
 import { CommandPalette } from "../ui/CommandPalette";
@@ -398,17 +400,14 @@ const Topbar = memo(function Topbar({
             </div>
           )}
         </div>
-
         <div className="h-4 w-px bg-line my-auto mx-0.5" />
 
         {/* Notifications */}
-        <button className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-surface text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-indigo-500 ring-2 ring-surface" />
-        </button>
+        <NotificationBell />
 
         {/* Theme Toggle */}
         <ThemeToggle />
+
 
         <div className="h-4 w-px bg-line my-auto mx-0.5" />
 
