@@ -35,6 +35,118 @@ export const PAGE_SIZE = 25;
 
 const BASE = "/api/v1/accounts";
 
+export interface PlantLocation {
+  name: string;
+  city: string;
+  address?: string;
+  spocName?: string;
+  spocPhone?: string;
+}
+
+export interface HardwareSpecs {
+  edgeProcessor?: string;
+  cameraCount?: number;
+  speakerCount?: number;
+  nvrMake?: string;
+}
+
+export interface CustomSection {
+  title: string;
+  content: string;
+}
+
+export interface CompanyProfile {
+  companyId: string;
+  tagline: string | null;
+  description: string | null;
+  primaryColor: string;
+  bannerUrl: string | null;
+  plantLocations: PlantLocation[];
+  aiDetections: string[];
+  hardwareSpecs: HardwareSpecs;
+  amcStatus: "active" | "pending_renewal" | "expired" | "none";
+  amcStartDate: string | null;
+  amcEndDate: string | null;
+  amcValue: number;
+  customSections: CustomSection[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LinkedDeal {
+  id: string;
+  title: string;
+  stage: string;
+  amount: number;
+  probability: number | null;
+  siteAssessmentDate: string | null;
+  siteAssessmentLocation: string | null;
+  expectedCloseDate: string | null;
+  createdAt: string;
+}
+
+export interface LinkedQuote {
+  id: string;
+  number: string | null;
+  status: string;
+  total: number;
+  currency: string;
+  currentVersion: number;
+  validUntil: string | null;
+  createdAt: string;
+}
+
+export interface LinkedInvoice {
+  id: string;
+  invoiceNumber: string | null;
+  title: string | null;
+  status: string;
+  total: number;
+  amountDue: number;
+  amountPaid: number;
+  dueDate: string | null;
+  createdAt: string;
+}
+
+export interface LinkedContact {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  title: string | null;
+}
+
+export interface FullCompanyProfilePayload {
+  account: Account;
+  profile: CompanyProfile;
+  deals: LinkedDeal[];
+  quotes: LinkedQuote[];
+  invoices: LinkedInvoice[];
+  contacts: LinkedContact[];
+}
+
+export interface ProfileInput {
+  name: string;
+  website?: string | null;
+  industry?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+  ownerUserId?: string | null;
+  tagline?: string | null;
+  description?: string | null;
+  primaryColor?: string | null;
+  bannerUrl?: string | null;
+  plantLocations?: PlantLocation[];
+  aiDetections?: string[];
+  hardwareSpecs?: HardwareSpecs;
+  amcStatus?: string | null;
+  amcStartDate?: string | null;
+  amcEndDate?: string | null;
+  amcValue?: number | null;
+  customSections?: CustomSection[];
+}
+
 export const accountsApi = {
   list: (offset = 0, limit = PAGE_SIZE) =>
     apiFetch<AccountPage>(`${BASE}?limit=${limit}&offset=${offset}`),
@@ -49,7 +161,16 @@ export const accountsApi = {
     }),
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),
+
+  getProfile: (id: string) => apiFetch<FullCompanyProfilePayload>(`${BASE}/${id}/profile`),
+
+  updateProfile: (id: string, payload: ProfileInput) =>
+    apiFetch<FullCompanyProfilePayload>(`${BASE}/${id}/profile`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
 };
+
 
 /**
  * Form contract. Reuses the shared account rules; the website is intentionally
