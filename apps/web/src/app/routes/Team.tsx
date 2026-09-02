@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuthStore } from "../auth/store";
+import { integrationsApi } from "../integrations/api";
 import { ApiError } from "../lib/api";
 import { COMMON_CURRENCIES } from "../lib/money";
 import { memberLabel, orgApi, type NewInvitation } from "../org/api";
@@ -60,6 +61,8 @@ export default function Team() {
       />
 
       <WorkspaceSettings />
+
+      <GoogleCalendarCard />
 
       <div className="grid gap-md lg:grid-cols-2">
         <Card padded={false}>
@@ -296,5 +299,84 @@ function InviteLink({
         </Button>
       </div>
     </div>
+  );
+}
+
+
+/**
+ * Connect or disconnect the Google Calendar used to book calls.
+ *
+ * The consent round trip returns to /app/team with ?connected or ?connectError,
+ * which is read once on mount so the outcome is visible without the user having
+ * to guess whether it worked.
+ */
+function GoogleCalendarCard() {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const connections = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsApi.list,
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("connected")) setNotice("Google Calendar connected.");
+    if (params.get("connectError")) setError(params.get("connectError"));
+    if (params.has("connected") || params.has("connectError")) {
+      // Clear the query so a refresh does not replay the message.
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  const google = (connections.data ?? []).find((c) => c.provider === "google");
+
+  const disconnect = useMutation({
+    mutationFn: integrationsApi.disconnectGoogle,
+    onSuccess: () => {
+      setNotice("Google Calendar disconnected.");
+      queryClient.invalidateQueries({ queryKey: ["integrations"] });
+    },
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "Could not disconnect"),
+  });
+
+  const connect = useMutation({
+    mutationFn: integrationsApi.connectGoogle,
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.message : "Could not start the connection"),
+  });
+
+  return (
+    <Card>
+      <CardHeader
+        title="Google Calendar"
+        subtitle="Books a Meet when you schedule a call with a lead."
+      />
+      {error && <Alert>{error}</Alert>}
+      {notice && !error && <p className="mt-sm text-sm text-fg-muted">{notice}</p>}
+
+      <div className="mt-md flex flex-wrap items-center justify-between gap-sm">
+        <p className="text-sm text-fg-muted">
+          {google
+            ? `Connected${google.providerAccountId ? "" : ""} — calls you book create a Google Meet on your calendar.`
+            : "Not connected. Booking a call will ask you to connect first."}
+        </p>
+        {google ? (
+          <Button
+            variant="secondary"
+            disabled={disconnect.isPending}
+            onClick={() => disconnect.mutate()}
+          >
+            Disconnect
+          </Button>
+        ) : (
+          <Button disabled={connect.isPending} onClick={() => connect.mutate()}>
+            Connect Google Calendar
+          </Button>
+        )}
+      </div>
+    </Card>
   );
 }

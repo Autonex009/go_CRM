@@ -12,6 +12,7 @@ import {
   FUNNEL_STAGES,
   LEAD_STAGES,
   TERMINAL_STAGES,
+  type Meeting,
   followUpLabel,
   leadCompany,
   leadName,
@@ -57,6 +58,7 @@ export default function Leads() {
   const [dialog, setDialog] = useState<{ lead: Lead | null } | null>(null);
   const [converting, setConverting] = useState<Lead | null>(null);
   const [booking, setBooking] = useState<Lead | null>(null);
+  const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,10 +90,25 @@ export default function Leads() {
   }, [queryClient]);
 
   const advance = useMutation({
-    mutationFn: ({ id, toStage, followUpAt }: { id: string; toStage: LeadStage; followUpAt?: string }) =>
-      leadsApi.advance(id, { toStage, followUpAt }),
-    onSuccess: () => {
+    mutationFn: ({
+      id,
+      toStage,
+      followUpAt,
+      meetingAt,
+      meetingMinutes,
+    }: {
+      id: string;
+      toStage: LeadStage;
+      followUpAt?: string;
+      meetingAt?: string;
+      meetingMinutes?: number;
+    }) => leadsApi.advance(id, { toStage, followUpAt, meetingAt, meetingMinutes }),
+    onSuccess: (result) => {
       setError(null);
+      // Surface the Meet link straight away: the person who booked the call is
+      // the one who has to send it on, and hunting for it in Google Calendar
+      // afterwards is the sort of small friction that stops a feature being used.
+      setMeeting(result.meeting ?? null);
       invalidate();
     },
     onError: (err) =>
@@ -242,6 +259,31 @@ export default function Leads() {
 
 
       {error && <Alert>{error}</Alert>}
+      {meeting && (
+        <Card className="flex flex-wrap items-center justify-between gap-sm">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-fg">Google Meet booked</p>
+            <p className="mt-xs truncate text-xs text-fg-muted">
+              {meeting.title} — {new Date(meeting.startAt).toLocaleString()}
+            </p>
+          </div>
+          <div className="flex items-center gap-sm">
+            {meeting.meetLink && (
+              <a
+                href={meeting.meetLink}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-medium text-accent underline"
+              >
+                Open Meet link
+              </a>
+            )}
+            <Button variant="secondary" onClick={() => setMeeting(null)}>
+              Dismiss
+            </Button>
+          </div>
+        </Card>
+      )}
       {query.isError && (
         <Alert>
           {query.error instanceof ApiError ? query.error.message : "Could not load leads"}
@@ -367,8 +409,14 @@ export default function Leads() {
         <BookCallDialog
           lead={booking}
           onClose={() => setBooking(null)}
-          onSubmit={(date) => {
-            advance.mutate({ id: booking.id, toStage: "call scheduled", followUpAt: date });
+          onSubmit={(date, meetingAt, minutes) => {
+            advance.mutate({
+              id: booking.id,
+              toStage: "call scheduled",
+              followUpAt: date,
+              meetingAt,
+              meetingMinutes: minutes,
+            });
             setBooking(null);
           }}
         />
@@ -528,33 +576,60 @@ function BookCallDialog({
 }: {
   lead: Lead;
   onClose: () => void;
-  onSubmit: (isoDate: string) => void;
+  onSubmit: (isoDate: string, meetingAt: string, minutes: number) => void;
 }) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const [date, setDate] = useState(tomorrow.toISOString().slice(0, 10));
+  const [time, setTime] = useState("10:00");
+  const [minutes, setMinutes] = useState(30);
+
+  const field =
+    "h-[36px] w-full rounded-md border border-line bg-surface px-md text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25";
+
+  // Built from the local date and time so the offset is the user's own; sending
+  // a bare "T00:00:00Z" would book every call at midnight UTC.
+  const meetingAt = new Date(`${date}T${time}`).toISOString();
 
   return (
-    <Card className="fixed inset-x-0 bottom-0 z-50 mx-auto mb-lg w-[min(420px,calc(100%-2rem))] shadow-lg">
+    <Card className="fixed inset-x-0 bottom-0 z-50 mx-auto mb-lg w-[min(520px,calc(100%-2rem))] shadow-lg">
       <p className="text-sm font-medium text-fg">Book a call with {leadName(lead)}</p>
       <p className="mt-xs text-xs text-fg-muted">
-        Sets the follow-up date so the lead stays in the queue.
+        Sets the follow-up date and books a Google Calendar event with a Meet link.
+        The lead is not invited — the link is yours to send.
       </p>
-      <div className="mt-md flex items-end gap-sm">
-        <label className="flex flex-1 flex-col gap-xs">
-          <span className="text-xs font-medium text-fg-muted">Call date</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-[36px] w-full rounded-md border border-line bg-surface px-md text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
-          />
+      <div className="mt-md grid grid-cols-3 gap-sm">
+        <label className="flex flex-col gap-xs">
+          <span className="text-xs font-medium text-fg-muted">Date</span>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} />
         </label>
+        <label className="flex flex-col gap-xs">
+          <span className="text-xs font-medium text-fg-muted">Time</span>
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={field} />
+        </label>
+        <label className="flex flex-col gap-xs">
+          <span className="text-xs font-medium text-fg-muted">Length</span>
+          <select
+            value={minutes}
+            onChange={(e) => setMinutes(Number(e.target.value))}
+            className={field}
+          >
+            <option value={15}>15 min</option>
+            <option value={30}>30 min</option>
+            <option value={45}>45 min</option>
+            <option value={60}>60 min</option>
+          </select>
+        </label>
+      </div>
+      <div className="mt-md flex justify-end gap-sm">
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
-        <Button disabled={!date} onClick={() => onSubmit(`${date}T00:00:00Z`)}>
-          Book
+        <Button
+          disabled={!date || !time}
+          onClick={() => onSubmit(`${date}T00:00:00Z`, meetingAt, minutes)}
+        >
+          Book with Meet
         </Button>
       </div>
     </Card>

@@ -106,6 +106,25 @@ export interface AdvanceInput {
   followUpAt?: string;
   clearFollowUp?: boolean;
   note?: string;
+  /** ISO timestamp. When set, books a Google Calendar event with a Meet link. */
+  meetingAt?: string;
+  /** Meeting length in minutes; the server defaults to 30. */
+  meetingMinutes?: number;
+}
+
+/** A booked Google Calendar event, returned when advancing created one. */
+export interface Meeting {
+  googleEventId: string;
+  meetLink: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+}
+
+/** Advancing returns the updated lead, plus the meeting when one was booked. */
+export interface AdvanceResult {
+  lead: Lead;
+  meeting?: Meeting;
 }
 
 /** The convert dialog's payload (brief §3.4). */
@@ -145,7 +164,10 @@ export const leadsApi = {
     apiFetch<Lead>(`${BASE}/${id}`, { method: "PUT", body: JSON.stringify(input) }),
 
   advance: (id: string, input: AdvanceInput) =>
-    apiFetch<Lead>(`${BASE}/${id}/advance`, { method: "POST", body: JSON.stringify(input) }),
+    apiFetch<AdvanceResult>(`${BASE}/${id}/advance`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 
   convert: (id: string, input: ConvertInput = {}) =>
     apiFetch<Conversion>(`${BASE}/${id}/convert`, {
