@@ -1,5 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
+
 
 import { AccountDialog } from "../accounts/AccountDialog";
 import {
@@ -200,18 +202,19 @@ function Row({
   return (
     <tr className="border-b border-line transition-colors duration-100 last:border-0 hover:bg-surface-hover">
       <td className="px-lg py-sm">
-        <button onClick={onEdit} className="flex items-center gap-sm text-left">
-          <span className="flex h-[28px] w-[28px] items-center justify-center rounded-md bg-surface-muted text-fg-muted">
-            <Icon name="building" size={14} />
+        <Link to={`/accounts/${account.id}`} className="flex items-center gap-sm text-left group">
+          <span className="flex h-[32px] w-[32px] items-center justify-center rounded-md bg-surface-muted text-fg-muted group-hover:bg-brand/10 group-hover:text-brand transition-colors">
+            <Icon name="building" size={16} />
           </span>
           <span className="min-w-0">
-            <span className="block font-medium text-fg">{account.name}</span>
+            <span className="block font-medium text-fg group-hover:text-brand transition-colors">{account.name}</span>
             <span className="block text-xs text-fg-muted">
               {site ?? account.industry ?? "—"}
             </span>
           </span>
-        </button>
+        </Link>
       </td>
+
       <td className="px-lg py-sm">
         {owner ? (
           <span className="flex items-center gap-sm">

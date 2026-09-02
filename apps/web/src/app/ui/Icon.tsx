@@ -30,7 +30,10 @@ export type IconName =
   | "moon"
   | "monitor"
   | "printer"
-  | "download";
+  | "download"
+  | "edit"
+  | "arrowLeft"
+  | "globe";
 
 const PATHS: Record<IconName, string> = {
   dashboard: "M4 13h7V4H4v9Zm0 7h7v-5H4v5Zm9 0h7v-9h-7v9Zm0-16v5h7V4h-7Z",
@@ -58,7 +61,11 @@ const PATHS: Record<IconName, string> = {
   monitor: "M3 5h18v11H3zM8 20h8M12 16v4",
   printer: "M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z",
   download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3",
+  edit: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
+  arrowLeft: "M19 12H5M12 19l-7-7 7-7",
+  globe: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-13h2v2h-2zm0 4h2v6h-2z",
 };
+
 
 interface IconProps {
   name: IconName;
