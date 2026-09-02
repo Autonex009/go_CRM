@@ -11,6 +11,7 @@ import { ImportWizardModal } from "../leads/ImportWizardModal";
 import {
   FUNNEL_STAGES,
   LEAD_STAGES,
+  TERMINAL_STAGES,
   followUpLabel,
   leadCompany,
   leadName,
@@ -39,7 +40,7 @@ const FILTERS: { key: string; label: string; tone?: "overdue" | "due" }[] = [
   { key: "overdue", label: "Overdue", tone: "overdue" },
   { key: "due_today", label: "Due today", tone: "due" },
   { key: "", label: "All Leads" },
-  ...LEAD_STAGES.filter((s) => s !== "converted" && s !== "dropped").map((s) => ({
+  ...LEAD_STAGES.filter((s) => !TERMINAL_STAGES.includes(s)).map((s) => ({
     key: s,
     label: STAGE_META[s].label,
   })),
@@ -367,7 +368,7 @@ export default function Leads() {
           lead={booking}
           onClose={() => setBooking(null)}
           onSubmit={(date) => {
-            advance.mutate({ id: booking.id, toStage: "call_booked", followUpAt: date });
+            advance.mutate({ id: booking.id, toStage: "call scheduled", followUpAt: date });
             setBooking(null);
           }}
         />
@@ -511,7 +512,7 @@ function Row({
           </Button>
         ) : (
           <span className="text-xs text-fg-subtle">
-            {lead.stage === "converted" ? "Converted" : "—"}
+            {lead.stage === "closed" ? "Closed" : "—"}
           </span>
         )}
       </td>
