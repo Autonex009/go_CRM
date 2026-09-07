@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { DealCard } from "../deals/DealCard";
 import { DealDialog } from "../deals/DealDialog";
@@ -21,6 +22,16 @@ export default function Deals() {
 
   const [moveError, setMoveError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ deal: Deal | null; stage: DealStage } | null>(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.new) {
+      setDialog({ deal: null, stage: "prospect" });
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const deals = query.data?.deals ?? [];
 

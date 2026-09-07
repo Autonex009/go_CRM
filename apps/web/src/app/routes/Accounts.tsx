@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 
 import { AccountDialog } from "../accounts/AccountDialog";
@@ -29,6 +30,17 @@ export default function Accounts() {
   const [offset, setOffset] = useState(0);
   const [dialog, setDialog] = useState<{ account: Account | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.new) {
+      setDialog({ account: null });
+      // Clear state so it doesn't reopen on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const query = useQuery({
     queryKey: ["accounts", offset],

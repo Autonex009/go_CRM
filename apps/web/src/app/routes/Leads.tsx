@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { Search, UploadCloud, Plus, GitBranch } from "lucide-react";
 
 import { MermaidDiagram } from "../components/ui/MermaidDiagram";
@@ -61,6 +62,15 @@ export default function Leads() {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.new) {
+      setDialog({ lead: null });
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const query = useQuery({
     queryKey: ["leads", filter, offset],

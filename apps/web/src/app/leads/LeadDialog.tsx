@@ -70,21 +70,7 @@ export function LeadDialog({ lead, onClose, onSubmit, onDelete }: LeadDialogProp
   const submit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      let finalAccountId = values.accountId;
-      let finalCompany = values.company;
-
-      if (!finalAccountId && values.company && values.company.trim() !== "") {
-        const newAccount = await accountsApi.create({ 
-          name: values.company.trim(),
-        });
-        finalAccountId = newAccount.id;
-        finalCompany = ""; // clear the text field now that it's linked
-        
-        queryClient.invalidateQueries({ queryKey: ["accountOptions"] });
-        queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      }
-
-      await onSubmit(toPayload({ ...values, accountId: finalAccountId, company: finalCompany }));
+      await onSubmit(toPayload(values));
       onClose();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not save this lead");
@@ -141,12 +127,6 @@ export function LeadDialog({ lead, onClose, onSubmit, onDelete }: LeadDialogProp
         </div>
 
         <AccountSelect error={errors.accountId?.message} {...register("accountId")} />
-        <Field
-          label="Company (if not listed above)"
-          placeholder="Typed in now, linked to a company record later"
-          error={errors.company?.message}
-          {...register("company")}
-        />
 
         <div className="grid gap-md sm:grid-cols-2">
           <SelectField label="Stage" error={errors.stage?.message} {...register("stage")}>

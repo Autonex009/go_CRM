@@ -370,28 +370,28 @@ const Topbar = memo(function Topbar({
               </div>
               <div className="h-px bg-line my-1" />
               <button
-                onClick={() => navigate("/leads")}
+                onClick={() => { setQuickMenuOpen(false); navigate("/leads", { state: { new: true } }); }}
                 className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
               >
                 <TrendingUp className="h-4 w-4 text-purple-500" />
                 <span>New Lead</span>
               </button>
               <button
-                onClick={() => navigate("/deals")}
+                onClick={() => { setQuickMenuOpen(false); navigate("/deals", { state: { new: true } }); }}
                 className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
               >
                 <Handshake className="h-4 w-4 text-emerald-500" />
                 <span>New Deal</span>
               </button>
               <button
-                onClick={() => navigate("/quotes/new")}
+                onClick={() => { setQuickMenuOpen(false); navigate("/quotes/new"); }}
                 className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
               >
                 <FileText className="h-4 w-4 text-amber-500" />
                 <span>New Quote</span>
               </button>
               <button
-                onClick={() => navigate("/accounts")}
+                onClick={() => { setQuickMenuOpen(false); navigate("/accounts", { state: { new: true } }); }}
                 className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
               >
                 <Building2 className="h-4 w-4 text-blue-500" />
