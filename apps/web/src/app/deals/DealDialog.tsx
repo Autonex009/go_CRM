@@ -4,6 +4,7 @@ import { useForm, useWatch } from "react-hook-form";
 
 import { accountsApi } from "../accounts/api";
 import { AccountSelect } from "../accounts/AccountSelect";
+import { leadsApi } from "../leads/api";
 import { Timeline } from "../activities/Timeline";
 import { contactName, contactsApi } from "../contacts/api";
 import { ApiError } from "../lib/api";
@@ -70,6 +71,12 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
     queryKey: ["accountProfile", accountId],
     queryFn: () => accountsApi.getProfile(accountId as string),
     enabled: Boolean(accountId),
+    staleTime: 60_000,
+  });
+
+  const allLeads = useQuery({
+    queryKey: ["leads"],
+    queryFn: () => leadsApi.list(),
     staleTime: 60_000,
   });
 
@@ -162,16 +169,14 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
           <AccountSelect error={errors.accountId?.message} {...register("accountId")} />
         </div>
         
-        {accountId && (
-          <SelectField label="Lead" error={errors.leadId?.message} {...register("leadId")}>
-            <option value="">—</option>
-            {(accountProfile.data?.leads ?? []).map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
-              </option>
-            ))}
-          </SelectField>
-        )}
+        <SelectField label="Lead" error={errors.leadId?.message} {...register("leadId")}>
+          <option value="">—</option>
+          {(allLeads.data?.items ?? []).map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
+            </option>
+          ))}
+        </SelectField>
 
         <TextareaField
           label="Description"
