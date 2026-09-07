@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
+import { accountsApi } from "../accounts/api";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { Timeline } from "../activities/Timeline";
 import { contactName, contactsApi } from "../contacts/api";
@@ -42,6 +43,7 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<DealFormValues>({
     resolver: zodResolver(dealFormSchema),
@@ -55,7 +57,20 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
       // A native date input needs exactly YYYY-MM-DD.
       expectedCloseDate: deal?.expectedCloseDate?.slice(0, 10) ?? "",
       accountId: deal?.accountId ?? "",
+      leadId: "",
     },
+  });
+
+  const accountId = useWatch({
+    control,
+    name: "accountId",
+  });
+
+  const accountProfile = useQuery({
+    queryKey: ["accountProfile", accountId],
+    queryFn: () => accountsApi.getProfile(accountId as string),
+    enabled: Boolean(accountId),
+    staleTime: 60_000,
   });
 
   const submit = handleSubmit(async (values) => {
@@ -146,6 +161,17 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
 
           <AccountSelect error={errors.accountId?.message} {...register("accountId")} />
         </div>
+        
+        {accountId && (
+          <SelectField label="Lead" error={errors.leadId?.message} {...register("leadId")}>
+            <option value="">—</option>
+            {(accountProfile.data?.leads ?? []).map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
+              </option>
+            ))}
+          </SelectField>
+        )}
 
         <TextareaField
           label="Description"
