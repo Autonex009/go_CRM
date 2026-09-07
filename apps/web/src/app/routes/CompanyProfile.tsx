@@ -117,7 +117,7 @@ export default function CompanyProfilePage() {
     );
   }
 
-  const { deals, quotes, invoices, contacts } = query.data;
+  const { deals, quotes, invoices, contacts, leads } = query.data;
   const brandColor = formData.primaryColor || "#6366f1";
 
   const handleSave = () => {
@@ -793,6 +793,29 @@ export default function CompanyProfilePage() {
               </div>
             ) : (
               <p className="text-xs text-fg-subtle">No contacts linked yet.</p>
+            )}
+          </Card>
+
+          {/* Leads */}
+          <Card>
+            <CardHeader title={`Leads (${leads?.length || 0})`} className="mb-md" />
+            {leads && leads.length > 0 ? (
+              <div className="flex flex-col gap-sm">
+                {leads.map((lead) => (
+                  <div key={lead.id} className="p-sm rounded-md border border-line bg-surface-muted text-xs flex flex-col gap-xs">
+                    <div className="flex justify-between font-medium text-fg">
+                      <span>{lead.firstName} {lead.lastName || ""}</span>
+                      {lead.value ? <span>${lead.value.toLocaleString()}</span> : null}
+                    </div>
+                    <div className="flex justify-between text-fg-muted">
+                      <span>Stage: {lead.stage}</span>
+                      {lead.title && <span>{lead.title}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-fg-subtle">No leads linked yet.</p>
             )}
           </Card>
         </div>

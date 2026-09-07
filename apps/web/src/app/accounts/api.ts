@@ -117,6 +117,18 @@ export interface LinkedContact {
   title: string | null;
 }
 
+export interface LinkedLead {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  title: string | null;
+  stage: string;
+  value: number | null;
+  createdAt: string;
+}
+
 export interface FullCompanyProfilePayload {
   account: Account;
   profile: CompanyProfile;
@@ -124,6 +136,7 @@ export interface FullCompanyProfilePayload {
   quotes: LinkedQuote[];
   invoices: LinkedInvoice[];
   contacts: LinkedContact[];
+  leads: LinkedLead[];
 }
 
 export interface ProfileInput {

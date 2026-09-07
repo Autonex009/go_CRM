@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { AccountSelect } from "../accounts/AccountSelect";
+import { accountsApi } from "../accounts/api";
 import { Timeline } from "../activities/Timeline";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
@@ -34,6 +35,7 @@ interface LeadDialogProps {
 /** Create/edit form. One dialog for both, since the field set is identical. */
 export function LeadDialog({ lead, onClose, onSubmit, onDelete }: LeadDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const members = useQuery({
     queryKey: ["members"],
@@ -68,7 +70,21 @@ export function LeadDialog({ lead, onClose, onSubmit, onDelete }: LeadDialogProp
   const submit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      await onSubmit(toPayload(values));
+      let finalAccountId = values.accountId;
+      let finalCompany = values.company;
+
+      if (!finalAccountId && values.company && values.company.trim() !== "") {
+        const newAccount = await accountsApi.create({ 
+          name: values.company.trim(),
+        });
+        finalAccountId = newAccount.id;
+        finalCompany = ""; // clear the text field now that it's linked
+        
+        queryClient.invalidateQueries({ queryKey: ["accountOptions"] });
+        queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      }
+
+      await onSubmit(toPayload({ ...values, accountId: finalAccountId, company: finalCompany }));
       onClose();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not save this lead");
