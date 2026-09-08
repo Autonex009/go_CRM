@@ -150,9 +150,13 @@ const BASE = "/api/v1/leads";
 
 export const leadsApi = {
   /** `filter` accepts a stage, or the derived views: overdue / due_today / open. */
-  list: (offset = 0, filter = "") =>
+  /**
+   * `limit` defaults to one page. Pickers that need the whole list rather than
+   * the first screenful pass their own; the gateway caps it at 100.
+   */
+  list: (offset = 0, filter = "", limit = PAGE_SIZE) =>
     apiFetch<LeadPage>(
-      `${BASE}?limit=${PAGE_SIZE}&offset=${offset}${filter ? `&filter=${filter}` : ""}`,
+      `${BASE}?limit=${limit}&offset=${offset}${filter ? `&filter=${filter}` : ""}`,
     ),
 
   get: (id: string) => apiFetch<Lead>(`${BASE}/${id}`),
@@ -161,7 +165,10 @@ export const leadsApi = {
     apiFetch<Lead>(BASE, { method: "POST", body: JSON.stringify(input) }),
 
   update: (id: string, input: LeadInput) =>
-    apiFetch<Lead>(`${BASE}/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+    apiFetch<Lead>(`${BASE}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
 
   advance: (id: string, input: AdvanceInput) =>
     apiFetch<AdvanceResult>(`${BASE}/${id}/advance`, {
@@ -186,14 +193,26 @@ interface StageMeta {
 }
 
 export const STAGE_META: Record<LeadStage, StageMeta> = {
-  "new": { label: "New", tone: "neutral", bar: "bg-neutral-300" },
+  new: { label: "New", tone: "neutral", bar: "bg-neutral-300" },
   "initial count": { label: "Initial count", tone: "info", bar: "bg-info-500" },
   "deck sent": { label: "Deck sent", tone: "brand", bar: "bg-brand-500" },
-  "call scheduled": { label: "Call scheduled", tone: "warning", bar: "bg-warning-500" },
+  "call scheduled": {
+    label: "Call scheduled",
+    tone: "warning",
+    bar: "bg-warning-500",
+  },
   "call done": { label: "Call done", tone: "success", bar: "bg-success-500" },
-  "proposal sent": { label: "Proposal sent", tone: "success", bar: "bg-success-600" },
-  "closed": { label: "Closed", tone: "success", bar: "bg-success-600" },
-  "not interested": { label: "Not interested", tone: "danger", bar: "bg-danger-500" },
+  "proposal sent": {
+    label: "Proposal sent",
+    tone: "success",
+    bar: "bg-success-600",
+  },
+  closed: { label: "Closed", tone: "success", bar: "bg-success-600" },
+  "not interested": {
+    label: "Not interested",
+    tone: "danger",
+    bar: "bg-danger-500",
+  },
 };
 
 export function stageLabel(stage: string): string {
@@ -217,16 +236,32 @@ interface NextAction {
 }
 
 export const NEXT_ACTION: Partial<Record<LeadStage, NextAction>> = {
-  "new": { label: "Log initial count", toStage: "initial count", icon: "mail" },
+  new: { label: "Log initial count", toStage: "initial count", icon: "mail" },
   "initial count": { label: "Send deck", toStage: "deck sent", icon: "mail" },
-  "deck sent": { label: "Schedule call", toStage: "call scheduled", icon: "phone", needsDate: true },
-  "call scheduled": { label: "Mark call done", toStage: "call done", icon: "check" },
-  "call done": { label: "Send proposal", toStage: "proposal sent", icon: "mail" },
+  "deck sent": {
+    label: "Schedule call",
+    toStage: "call scheduled",
+    icon: "phone",
+    needsDate: true,
+  },
+  "call scheduled": {
+    label: "Mark call done",
+    toStage: "call done",
+    icon: "check",
+  },
+  "call done": {
+    label: "Send proposal",
+    toStage: "proposal sent",
+    icon: "mail",
+  },
   "proposal sent": { label: "Mark closed", toStage: "closed", icon: "check" },
 };
 
 /** "3 days overdue" / "Due tomorrow" — the follow-up column's wording. */
-export function followUpLabel(lead: Lead): { text: string; tone: "overdue" | "due" | "plain" } {
+export function followUpLabel(lead: Lead): {
+  text: string;
+  tone: "overdue" | "due" | "plain";
+} {
   if (!lead.followUpAt) return { text: "—", tone: "plain" };
 
   const due = new Date(lead.followUpAt);
@@ -244,9 +279,13 @@ export function followUpLabel(lead: Lead): { text: string; tone: "overdue" | "du
       tone: finished ? "plain" : "overdue",
     };
   }
-  if (days === 0) return { text: "Due today", tone: finished ? "plain" : "due" };
+  if (days === 0)
+    return { text: "Due today", tone: finished ? "plain" : "due" };
   if (days === 1) return { text: "Due tomorrow", tone: "plain" };
-  return { text: due.toLocaleDateString(undefined, { day: "numeric", month: "short" }), tone: "plain" };
+  return {
+    text: due.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+    tone: "plain",
+  };
 }
 
 /** "Ada Lovelace", or just the first name when there's no surname. */
@@ -255,6 +294,8 @@ export function leadName(lead: Pick<Lead, "firstName" | "lastName">): string {
 }
 
 /** The company to show: the linked account, else the free text. */
-export function leadCompany(lead: Pick<Lead, "accountName" | "company">): string | null {
+export function leadCompany(
+  lead: Pick<Lead, "accountName" | "company">,
+): string | null {
   return lead.accountName ?? lead.company;
 }

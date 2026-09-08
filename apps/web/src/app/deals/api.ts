@@ -16,6 +16,8 @@ export interface Deal {
   contactId: string | null;
   contactName: string | null;
   accountId: string | null;
+  /** The lead this deal was converted from, if any. */
+  leadId: string | null;
   /** What is being deployed on this deal. */
   totalCameras: number | null;
   location: string | null;

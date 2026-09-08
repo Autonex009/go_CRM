@@ -30,8 +30,6 @@ import {
   stageLabel,
   type DealStage,
 } from "../deals/stages";
-import { LeadDialog } from "../leads/LeadDialog";
-import { leadsApi, type LeadInput } from "../leads/api";
 import { ApiError } from "../lib/api";
 import {
   Alert,
@@ -122,20 +120,7 @@ export default function CompanyProfilePage() {
     },
   });
 
-  const [isDealDialogOpen, setIsDealDialogOpen] = useState(false);
   const [dealToEdit, setDealToEdit] = useState<LinkedDeal | null>(null);
-  const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
-
-  const createDealMutation = useMutation({
-    mutationFn: (data: DealInput) =>
-      dealsApi.create({ ...data, accountId: id }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
-      void queryClient.invalidateQueries({ queryKey: ["deals"] });
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      setIsDealDialogOpen(false);
-    },
-  });
 
   const updateDealMutation = useMutation({
     mutationFn: ({ dealId, data }: { dealId: string; data: DealInput }) =>
@@ -145,17 +130,6 @@ export default function CompanyProfilePage() {
       void queryClient.invalidateQueries({ queryKey: ["deals"] });
       void queryClient.invalidateQueries({ queryKey: ["accounts"] });
       setDealToEdit(null);
-    },
-  });
-
-  const createLeadMutation = useMutation({
-    mutationFn: (data: LeadInput) =>
-      leadsApi.create({ ...data, accountId: id }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
-      void queryClient.invalidateQueries({ queryKey: ["leads"] });
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      setIsLeadDialogOpen(false);
     },
   });
 
@@ -215,6 +189,7 @@ export default function CompanyProfilePage() {
     accountId: id || null,
     // Carried through, not defaulted: the dialog saves the whole deal, so a
     // field missing here would be written back as empty.
+    leadId: ld.leadId,
     totalCameras: ld.totalCameras,
     location: ld.location,
     products: ld.products,
@@ -298,20 +273,6 @@ export default function CompanyProfilePage() {
             </>
           ) : (
             <>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setIsLeadDialogOpen(true)}
-              >
-                + New Lead
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsDealDialogOpen(true)}
-              >
-                + New Deal
-              </Button>
               <Button
                 variant="secondary"
                 size="sm"
@@ -666,24 +627,15 @@ export default function CompanyProfilePage() {
               <CardHeader
                 title={`Active Deals (${deals.length})`}
                 action={
-                  <div className="flex items-center gap-xs">
+                  deals.length > 0 && (
                     <Button
                       size="sm"
-                      variant="secondary"
-                      onClick={() => setIsDealDialogOpen(true)}
+                      variant="ghost"
+                      onClick={() => setActiveTab("pipeline")}
                     >
-                      + New Deal
+                      View All →
                     </Button>
-                    {deals.length > 0 && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setActiveTab("pipeline")}
-                      >
-                        View All →
-                      </Button>
-                    )}
-                  </div>
+                  )
                 }
                 className="mb-md"
               />
@@ -740,17 +692,10 @@ export default function CompanyProfilePage() {
                   )}
                 </div>
               ) : (
-                <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-xs">
+                <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30">
                   <p className="text-xs text-fg-muted">
-                    No active deals yet for this company.
+                    No active deals yet. Deals are created on the Deals board.
                   </p>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setIsDealDialogOpen(true)}
-                  >
-                    + Create First Deal
-                  </Button>
                 </div>
               )}
             </Card>
@@ -761,13 +706,6 @@ export default function CompanyProfilePage() {
                 title={`Active Leads (${leads.length})`}
                 action={
                   <div className="flex items-center gap-xs">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setIsLeadDialogOpen(true)}
-                    >
-                      + New Lead
-                    </Button>
                     {leads.length > 0 && (
                       <Button
                         size="sm"
@@ -824,17 +762,11 @@ export default function CompanyProfilePage() {
                   )}
                 </div>
               ) : (
-                <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-xs">
+                <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30">
                   <p className="text-xs text-fg-muted">
-                    No leads currently linked to this company.
+                    No leads currently linked. Leads are created on the Leads
+                    page.
                   </p>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setIsLeadDialogOpen(true)}
-                  >
-                    + Add First Lead
-                  </Button>
                 </div>
               )}
             </Card>
@@ -1342,18 +1274,13 @@ export default function CompanyProfilePage() {
             <CardHeader
               title={`Active Deals (${deals.length})`}
               action={
-                <div className="flex items-center gap-xs">
-                  <Button size="sm" onClick={() => setIsDealDialogOpen(true)}>
-                    + New Deal
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => navigate("/deals")}
-                  >
-                    View Deals Board
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => navigate("/deals")}
+                >
+                  View Deals Board
+                </Button>
               }
               className="mb-md"
             />
@@ -1430,13 +1357,10 @@ export default function CompanyProfilePage() {
                 })}
               </div>
             ) : (
-              <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-sm">
+              <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30">
                 <p className="text-sm text-fg-muted">
-                  No active deals found for this company.
+                  No active deals found. Deals are created on the Deals board.
                 </p>
-                <Button size="sm" onClick={() => setIsDealDialogOpen(true)}>
-                  + Create New Deal
-                </Button>
               </div>
             )}
           </Card>
@@ -1446,18 +1370,13 @@ export default function CompanyProfilePage() {
             <CardHeader
               title={`Active Leads in Pipeline (${leads.length})`}
               action={
-                <div className="flex items-center gap-xs">
-                  <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
-                    + New Lead
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => navigate("/leads")}
-                  >
-                    View All Leads
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => navigate("/leads")}
+                >
+                  View All Leads
+                </Button>
               }
               className="mb-md"
             />
@@ -1510,13 +1429,11 @@ export default function CompanyProfilePage() {
                 ))}
               </div>
             ) : (
-              <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-sm">
+              <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30">
                 <p className="text-sm text-fg-muted">
-                  No leads linked to this company yet.
+                  No leads linked to this company yet. Leads are created on the
+                  Leads page.
                 </p>
-                <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
-                  + Add Lead
-                </Button>
               </div>
             )}
           </Card>
@@ -1650,26 +1567,13 @@ export default function CompanyProfilePage() {
               title={`Leads (${leads?.length || 0})`}
               className="mb-md"
               action={
-                <div className="flex items-center gap-xs">
-                  <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
-                    + Add Lead
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() =>
-                      navigate("/leads", {
-                        state: {
-                          new: true,
-                          accountId: id,
-                          accountName: formData.name,
-                        },
-                      })
-                    }
-                  >
-                    Open Leads Page
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => navigate("/leads")}
+                >
+                  Open Leads Page
+                </Button>
               }
             />
             {leads && leads.length > 0 ? (
@@ -1706,18 +1610,8 @@ export default function CompanyProfilePage() {
         </div>
       )}
 
-      {/* Modals for Creating/Editing Deals & Leads */}
-      {isDealDialogOpen && (
-        <DealDialog
-          deal={null}
-          defaultStage="discovery"
-          onClose={() => setIsDealDialogOpen(false)}
-          onSubmit={async (input) => {
-            await createDealMutation.mutateAsync(input);
-          }}
-        />
-      )}
-
+      {/* Editing a linked deal only. Deals and leads are created on their own
+          pages, so the profile stays a view of what already exists. */}
       {dealToEdit && (
         <DealDialog
           deal={linkedToFullDeal(dealToEdit)}
@@ -1728,17 +1622,6 @@ export default function CompanyProfilePage() {
               dealId: dealToEdit.id,
               data: input,
             });
-          }}
-        />
-      )}
-
-      {isLeadDialogOpen && (
-        <LeadDialog
-          lead={null}
-          initialState={{ accountId: id, company: formData.name }}
-          onClose={() => setIsLeadDialogOpen(false)}
-          onSubmit={async (input) => {
-            await createLeadMutation.mutateAsync(input);
           }}
         />
       )}

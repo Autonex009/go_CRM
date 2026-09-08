@@ -84,6 +84,8 @@ export interface LinkedDeal {
   siteAssessmentLocation: string | null;
   expectedCloseDate: string | null;
   remark?: string | null;
+  /** Carried so the edit dialog round-trips the whole deal. */
+  leadId: string | null;
   /** What the deal is deploying — mirrors deals.Deal. */
   totalCameras: number | null;
   location: string | null;

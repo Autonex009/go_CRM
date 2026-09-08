@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
@@ -82,7 +82,7 @@ export function DealDialog({
       // A native date input needs exactly YYYY-MM-DD.
       expectedCloseDate: deal?.expectedCloseDate?.slice(0, 10) ?? "",
       accountId: deal?.accountId ?? "",
-      leadId: "",
+      leadId: deal?.leadId ?? "",
       totalCameras: deal?.totalCameras ?? null,
       location: deal?.location ?? "",
       products: deal?.products ?? "",
@@ -101,9 +101,12 @@ export function DealDialog({
     staleTime: 60_000,
   });
 
+  // The picker needs the workspace's leads, not the first page of them — at the
+  // default 25 a deal's own lead could be missing from its own edit form. 100 is
+  // the gateway's cap.
   const allLeads = useQuery({
-    queryKey: ["leads"],
-    queryFn: () => leadsApi.list(),
+    queryKey: ["leads", "picker"],
+    queryFn: () => leadsApi.list(0, "", 100),
     staleTime: 60_000,
   });
 
@@ -131,6 +134,29 @@ export function DealDialog({
       }
     }
   }, [leadId, allLeads.data, setValue, deal]);
+
+  /**
+   * Leads the selected account can actually be linked to.
+   *
+   * The server rejects a lead filed under a different account, so offering the
+   * whole workspace here would just be a way to fail on save. Leads with no
+   * account stay visible: those are captured before the company record exists,
+   * and converting one is the normal path into a deal.
+   */
+  const selectableLeads = useMemo(() => {
+    const items = allLeads.data?.items ?? [];
+    if (!accountId) return items;
+    return items.filter((l) => !l.accountId || l.accountId === accountId);
+  }, [allLeads.data, accountId]);
+
+  // Switching account used to leave a now-invalid lead selected, and the save
+  // failed with a message about an account the user had already moved on from.
+  useEffect(() => {
+    if (!leadId || !allLeads.data) return;
+    if (!selectableLeads.some((l) => l.id === leadId)) {
+      setValue("leadId", "");
+    }
+  }, [selectableLeads, leadId, allLeads.data, setValue]);
 
   const submit = handleSubmit(async (values) => {
     setFormError(null);
@@ -274,7 +300,7 @@ export function DealDialog({
           {...register("leadId")}
         >
           <option value="">—</option>
-          {(allLeads.data?.items ?? []).map((l) => (
+          {selectableLeads.map((l) => (
             <option key={l.id} value={l.id}>
               {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
             </option>
