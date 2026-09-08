@@ -116,7 +116,7 @@ export default function Dashboard() {
                 to="/deals"
               />
               <KpiCard
-                title="Lead Pipeline"
+                title="Open Leads"
                 value={formatMoney(data.leads.open, currency)}
                 subtitle={`${data.leads.total} total lead${data.leads.total === 1 ? "" : "s"}`}
                 icon={TrendingUp}
@@ -155,19 +155,6 @@ export default function Dashboard() {
               <PipelineCard
                 className="lg:col-span-5"
                 currency={currency}
-                title="Lead Funnel"
-                subtitle="Stage distribution across outreach"
-                to="/leads"
-                pipeline={data.leads}
-                meta={LEAD_META}
-                label={leadStageLabel}
-                emptyIcon="leads"
-                emptyText="No leads registered yet."
-              />
-              <RecentCard className="lg:col-span-7" items={data.recent} />
-              <PipelineCard
-                className="lg:col-span-5"
-                currency={currency}
                 title="Deals by Stage"
                 subtitle="Stage distribution across active revenue"
                 to="/deals"
@@ -177,6 +164,7 @@ export default function Dashboard() {
                 emptyIcon="deals"
                 emptyText="No deals in pipeline yet."
               />
+              <RecentCard className="lg:col-span-12" items={data.recent} />
             </div>
           </>
         )
@@ -429,7 +417,7 @@ function AttentionCard({
     <Card className={className} padded={false}>
       <CardHeader
         className="p-lg pb-md"
-        title="Needs attention"
+        title="Now Need Attenction"
         subtitle="Overdue and due soon, across everything"
       />
 
