@@ -93,7 +93,14 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
         if (selectedLead.contactId) setValue("contactId", selectedLead.contactId);
         if (selectedLead.ownerUserId) setValue("ownerUserId", selectedLead.ownerUserId);
         if (selectedLead.value) setValue("amount", selectedLead.value);
-        if (!deal?.title) setValue("title", `${selectedLead.firstName} ${selectedLead.lastName || ""} - Deal`);
+        // The deal title is the deal's own name, not the lead's. Pre-fill from the
+        // lead's company (what the deal is actually about) and only when the user
+        // has not typed one; falling back to the person's name produced titles
+        // like "Chandan  - Deal".
+        if (!deal?.title) {
+          const company = selectedLead.company?.trim();
+          if (company) setValue("title", company, { shouldValidate: true });
+        }
       }
     }
   }, [leadId, allLeads.data, setValue, deal]);

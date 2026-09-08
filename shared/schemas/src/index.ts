@@ -24,6 +24,7 @@ export const DEAL_STAGES = [
   "site_assessment",
   "quote_sent",
   "negotiation",
+  "delivery",
   "won",
   "lost",
 ] as const;

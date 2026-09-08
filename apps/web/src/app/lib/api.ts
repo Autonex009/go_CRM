@@ -52,7 +52,10 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
 function buildInit(init: RequestInit, token: string | null): RequestInit {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  if (init.body !== undefined) {
+  // FormData sets its own Content-Type, including the multipart boundary the
+  // server needs to split the parts. Setting it here would send a boundary-less
+  // header and every upload would fail to parse.
+  if (init.body !== undefined && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   if (token) {
