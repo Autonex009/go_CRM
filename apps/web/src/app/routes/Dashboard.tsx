@@ -417,7 +417,7 @@ function AttentionCard({
     <Card className={className} padded={false}>
       <CardHeader
         className="p-lg pb-md"
-        title="Now Need Attenction"
+        title="Now Need Attenction Today"
         subtitle="Overdue and due soon, across everything"
       />
 
