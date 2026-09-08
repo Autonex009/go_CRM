@@ -16,8 +16,9 @@ interface StageMeta {
  * than leads — a deal has no "contacted" step.
  */
 export const STAGE_META: Record<DealStage, StageMeta> = {
-  prospect: { label: "Prospect", tone: "neutral", bar: "bg-neutral-300" },
-  proposal: { label: "Proposal", tone: "info", bar: "bg-info-500" },
+  discovery: { label: "Discovery", tone: "neutral", bar: "bg-purple-300" },
+  site_assessment: { label: "Site assessment", tone: "brand", bar: "bg-purple-500" },
+  quote_sent: { label: "Quote sent", tone: "info", bar: "bg-indigo-500" },
   negotiation: { label: "Negotiation", tone: "warning", bar: "bg-amber-500" },
   won: { label: "Won", tone: "success", bar: "bg-success-500" },
   lost: { label: "Lost", tone: "danger", bar: "bg-danger-500" },

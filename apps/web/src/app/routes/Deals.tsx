@@ -28,7 +28,7 @@ export default function Deals() {
 
   useEffect(() => {
     if (location.state?.new) {
-      setDialog({ deal: null, stage: "prospect" });
+      setDialog({ deal: null, stage: "discovery" });
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, location.pathname, navigate]);
@@ -108,7 +108,7 @@ export default function Deals() {
               )} open · ${formatMoneyCompact(totals.won, currency)} won`
         }
         action={
-          <Button icon="plus" onClick={() => setDialog({ deal: null, stage: "prospect" })}>
+          <Button icon="plus" onClick={() => setDialog({ deal: null, stage: "discovery" })}>
             New deal
           </Button>
         }
