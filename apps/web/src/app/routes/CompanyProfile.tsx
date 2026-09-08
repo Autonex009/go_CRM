@@ -1,7 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { MessageSquare, Plus, ArrowRight, TrendingUp, DollarSign, Users, Briefcase } from "lucide-react";
+import {
+  MessageSquare,
+  Plus,
+  ArrowRight,
+  TrendingUp,
+  DollarSign,
+  Users,
+  Briefcase,
+} from "lucide-react";
 
 import {
   accountsApi,
@@ -15,7 +23,13 @@ import {
 import { Timeline } from "../activities/Timeline";
 import { DealDialog } from "../deals/DealDialog";
 import { dealsApi, type Deal, type DealInput } from "../deals/api";
-import { getStageMeta, normalizeDealStage, stageLabel, type DealStage } from "../deals/stages";
+import { DeploymentSummary } from "../deals/DeploymentSummary";
+import {
+  getStageMeta,
+  normalizeDealStage,
+  stageLabel,
+  type DealStage,
+} from "../deals/stages";
 import { LeadDialog } from "../leads/LeadDialog";
 import { leadsApi, type LeadInput } from "../leads/api";
 import { ApiError } from "../lib/api";
@@ -50,7 +64,9 @@ export default function CompanyProfilePage() {
   const [mode, setMode] = useState<"preview" | "edit">("preview");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "contacts" | "pipeline" | "financials">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "contacts" | "pipeline" | "financials"
+  >("overview");
 
   const query = useQuery({
     queryKey: ["companyProfile", id],
@@ -98,7 +114,11 @@ export default function CompanyProfilePage() {
       setMode("preview");
     },
     onError: (err) => {
-      setSaveError(err instanceof ApiError ? err.message : "Failed to update company profile");
+      setSaveError(
+        err instanceof ApiError
+          ? err.message
+          : "Failed to update company profile",
+      );
     },
   });
 
@@ -107,7 +127,8 @@ export default function CompanyProfilePage() {
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
 
   const createDealMutation = useMutation({
-    mutationFn: (data: DealInput) => dealsApi.create({ ...data, accountId: id }),
+    mutationFn: (data: DealInput) =>
+      dealsApi.create({ ...data, accountId: id }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
       void queryClient.invalidateQueries({ queryKey: ["deals"] });
@@ -117,7 +138,8 @@ export default function CompanyProfilePage() {
   });
 
   const updateDealMutation = useMutation({
-    mutationFn: ({ dealId, data }: { dealId: string; data: DealInput }) => dealsApi.update(dealId, data),
+    mutationFn: ({ dealId, data }: { dealId: string; data: DealInput }) =>
+      dealsApi.update(dealId, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
       void queryClient.invalidateQueries({ queryKey: ["deals"] });
@@ -127,7 +149,8 @@ export default function CompanyProfilePage() {
   });
 
   const createLeadMutation = useMutation({
-    mutationFn: (data: LeadInput) => leadsApi.create({ ...data, accountId: id }),
+    mutationFn: (data: LeadInput) =>
+      leadsApi.create({ ...data, accountId: id }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
       void queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -150,7 +173,9 @@ export default function CompanyProfilePage() {
     return (
       <div className="p-lg">
         <Alert>
-          {query.error instanceof ApiError ? query.error.message : "Company profile not found"}
+          {query.error instanceof ApiError
+            ? query.error.message
+            : "Company profile not found"}
         </Alert>
         <div className="mt-md">
           <Button variant="secondary" onClick={() => navigate("/accounts")}>
@@ -165,6 +190,14 @@ export default function CompanyProfilePage() {
   const brandColor = formData.primaryColor || "#6366f1";
 
   const totalDealAmount = deals.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  // Cameras committed across this company's deals. Summed from the deals rather
+  // than stored on the account: a client buys in rounds, and one number on the
+  // account would lose which deal committed to what.
+  const totalCameras = deals.reduce((sum, d) => sum + (d.totalCameras ?? 0), 0);
+  const scopedDeals = deals.filter(
+    (d) => typeof d.totalCameras === "number",
+  ).length;
   const totalLeadEstimate = leads.reduce((sum, l) => sum + (l.value || 0), 0);
 
   const linkedToFullDeal = (ld: LinkedDeal): Deal => ({
@@ -180,6 +213,11 @@ export default function CompanyProfilePage() {
     contactId: null,
     contactName: null,
     accountId: id || null,
+    // Carried through, not defaulted: the dialog saves the whole deal, so a
+    // field missing here would be written back as empty.
+    totalCameras: ld.totalCameras,
+    location: ld.location,
+    products: ld.products,
     expectedCloseDate: ld.expectedCloseDate,
     position: 0,
     createdAt: ld.createdAt,
@@ -196,7 +234,12 @@ export default function CompanyProfilePage() {
       {/* Top Header Navigation & Mode Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-md border-b border-line pb-md">
         <div className="flex items-center gap-sm">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/accounts")} icon="arrowLeft">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/accounts")}
+            icon="arrowLeft"
+          >
             Accounts
           </Button>
 
@@ -307,21 +350,29 @@ export default function CompanyProfilePage() {
                     type="text"
                     className="text-xl font-bold text-fg bg-surface border border-line rounded px-sm py-xs"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                   />
                   <input
                     type="text"
                     placeholder="Company Tagline (e.g., Leading Industrial Manufacturer)"
                     className="text-xs text-fg-muted bg-surface border border-line rounded px-sm py-xs w-full md:w-80"
                     value={formData.tagline || ""}
-                    onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, tagline: e.target.value })
+                    }
                   />
                 </div>
               ) : (
                 <>
-                  <h2 className="text-2xl font-bold text-fg">{formData.name}</h2>
+                  <h2 className="text-2xl font-bold text-fg">
+                    {formData.name}
+                  </h2>
                   {formData.tagline && (
-                    <p className="text-sm font-medium text-fg-muted mt-xs">{formData.tagline}</p>
+                    <p className="text-sm font-medium text-fg-muted mt-xs">
+                      {formData.tagline}
+                    </p>
                   )}
                 </>
               )}
@@ -364,10 +415,10 @@ export default function CompanyProfilePage() {
                     formData.amcStatus === "active"
                       ? "success"
                       : formData.amcStatus === "pending_renewal"
-                      ? "warning"
-                      : formData.amcStatus === "expired"
-                      ? "danger"
-                      : "neutral"
+                        ? "warning"
+                        : formData.amcStatus === "expired"
+                          ? "danger"
+                          : "neutral"
                   }
                 >
                   {(formData.amcStatus || "NONE").toUpperCase()}
@@ -379,7 +430,9 @@ export default function CompanyProfilePage() {
                   <select
                     className="text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
                     value={formData.amcStatus || "none"}
-                    onChange={(e) => setFormData({ ...formData, amcStatus: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amcStatus: e.target.value })
+                    }
                   >
                     <option value="active">Active</option>
                     <option value="pending_renewal">Pending Renewal</option>
@@ -392,13 +445,18 @@ export default function CompanyProfilePage() {
                     className="text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
                     value={formData.amcValue || ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, amcValue: parseFloat(e.target.value) || 0 })
+                      setFormData({
+                        ...formData,
+                        amcValue: parseFloat(e.target.value) || 0,
+                      })
                     }
                   />
                 </div>
               ) : (
                 <div className="text-sm font-semibold text-fg">
-                  {formData.amcValue ? `$${formData.amcValue.toLocaleString()}` : "N/A"}
+                  {formData.amcValue
+                    ? `$${formData.amcValue.toLocaleString()}`
+                    : "N/A"}
                   {formData.amcEndDate && (
                     <span className="block text-xs font-normal text-fg-muted">
                       Renews: {formData.amcEndDate}
@@ -413,14 +471,25 @@ export default function CompanyProfilePage() {
         {/* Color Theme Selector in Edit Mode */}
         {mode === "edit" && (
           <div className="mt-md pt-md border-t border-line flex items-center gap-md">
-            <span className="text-xs text-fg-muted font-medium">Brand Accent Color:</span>
+            <span className="text-xs text-fg-muted font-medium">
+              Brand Accent Color:
+            </span>
             <div className="flex items-center gap-xs">
-              {["#6366f1", "#0b6bcb", "#059669", "#d97706", "#dc2626", "#7c3aed"].map((c) => (
+              {[
+                "#6366f1",
+                "#0b6bcb",
+                "#059669",
+                "#d97706",
+                "#dc2626",
+                "#7c3aed",
+              ].map((c) => (
                 <button
                   key={c}
                   type="button"
                   className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                    formData.primaryColor === c ? "scale-110 border-fg" : "border-transparent"
+                    formData.primaryColor === c
+                      ? "scale-110 border-fg"
+                      : "border-transparent"
                   }`}
                   style={{ backgroundColor: c }}
                   onClick={() => setFormData({ ...formData, primaryColor: c })}
@@ -429,7 +498,9 @@ export default function CompanyProfilePage() {
               <input
                 type="color"
                 value={formData.primaryColor || "#6366f1"}
-                onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, primaryColor: e.target.value })
+                }
                 className="h-6 w-6 rounded cursor-pointer border-0 bg-transparent"
               />
             </div>
@@ -442,9 +513,21 @@ export default function CompanyProfilePage() {
         {(
           [
             { id: "overview", label: "Overview", count: null },
-            { id: "pipeline", label: "Pipeline & Deals", count: deals.length + leads.length },
-            { id: "contacts", label: "Contacts & Leads", count: contacts.length + leads.length },
-            { id: "financials", label: "Financials", count: quotes.length + invoices.length },
+            {
+              id: "pipeline",
+              label: "Pipeline & Deals",
+              count: deals.length + leads.length,
+            },
+            {
+              id: "contacts",
+              label: "Contacts & Leads",
+              count: contacts.length + leads.length,
+            },
+            {
+              id: "financials",
+              label: "Financials",
+              count: quotes.length + invoices.length,
+            },
           ] as const
         ).map((tab) => (
           <button
@@ -483,14 +566,30 @@ export default function CompanyProfilePage() {
             >
               <div className="flex items-center justify-between text-xs text-fg-muted">
                 <span className="font-medium">Active Deals</span>
-                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
+                  →
+                </span>
               </div>
               <div className="text-xl font-bold text-fg mt-xs">
-                {deals.length} <span className="text-xs font-normal text-fg-muted">({deals.length === 1 ? "Deal" : "Deals"})</span>
+                {deals.length}{" "}
+                <span className="text-xs font-normal text-fg-muted">
+                  ({deals.length === 1 ? "Deal" : "Deals"})
+                </span>
               </div>
               <div className="text-xs text-brand font-medium mt-xs truncate">
                 ${totalDealAmount.toLocaleString()} total pipeline
               </div>
+              {totalCameras > 0 && (
+                <div
+                  className="text-[11px] text-fg-subtle mt-0.5 truncate"
+                  title={`${totalCameras.toLocaleString()} cameras across ${scopedDeals} scoped deal${scopedDeals === 1 ? "" : "s"}`}
+                >
+                  {totalCameras.toLocaleString()} camera
+                  {totalCameras === 1 ? "" : "s"}
+                  {scopedDeals < deals.length &&
+                    ` · ${deals.length - scopedDeals} unscoped`}
+                </div>
+              )}
             </div>
 
             {/* Active Leads Metric Card */}
@@ -500,13 +599,20 @@ export default function CompanyProfilePage() {
             >
               <div className="flex items-center justify-between text-xs text-fg-muted">
                 <span className="font-medium">Active Leads</span>
-                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
+                  →
+                </span>
               </div>
               <div className="text-xl font-bold text-fg mt-xs">
-                {leads.length} <span className="text-xs font-normal text-fg-muted">({leads.length === 1 ? "Lead" : "Leads"})</span>
+                {leads.length}{" "}
+                <span className="text-xs font-normal text-fg-muted">
+                  ({leads.length === 1 ? "Lead" : "Leads"})
+                </span>
               </div>
               <div className="text-xs text-amber-500 font-medium mt-xs truncate">
-                {totalLeadEstimate > 0 ? `$${totalLeadEstimate.toLocaleString()} est.` : "Top of funnel"}
+                {totalLeadEstimate > 0
+                  ? `$${totalLeadEstimate.toLocaleString()} est.`
+                  : "Top of funnel"}
               </div>
             </div>
 
@@ -517,10 +623,15 @@ export default function CompanyProfilePage() {
             >
               <div className="flex items-center justify-between text-xs text-fg-muted">
                 <span className="font-medium">Key Contacts</span>
-                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
+                  →
+                </span>
               </div>
               <div className="text-xl font-bold text-fg mt-xs">
-                {contacts.length} <span className="text-xs font-normal text-fg-muted">({contacts.length === 1 ? "Contact" : "Contacts"})</span>
+                {contacts.length}{" "}
+                <span className="text-xs font-normal text-fg-muted">
+                  ({contacts.length === 1 ? "Contact" : "Contacts"})
+                </span>
               </div>
               <div className="text-xs text-fg-muted mt-xs truncate">
                 Decision makers & SPOCs
@@ -534,10 +645,13 @@ export default function CompanyProfilePage() {
             >
               <div className="flex items-center justify-between text-xs text-fg-muted">
                 <span className="font-medium">Financials</span>
-                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
+                  →
+                </span>
               </div>
               <div className="text-xl font-bold text-fg mt-xs">
-                {quotes.length + invoices.length} <span className="text-xs font-normal text-fg-muted">Docs</span>
+                {quotes.length + invoices.length}{" "}
+                <span className="text-xs font-normal text-fg-muted">Docs</span>
               </div>
               <div className="text-xs text-emerald-500 font-medium mt-xs truncate">
                 {quotes.length} Quotes · {invoices.length} Invoices
@@ -553,11 +667,19 @@ export default function CompanyProfilePage() {
                 title={`Active Deals (${deals.length})`}
                 action={
                   <div className="flex items-center gap-xs">
-                    <Button size="sm" variant="secondary" onClick={() => setIsDealDialogOpen(true)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setIsDealDialogOpen(true)}
+                    >
                       + New Deal
                     </Button>
                     {deals.length > 0 && (
-                      <Button size="sm" variant="ghost" onClick={() => setActiveTab("pipeline")}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setActiveTab("pipeline")}
+                      >
                         View All →
                       </Button>
                     )}
@@ -584,13 +706,21 @@ export default function CompanyProfilePage() {
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-xs text-fg-muted">
-                          <Badge tone={meta.tone} dot>{stageLabel(deal.stage)}</Badge>
+                          <Badge tone={meta.tone} dot>
+                            {stageLabel(deal.stage)}
+                          </Badge>
                           {deal.expectedCloseDate && (
                             <span className="text-[11px] text-fg-subtle">
                               Close: {deal.expectedCloseDate}
                             </span>
                           )}
                         </div>
+                        <DeploymentSummary
+                          compact
+                          totalCameras={deal.totalCameras}
+                          location={deal.location}
+                          products={deal.products}
+                        />
                         {deal.remark && (
                           <div className="mt-xs flex items-start gap-xs text-[11px] text-fg-subtle bg-surface/80 rounded p-1.5 border border-line/50 italic">
                             <MessageSquare className="h-3 w-3 text-brand shrink-0 mt-0.5" />
@@ -611,8 +741,14 @@ export default function CompanyProfilePage() {
                 </div>
               ) : (
                 <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-xs">
-                  <p className="text-xs text-fg-muted">No active deals yet for this company.</p>
-                  <Button size="sm" variant="secondary" onClick={() => setIsDealDialogOpen(true)}>
+                  <p className="text-xs text-fg-muted">
+                    No active deals yet for this company.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setIsDealDialogOpen(true)}
+                  >
                     + Create First Deal
                   </Button>
                 </div>
@@ -625,11 +761,19 @@ export default function CompanyProfilePage() {
                 title={`Active Leads (${leads.length})`}
                 action={
                   <div className="flex items-center gap-xs">
-                    <Button size="sm" variant="secondary" onClick={() => setIsLeadDialogOpen(true)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setIsLeadDialogOpen(true)}
+                    >
                       + New Lead
                     </Button>
                     {leads.length > 0 && (
-                      <Button size="sm" variant="ghost" onClick={() => setActiveTab("pipeline")}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setActiveTab("pipeline")}
+                      >
                         View All →
                       </Button>
                     )}
@@ -681,8 +825,14 @@ export default function CompanyProfilePage() {
                 </div>
               ) : (
                 <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-xs">
-                  <p className="text-xs text-fg-muted">No leads currently linked to this company.</p>
-                  <Button size="sm" variant="secondary" onClick={() => setIsLeadDialogOpen(true)}>
+                  <p className="text-xs text-fg-muted">
+                    No leads currently linked to this company.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setIsLeadDialogOpen(true)}
+                  >
                     + Add First Lead
                   </Button>
                 </div>
@@ -691,374 +841,496 @@ export default function CompanyProfilePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-lg">
-        {/* Left Column: Description & Plant Sites */}
-        <div className="md:col-span-2 flex flex-col gap-lg">
-          {/* Company Description Card */}
-          <Card>
-            <CardHeader title="About Company" className="mb-md" />
-            {mode === "edit" ? (
-              <textarea
-                rows={4}
-                className="w-full text-sm bg-surface border border-line rounded-md p-sm text-fg"
-                placeholder="Enter company description, history, or key technical overview..."
-                value={formData.description || ""}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            ) : (
-              <p className="text-sm text-fg-muted leading-relaxed">
-                {formData.description || "No company description provided yet."}
-              </p>
-            )}
-          </Card>
-
-          {/* VIGIL AI Detections Module */}
-          <Card>
-            <CardHeader title="Active VIGIL AI Detection Modules" className="mb-md" />
-            {mode === "edit" ? (
-              <div className="flex flex-col gap-sm">
-                <p className="text-xs text-fg-muted">Select AI detection models deployed at company sites:</p>
-                <div className="flex flex-wrap gap-xs">
-                  {COMMON_AI_DETECTIONS.map((det) => {
-                    const isSelected = formData.aiDetections?.includes(det);
-                    return (
-                      <button
-                        key={det}
-                        type="button"
-                        onClick={() => {
-                          const current = formData.aiDetections || [];
-                          const next = isSelected
-                            ? current.filter((item) => item !== det)
-                            : [...current, det];
-                          setFormData({ ...formData, aiDetections: next });
-                        }}
-                        className={`text-xs px-sm py-xs rounded-md border transition-colors ${
-                          isSelected
-                            ? "bg-brand/10 border-brand text-brand font-medium"
-                            : "bg-surface-muted border-line text-fg-muted hover:border-fg-subtle"
-                        }`}
-                      >
-                        {isSelected ? "✓ " : "+ "}
-                        {det}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-xs">
-                {formData.aiDetections && formData.aiDetections.length > 0 ? (
-                  formData.aiDetections.map((det) => (
-                    <Badge key={det} tone="brand">
-                      {det}
-                    </Badge>
-                  ))
+            {/* Left Column: Description & Plant Sites */}
+            <div className="md:col-span-2 flex flex-col gap-lg">
+              {/* Company Description Card */}
+              <Card>
+                <CardHeader title="About Company" className="mb-md" />
+                {mode === "edit" ? (
+                  <textarea
+                    rows={4}
+                    className="w-full text-sm bg-surface border border-line rounded-md p-sm text-fg"
+                    placeholder="Enter company description, history, or key technical overview..."
+                    value={formData.description || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                  />
                 ) : (
-                  <span className="text-xs text-fg-subtle">No active AI detection modules assigned.</span>
+                  <p className="text-sm text-fg-muted leading-relaxed">
+                    {formData.description ||
+                      "No company description provided yet."}
+                  </p>
                 )}
-              </div>
-            )}
-          </Card>
+              </Card>
 
-          {/* Plant Locations & Sites */}
-          <Card>
-            <CardHeader
-              title={`Plant Sites (${formData.plantLocations?.length || 0})`}
-              action={
-                mode === "edit" ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon="plus"
-                    onClick={() => {
-                      const locs = formData.plantLocations || [];
-                      setFormData({
-                        ...formData,
-                        plantLocations: [
-                          ...locs,
-                          { name: "New Plant", city: "", address: "", spocName: "", spocPhone: "" },
-                        ],
-                      });
-                    }}
-                  >
-                    Add Site
-                  </Button>
-                ) : undefined
-              }
-              className="mb-md"
-            />
-            {formData.plantLocations && formData.plantLocations.length > 0 ? (
-              <div className="flex flex-col gap-md">
-                {formData.plantLocations.map((loc, idx) => (
-                  <div
-                    key={idx}
-                    className="p-md rounded-lg border border-line bg-surface-muted flex flex-col gap-xs relative"
-                  >
+              {/* VIGIL AI Detections Module */}
+              <Card>
+                <CardHeader
+                  title="Active VIGIL AI Detection Modules"
+                  className="mb-md"
+                />
+                {mode === "edit" ? (
+                  <div className="flex flex-col gap-sm">
+                    <p className="text-xs text-fg-muted">
+                      Select AI detection models deployed at company sites:
+                    </p>
+                    <div className="flex flex-wrap gap-xs">
+                      {COMMON_AI_DETECTIONS.map((det) => {
+                        const isSelected = formData.aiDetections?.includes(det);
+                        return (
+                          <button
+                            key={det}
+                            type="button"
+                            onClick={() => {
+                              const current = formData.aiDetections || [];
+                              const next = isSelected
+                                ? current.filter((item) => item !== det)
+                                : [...current, det];
+                              setFormData({ ...formData, aiDetections: next });
+                            }}
+                            className={`text-xs px-sm py-xs rounded-md border transition-colors ${
+                              isSelected
+                                ? "bg-brand/10 border-brand text-brand font-medium"
+                                : "bg-surface-muted border-line text-fg-muted hover:border-fg-subtle"
+                            }`}
+                          >
+                            {isSelected ? "✓ " : "+ "}
+                            {det}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-xs">
+                    {formData.aiDetections &&
+                    formData.aiDetections.length > 0 ? (
+                      formData.aiDetections.map((det) => (
+                        <Badge key={det} tone="brand">
+                          {det}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-fg-subtle">
+                        No active AI detection modules assigned.
+                      </span>
+                    )}
+                  </div>
+                )}
+              </Card>
+
+              {/* Plant Locations & Sites */}
+              <Card>
+                <CardHeader
+                  title={`Plant Sites (${formData.plantLocations?.length || 0})`}
+                  action={
+                    mode === "edit" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon="plus"
+                        onClick={() => {
+                          const locs = formData.plantLocations || [];
+                          setFormData({
+                            ...formData,
+                            plantLocations: [
+                              ...locs,
+                              {
+                                name: "New Plant",
+                                city: "",
+                                address: "",
+                                spocName: "",
+                                spocPhone: "",
+                              },
+                            ],
+                          });
+                        }}
+                      >
+                        Add Site
+                      </Button>
+                    ) : undefined
+                  }
+                  className="mb-md"
+                />
+                {formData.plantLocations &&
+                formData.plantLocations.length > 0 ? (
+                  <div className="flex flex-col gap-md">
+                    {formData.plantLocations.map((loc, idx) => (
+                      <div
+                        key={idx}
+                        className="p-md rounded-lg border border-line bg-surface-muted flex flex-col gap-xs relative"
+                      >
+                        {mode === "edit" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-sm">
+                            <div>
+                              <label className="text-xs text-fg-muted font-medium">
+                                Plant Name
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
+                                value={loc.name}
+                                onChange={(e) => {
+                                  const locs = [
+                                    ...(formData.plantLocations || []),
+                                  ];
+                                  locs[idx] = {
+                                    ...locs[idx],
+                                    name: e.target.value,
+                                  };
+                                  setFormData({
+                                    ...formData,
+                                    plantLocations: locs,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-fg-muted font-medium">
+                                City / Region
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
+                                value={loc.city}
+                                onChange={(e) => {
+                                  const locs = [
+                                    ...(formData.plantLocations || []),
+                                  ];
+                                  locs[idx] = {
+                                    ...locs[idx],
+                                    city: e.target.value,
+                                  };
+                                  setFormData({
+                                    ...formData,
+                                    plantLocations: locs,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-fg-muted font-medium">
+                                Site SPOC Name
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
+                                value={loc.spocName || ""}
+                                onChange={(e) => {
+                                  const locs = [
+                                    ...(formData.plantLocations || []),
+                                  ];
+                                  locs[idx] = {
+                                    ...locs[idx],
+                                    spocName: e.target.value,
+                                  };
+                                  setFormData({
+                                    ...formData,
+                                    plantLocations: locs,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-fg-muted font-medium">
+                                Site SPOC Phone
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
+                                value={loc.spocPhone || ""}
+                                onChange={(e) => {
+                                  const locs = [
+                                    ...(formData.plantLocations || []),
+                                  ];
+                                  locs[idx] = {
+                                    ...locs[idx],
+                                    spocPhone: e.target.value,
+                                  };
+                                  setFormData({
+                                    ...formData,
+                                    plantLocations: locs,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div className="md:col-span-2 flex justify-end mt-xs">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const locs = (
+                                    formData.plantLocations || []
+                                  ).filter((_, i) => i !== idx);
+                                  setFormData({
+                                    ...formData,
+                                    plantLocations: locs,
+                                  });
+                                }}
+                              >
+                                <span className="text-bad-fg text-xs">
+                                  Remove Site
+                                </span>
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-semibold text-fg">
+                                {loc.name}
+                              </h4>
+                              {loc.city && (
+                                <Badge tone="neutral">{loc.city}</Badge>
+                              )}
+                            </div>
+                            {loc.address && (
+                              <p className="text-xs text-fg-muted">
+                                {loc.address}
+                              </p>
+                            )}
+                            {(loc.spocName || loc.spocPhone) && (
+                              <div className="text-xs text-fg-muted mt-xs pt-xs border-t border-line flex items-center gap-md">
+                                <span>
+                                  SPOC: <strong>{loc.spocName || "N/A"}</strong>
+                                </span>
+                                {loc.spocPhone && (
+                                  <span>Phone: {loc.spocPhone}</span>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-fg-subtle">
+                    No plant sites configured.
+                  </p>
+                )}
+              </Card>
+
+              {/* Custom Sections Builder */}
+              {formData.customSections &&
+                formData.customSections.map((sec, idx) => (
+                  <Card key={idx}>
+                    <CardHeader title={sec.title} className="mb-md" />
                     {mode === "edit" ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-sm">
-                        <div>
-                          <label className="text-xs text-fg-muted font-medium">Plant Name</label>
-                          <input
-                            type="text"
-                            className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                            value={loc.name}
-                            onChange={(e) => {
-                              const locs = [...(formData.plantLocations || [])];
-                              locs[idx] = { ...locs[idx], name: e.target.value };
-                              setFormData({ ...formData, plantLocations: locs });
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-fg-muted font-medium">City / Region</label>
-                          <input
-                            type="text"
-                            className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                            value={loc.city}
-                            onChange={(e) => {
-                              const locs = [...(formData.plantLocations || [])];
-                              locs[idx] = { ...locs[idx], city: e.target.value };
-                              setFormData({ ...formData, plantLocations: locs });
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-fg-muted font-medium">Site SPOC Name</label>
-                          <input
-                            type="text"
-                            className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                            value={loc.spocName || ""}
-                            onChange={(e) => {
-                              const locs = [...(formData.plantLocations || [])];
-                              locs[idx] = { ...locs[idx], spocName: e.target.value };
-                              setFormData({ ...formData, plantLocations: locs });
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-fg-muted font-medium">Site SPOC Phone</label>
-                          <input
-                            type="text"
-                            className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                            value={loc.spocPhone || ""}
-                            onChange={(e) => {
-                              const locs = [...(formData.plantLocations || [])];
-                              locs[idx] = { ...locs[idx], spocPhone: e.target.value };
-                              setFormData({ ...formData, plantLocations: locs });
-                            }}
-                          />
-                        </div>
-                        <div className="md:col-span-2 flex justify-end mt-xs">
+                      <div className="flex flex-col gap-sm">
+                        <input
+                          type="text"
+                          className="w-full text-sm font-medium bg-surface border border-line rounded px-sm py-xs text-fg"
+                          value={sec.title}
+                          onChange={(e) => {
+                            const secs = [...(formData.customSections || [])];
+                            secs[idx] = { ...secs[idx], title: e.target.value };
+                            setFormData({ ...formData, customSections: secs });
+                          }}
+                        />
+                        <textarea
+                          rows={3}
+                          className="w-full text-xs bg-surface border border-line rounded p-sm text-fg"
+                          value={sec.content}
+                          onChange={(e) => {
+                            const secs = [...(formData.customSections || [])];
+                            secs[idx] = {
+                              ...secs[idx],
+                              content: e.target.value,
+                            };
+                            setFormData({ ...formData, customSections: secs });
+                          }}
+                        />
+                        <div className="flex justify-end">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              const locs = (formData.plantLocations || []).filter((_, i) => i !== idx);
-                              setFormData({ ...formData, plantLocations: locs });
+                              const secs = (
+                                formData.customSections || []
+                              ).filter((_, i) => i !== idx);
+                              setFormData({
+                                ...formData,
+                                customSections: secs,
+                              });
                             }}
                           >
-                            <span className="text-bad-fg text-xs">Remove Site</span>
+                            <span className="text-bad-fg text-xs">
+                              Remove Section
+                            </span>
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-semibold text-fg">{loc.name}</h4>
-                          {loc.city && <Badge tone="neutral">{loc.city}</Badge>}
-                        </div>
-                        {loc.address && <p className="text-xs text-fg-muted">{loc.address}</p>}
-                        {(loc.spocName || loc.spocPhone) && (
-                          <div className="text-xs text-fg-muted mt-xs pt-xs border-t border-line flex items-center gap-md">
-                            <span>SPOC: <strong>{loc.spocName || "N/A"}</strong></span>
-                            {loc.spocPhone && <span>Phone: {loc.spocPhone}</span>}
-                          </div>
-                        )}
-                      </>
+                      <p className="text-sm text-fg-muted whitespace-pre-wrap">
+                        {sec.content}
+                      </p>
+                    )}
+                  </Card>
+                ))}
+
+              {mode === "edit" && (
+                <Button
+                  variant="secondary"
+                  icon="plus"
+                  onClick={() => {
+                    const secs = formData.customSections || [];
+                    setFormData({
+                      ...formData,
+                      customSections: [
+                        ...secs,
+                        { title: "Custom Documentation Section", content: "" },
+                      ],
+                    });
+                  }}
+                >
+                  Add Custom Section
+                </Button>
+              )}
+            </div>
+
+            {/* Right Column: Hardware Specs, Linked Deals, Commercials, Contacts */}
+            <div className="flex flex-col gap-lg">
+              {/* Hardware Infrastructure */}
+              <Card>
+                <CardHeader title="Hardware Infrastructure" className="mb-md" />
+                <div className="flex flex-col gap-sm text-xs">
+                  <div className="flex justify-between items-center py-xs border-b border-line">
+                    <span className="text-fg-muted">Edge Processor:</span>
+                    {mode === "edit" ? (
+                      <input
+                        type="text"
+                        className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
+                        value={formData.hardwareSpecs?.edgeProcessor || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            hardwareSpecs: {
+                              ...formData.hardwareSpecs,
+                              edgeProcessor: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    ) : (
+                      <span className="font-medium text-fg">
+                        {formData.hardwareSpecs?.edgeProcessor || "N/A"}
+                      </span>
                     )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-fg-subtle">No plant sites configured.</p>
-            )}
-          </Card>
-
-          {/* Custom Sections Builder */}
-          {formData.customSections && formData.customSections.map((sec, idx) => (
-            <Card key={idx}>
-              <CardHeader title={sec.title} className="mb-md" />
-              {mode === "edit" ? (
-                <div className="flex flex-col gap-sm">
-                  <input
-                    type="text"
-                    className="w-full text-sm font-medium bg-surface border border-line rounded px-sm py-xs text-fg"
-                    value={sec.title}
-                    onChange={(e) => {
-                      const secs = [...(formData.customSections || [])];
-                      secs[idx] = { ...secs[idx], title: e.target.value };
-                      setFormData({ ...formData, customSections: secs });
-                    }}
-                  />
-                  <textarea
-                    rows={3}
-                    className="w-full text-xs bg-surface border border-line rounded p-sm text-fg"
-                    value={sec.content}
-                    onChange={(e) => {
-                      const secs = [...(formData.customSections || [])];
-                      secs[idx] = { ...secs[idx], content: e.target.value };
-                      setFormData({ ...formData, customSections: secs });
-                    }}
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const secs = (formData.customSections || []).filter((_, i) => i !== idx);
-                        setFormData({ ...formData, customSections: secs });
-                      }}
-                    >
-                      <span className="text-bad-fg text-xs">Remove Section</span>
-                    </Button>
+                  <div className="flex justify-between items-center py-xs border-b border-line">
+                    <span className="text-fg-muted">Camera Stream Count:</span>
+                    {mode === "edit" ? (
+                      <input
+                        type="number"
+                        className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
+                        value={formData.hardwareSpecs?.cameraCount || 0}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            hardwareSpecs: {
+                              ...formData.hardwareSpecs,
+                              cameraCount: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                      />
+                    ) : (
+                      <span className="font-medium text-fg">
+                        {formData.hardwareSpecs?.cameraCount || 0} Streams
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center py-xs border-b border-line">
+                    <span className="text-fg-muted">
+                      Audio / Speaker Units:
+                    </span>
+                    {mode === "edit" ? (
+                      <input
+                        type="number"
+                        className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
+                        value={formData.hardwareSpecs?.speakerCount || 0}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            hardwareSpecs: {
+                              ...formData.hardwareSpecs,
+                              speakerCount: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                      />
+                    ) : (
+                      <span className="font-medium text-fg">
+                        {formData.hardwareSpecs?.speakerCount || 0} Units
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center py-xs">
+                    <span className="text-fg-muted">NVR / CCTV Make:</span>
+                    {mode === "edit" ? (
+                      <input
+                        type="text"
+                        className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
+                        value={formData.hardwareSpecs?.nvrMake || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            hardwareSpecs: {
+                              ...formData.hardwareSpecs,
+                              nvrMake: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    ) : (
+                      <span className="font-medium text-fg">
+                        {formData.hardwareSpecs?.nvrMake || "N/A"}
+                      </span>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <p className="text-sm text-fg-muted whitespace-pre-wrap">{sec.content}</p>
-              )}
-            </Card>
-          ))}
+              </Card>
 
-          {mode === "edit" && (
-            <Button
-              variant="secondary"
-              icon="plus"
-              onClick={() => {
-                const secs = formData.customSections || [];
-                setFormData({
-                  ...formData,
-                  customSections: [
-                    ...secs,
-                    { title: "Custom Documentation Section", content: "" },
-                  ],
-                });
-              }}
-            >
-              Add Custom Section
-            </Button>
-          )}
-        </div>
-
-        {/* Right Column: Hardware Specs, Linked Deals, Commercials, Contacts */}
-        <div className="flex flex-col gap-lg">
-          {/* Hardware Infrastructure */}
-          <Card>
-            <CardHeader title="Hardware Infrastructure" className="mb-md" />
-            <div className="flex flex-col gap-sm text-xs">
-              <div className="flex justify-between items-center py-xs border-b border-line">
-                <span className="text-fg-muted">Edge Processor:</span>
-                {mode === "edit" ? (
-                  <input
-                    type="text"
-                    className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
-                    value={formData.hardwareSpecs?.edgeProcessor || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        hardwareSpecs: { ...formData.hardwareSpecs, edgeProcessor: e.target.value },
-                      })
-                    }
-                  />
-                ) : (
-                  <span className="font-medium text-fg">{formData.hardwareSpecs?.edgeProcessor || "N/A"}</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center py-xs border-b border-line">
-                <span className="text-fg-muted">Camera Stream Count:</span>
-                {mode === "edit" ? (
-                  <input
-                    type="number"
-                    className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
-                    value={formData.hardwareSpecs?.cameraCount || 0}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        hardwareSpecs: {
-                          ...formData.hardwareSpecs,
-                          cameraCount: parseInt(e.target.value) || 0,
-                        },
-                      })
-                    }
-                  />
-                ) : (
-                  <span className="font-medium text-fg">{formData.hardwareSpecs?.cameraCount || 0} Streams</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center py-xs border-b border-line">
-                <span className="text-fg-muted">Audio / Speaker Units:</span>
-                {mode === "edit" ? (
-                  <input
-                    type="number"
-                    className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
-                    value={formData.hardwareSpecs?.speakerCount || 0}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        hardwareSpecs: {
-                          ...formData.hardwareSpecs,
-                          speakerCount: parseInt(e.target.value) || 0,
-                        },
-                      })
-                    }
-                  />
-                ) : (
-                  <span className="font-medium text-fg">{formData.hardwareSpecs?.speakerCount || 0} Units</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center py-xs">
-                <span className="text-fg-muted">NVR / CCTV Make:</span>
-                {mode === "edit" ? (
-                  <input
-                    type="text"
-                    className="bg-surface border border-line rounded px-xs py-xs text-xs text-fg w-32"
-                    value={formData.hardwareSpecs?.nvrMake || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        hardwareSpecs: { ...formData.hardwareSpecs, nvrMake: e.target.value },
-                      })
-                    }
-                  />
-                ) : (
-                  <span className="font-medium text-fg">{formData.hardwareSpecs?.nvrMake || "N/A"}</span>
-                )}
-              </div>
+              <Timeline scope={{ accountId: id! }} />
             </div>
-          </Card>
-          
-          <Timeline scope={{ accountId: id! }} />
+          </div>
         </div>
-      </div>
-    </div>
-  )}
+      )}
 
       {activeTab === "pipeline" && (
         <div className="flex flex-col gap-lg mt-md">
           {/* Pipeline Funnel Header */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-md p-md rounded-xl border border-line bg-surface">
             <div>
-              <span className="text-xs text-fg-muted">Active Deals Pipeline</span>
+              <span className="text-xs text-fg-muted">
+                Active Deals Pipeline
+              </span>
               <div className="text-xl font-bold text-fg mt-0.5">
-                {deals.length} Deals <span className="text-sm font-semibold text-brand">(${totalDealAmount.toLocaleString()})</span>
+                {deals.length} Deals{" "}
+                <span className="text-sm font-semibold text-brand">
+                  (${totalDealAmount.toLocaleString()})
+                </span>
               </div>
             </div>
             <div>
-              <span className="text-xs text-fg-muted">Active Leads Pipeline</span>
+              <span className="text-xs text-fg-muted">
+                Active Leads Pipeline
+              </span>
               <div className="text-xl font-bold text-fg mt-0.5">
-                {leads.length} Leads <span className="text-sm font-semibold text-amber-500">{totalLeadEstimate > 0 ? `($${totalLeadEstimate.toLocaleString()})` : ""}</span>
+                {leads.length} Leads{" "}
+                <span className="text-sm font-semibold text-amber-500">
+                  {totalLeadEstimate > 0
+                    ? `($${totalLeadEstimate.toLocaleString()})`
+                    : ""}
+                </span>
               </div>
             </div>
             <div>
-              <span className="text-xs text-fg-muted">Total Active Records</span>
+              <span className="text-xs text-fg-muted">
+                Total Active Records
+              </span>
               <div className="text-xl font-bold text-fg mt-0.5">
                 {deals.length + leads.length} Records
               </div>
@@ -1074,7 +1346,11 @@ export default function CompanyProfilePage() {
                   <Button size="sm" onClick={() => setIsDealDialogOpen(true)}>
                     + New Deal
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => navigate("/deals")}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => navigate("/deals")}
+                  >
                     View Deals Board
                   </Button>
                 </div>
@@ -1098,29 +1374,54 @@ export default function CompanyProfilePage() {
                           >
                             {deal.title}
                           </span>
-                          <Badge tone={meta.tone} dot>{stageLabel(deal.stage)}</Badge>
+                          <Badge tone={meta.tone} dot>
+                            {stageLabel(deal.stage)}
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-sm">
-                          <span className="text-sm font-bold text-fg">${deal.amount.toLocaleString()}</span>
-                          <Button size="sm" variant="ghost" onClick={() => setDealToEdit(deal)}>
+                          <span className="text-sm font-bold text-fg">
+                            ${deal.amount.toLocaleString()}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDealToEdit(deal)}
+                          >
                             Edit
                           </Button>
                         </div>
                       </div>
                       <div className="flex justify-between text-fg-muted mt-xs">
                         {deal.expectedCloseDate ? (
-                          <span>Target Close: <strong className="text-fg">{deal.expectedCloseDate}</strong></span>
+                          <span>
+                            Target Close:{" "}
+                            <strong className="text-fg">
+                              {deal.expectedCloseDate}
+                            </strong>
+                          </span>
                         ) : (
                           <span className="text-fg-subtle">No close date</span>
                         )}
-                        <span className="text-fg-subtle">Created: {new Date(deal.createdAt).toLocaleDateString()}</span>
+                        <span className="text-fg-subtle">
+                          Created:{" "}
+                          {new Date(deal.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
+                      <DeploymentSummary
+                        totalCameras={deal.totalCameras}
+                        location={deal.location}
+                        products={deal.products}
+                      />
                       {deal.remark && (
                         <div className="mt-sm flex items-start gap-sm text-xs text-fg-subtle bg-surface/90 rounded-md p-sm border border-line/60">
                           <MessageSquare className="h-4 w-4 text-brand shrink-0 mt-0.5" />
                           <div className="flex flex-col">
-                            <span className="text-[10px] uppercase tracking-wider font-semibold text-fg-muted">Remark</span>
-                            <span className="text-fg mt-0.5">{deal.remark}</span>
+                            <span className="text-[10px] uppercase tracking-wider font-semibold text-fg-muted">
+                              Remark
+                            </span>
+                            <span className="text-fg mt-0.5">
+                              {deal.remark}
+                            </span>
                           </div>
                         </div>
                       )}
@@ -1130,7 +1431,9 @@ export default function CompanyProfilePage() {
               </div>
             ) : (
               <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-sm">
-                <p className="text-sm text-fg-muted">No active deals found for this company.</p>
+                <p className="text-sm text-fg-muted">
+                  No active deals found for this company.
+                </p>
                 <Button size="sm" onClick={() => setIsDealDialogOpen(true)}>
                   + Create New Deal
                 </Button>
@@ -1147,7 +1450,11 @@ export default function CompanyProfilePage() {
                   <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
                     + New Lead
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => navigate("/leads")}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => navigate("/leads")}
+                  >
                     View All Leads
                   </Button>
                 </div>
@@ -1167,16 +1474,30 @@ export default function CompanyProfilePage() {
                           {lead.firstName} {lead.lastName || ""}
                         </span>
                         <Badge tone="brand">{lead.stage}</Badge>
-                        {lead.title && <span className="text-fg-muted">• {lead.title}</span>}
+                        {lead.title && (
+                          <span className="text-fg-muted">• {lead.title}</span>
+                        )}
                       </div>
                       {lead.value ? (
-                        <span className="text-sm font-bold text-amber-500">${lead.value.toLocaleString()}</span>
+                        <span className="text-sm font-bold text-amber-500">
+                          ${lead.value.toLocaleString()}
+                        </span>
                       ) : null}
                     </div>
                     <div className="flex justify-between items-center text-fg-muted mt-xs">
                       <div className="flex items-center gap-md text-fg-subtle">
-                        {lead.email && <span>Email: <strong className="text-fg">{lead.email}</strong></span>}
-                        {lead.phone && <span>Phone: <strong className="text-fg">{lead.phone}</strong></span>}
+                        {lead.email && (
+                          <span>
+                            Email:{" "}
+                            <strong className="text-fg">{lead.email}</strong>
+                          </span>
+                        )}
+                        {lead.phone && (
+                          <span>
+                            Phone:{" "}
+                            <strong className="text-fg">{lead.phone}</strong>
+                          </span>
+                        )}
                       </div>
                       <Link
                         to={`/leads`}
@@ -1190,7 +1511,9 @@ export default function CompanyProfilePage() {
               </div>
             ) : (
               <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-sm">
-                <p className="text-sm text-fg-muted">No leads linked to this company yet.</p>
+                <p className="text-sm text-fg-muted">
+                  No leads linked to this company yet.
+                </p>
                 <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
                   + Add Lead
                 </Button>
@@ -1204,18 +1527,33 @@ export default function CompanyProfilePage() {
         <div className="flex flex-col gap-lg mt-md">
           {/* Quotes & Proposals */}
           <Card>
-            <CardHeader title={`Quotes & Proposals (${quotes.length})`} className="mb-md" />
+            <CardHeader
+              title={`Quotes & Proposals (${quotes.length})`}
+              className="mb-md"
+            />
             {quotes.length > 0 ? (
               <div className="flex flex-col gap-sm">
                 {quotes.map((quote) => (
-                  <div key={quote.id} className="p-sm rounded-md border border-line bg-surface-muted text-xs flex justify-between items-center">
+                  <div
+                    key={quote.id}
+                    className="p-sm rounded-md border border-line bg-surface-muted text-xs flex justify-between items-center"
+                  >
                     <div>
-                      <span className="font-medium text-fg block">{quote.number || "Quote"}</span>
-                      <span className="text-fg-muted">Status: {quote.status}</span>
+                      <span className="font-medium text-fg block">
+                        {quote.number || "Quote"}
+                      </span>
+                      <span className="text-fg-muted">
+                        Status: {quote.status}
+                      </span>
                     </div>
                     <div className="text-right">
-                      <span className="font-semibold text-fg block">${quote.total.toLocaleString()}</span>
-                      <Link to={`/quotes/${quote.id}/preview`} className="text-brand hover:underline text-[11px]">
+                      <span className="font-semibold text-fg block">
+                        ${quote.total.toLocaleString()}
+                      </span>
+                      <Link
+                        to={`/quotes/${quote.id}/preview`}
+                        className="text-brand hover:underline text-[11px]"
+                      >
                         View Quote →
                       </Link>
                     </div>
@@ -1229,18 +1567,33 @@ export default function CompanyProfilePage() {
 
           {/* Invoices */}
           <Card>
-            <CardHeader title={`Invoices & Billing (${invoices.length})`} className="mb-md" />
+            <CardHeader
+              title={`Invoices & Billing (${invoices.length})`}
+              className="mb-md"
+            />
             {invoices.length > 0 ? (
               <div className="flex flex-col gap-sm">
                 {invoices.map((inv) => (
-                  <div key={inv.id} className="p-sm rounded-md border border-line bg-surface-muted text-xs flex justify-between items-center">
+                  <div
+                    key={inv.id}
+                    className="p-sm rounded-md border border-line bg-surface-muted text-xs flex justify-between items-center"
+                  >
                     <div>
-                      <span className="font-medium text-fg block">{inv.invoiceNumber || inv.title || "Invoice"}</span>
-                      <span className="text-fg-muted">Status: {inv.status}</span>
+                      <span className="font-medium text-fg block">
+                        {inv.invoiceNumber || inv.title || "Invoice"}
+                      </span>
+                      <span className="text-fg-muted">
+                        Status: {inv.status}
+                      </span>
                     </div>
                     <div className="text-right">
-                      <span className="font-semibold text-fg block">${inv.total.toLocaleString()}</span>
-                      <Link to={`/invoices/${inv.id}/preview`} className="text-brand hover:underline text-[11px]">
+                      <span className="font-semibold text-fg block">
+                        ${inv.total.toLocaleString()}
+                      </span>
+                      <Link
+                        to={`/invoices/${inv.id}/preview`}
+                        className="text-brand hover:underline text-[11px]"
+                      >
                         View Invoice →
                       </Link>
                     </div>
@@ -1258,17 +1611,30 @@ export default function CompanyProfilePage() {
         <div className="flex flex-col gap-lg mt-md">
           {/* Key Contacts */}
           <Card>
-            <CardHeader title={`Key Contacts (${contacts.length})`} className="mb-md" />
+            <CardHeader
+              title={`Key Contacts (${contacts.length})`}
+              className="mb-md"
+            />
             {contacts.length > 0 ? (
               <div className="flex flex-col gap-sm">
                 {contacts.map((contact) => (
-                  <div key={contact.id} className="flex items-center gap-sm p-sm rounded-md border border-line bg-surface-muted text-xs">
-                    <Avatar name={`${contact.firstName} ${contact.lastName || ""}`} size="xs" />
+                  <div
+                    key={contact.id}
+                    className="flex items-center gap-sm p-sm rounded-md border border-line bg-surface-muted text-xs"
+                  >
+                    <Avatar
+                      name={`${contact.firstName} ${contact.lastName || ""}`}
+                      size="xs"
+                    />
                     <div className="min-w-0 flex-1">
                       <span className="font-medium text-fg block truncate">
                         {contact.firstName} {contact.lastName || ""}
                       </span>
-                      {contact.title && <span className="text-fg-muted block truncate">{contact.title}</span>}
+                      {contact.title && (
+                        <span className="text-fg-muted block truncate">
+                          {contact.title}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1280,21 +1646,26 @@ export default function CompanyProfilePage() {
 
           {/* Leads */}
           <Card>
-            <CardHeader 
-              title={`Leads (${leads?.length || 0})`} 
-              className="mb-md" 
+            <CardHeader
+              title={`Leads (${leads?.length || 0})`}
+              className="mb-md"
               action={
                 <div className="flex items-center gap-xs">
-                  <Button
-                    size="sm"
-                    onClick={() => setIsLeadDialogOpen(true)}
-                  >
+                  <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
                     + Add Lead
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => navigate('/leads', { state: { new: true, accountId: id, accountName: formData.name }})}
+                    onClick={() =>
+                      navigate("/leads", {
+                        state: {
+                          new: true,
+                          accountId: id,
+                          accountName: formData.name,
+                        },
+                      })
+                    }
                   >
                     Open Leads Page
                   </Button>
@@ -1304,17 +1675,26 @@ export default function CompanyProfilePage() {
             {leads && leads.length > 0 ? (
               <div className="flex flex-col gap-sm">
                 {leads.map((lead) => (
-                  <div key={lead.id} className="p-sm rounded-md border border-line bg-surface-muted text-xs flex flex-col gap-xs">
+                  <div
+                    key={lead.id}
+                    className="p-sm rounded-md border border-line bg-surface-muted text-xs flex flex-col gap-xs"
+                  >
                     <div className="flex justify-between font-medium text-fg">
-                      <span>{lead.firstName} {lead.lastName || ""}</span>
-                      {lead.value ? <span>${lead.value.toLocaleString()}</span> : null}
+                      <span>
+                        {lead.firstName} {lead.lastName || ""}
+                      </span>
+                      {lead.value ? (
+                        <span>${lead.value.toLocaleString()}</span>
+                      ) : null}
                     </div>
                     <div className="flex justify-between text-fg-muted">
                       <span>Stage: {lead.stage}</span>
                       {lead.title && <span>{lead.title}</span>}
                     </div>
                     {lead.email && (
-                      <div className="text-fg-subtle truncate">{lead.email}</div>
+                      <div className="text-fg-subtle truncate">
+                        {lead.email}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1344,7 +1724,10 @@ export default function CompanyProfilePage() {
           defaultStage={normalizeDealStage(dealToEdit.stage)}
           onClose={() => setDealToEdit(null)}
           onSubmit={async (input) => {
-            await updateDealMutation.mutateAsync({ dealId: dealToEdit.id, data: input });
+            await updateDealMutation.mutateAsync({
+              dealId: dealToEdit.id,
+              data: input,
+            });
           }}
         />
       )}

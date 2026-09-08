@@ -13,7 +13,11 @@ interface DealCardProps {
   onRemark?: (deal: Deal) => void;
 }
 
-export const DealCard = memo(function DealCard({ deal, overlay = false, onRemark }: DealCardProps) {
+export const DealCard = memo(function DealCard({
+  deal,
+  overlay = false,
+  onRemark,
+}: DealCardProps) {
   const currency = useCurrency();
   const owner = deal.ownerName?.trim() || deal.ownerEmail;
   const days = isClosed(deal.stage) ? null : daysUntil(deal.expectedCloseDate);
@@ -28,7 +32,9 @@ export const DealCard = memo(function DealCard({ deal, overlay = false, onRemark
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <h4 className="text-sm font-bold leading-snug text-fg line-clamp-2">{deal.title}</h4>
+        <h4 className="text-sm font-bold leading-snug text-fg line-clamp-2">
+          {deal.title}
+        </h4>
         <span className="shrink-0 rounded-xl bg-indigo-500/10 px-2.5 py-1 text-xs font-extrabold tabular-nums text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
           {formatMoneyCompact(deal.amount, currency)}
         </span>
@@ -53,7 +59,9 @@ export const DealCard = memo(function DealCard({ deal, overlay = false, onRemark
           title="Click to edit remark"
         >
           <MessageSquare className="h-3.5 w-3.5 text-indigo-500 shrink-0 mt-0.5" />
-          <span className="line-clamp-2 italic font-normal text-fg-muted">{remarkText}</span>
+          <span className="line-clamp-2 italic font-normal text-fg-muted">
+            {remarkText}
+          </span>
         </div>
       )}
 
@@ -62,10 +70,14 @@ export const DealCard = memo(function DealCard({ deal, overlay = false, onRemark
           {owner ? (
             <div className="flex items-center gap-1.5">
               <Avatar name={owner} title={deal.ownerEmail ?? owner} size="xs" />
-              <span className="text-[11px] font-medium text-fg-muted truncate max-w-24">{owner}</span>
+              <span className="text-[11px] font-medium text-fg-muted truncate max-w-24">
+                {owner}
+              </span>
             </div>
           ) : (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">Unassigned</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
+              Unassigned
+            </span>
           )}
 
           {onRemark && (
@@ -82,7 +94,9 @@ export const DealCard = memo(function DealCard({ deal, overlay = false, onRemark
               }`}
               title={remarkText ? "Edit remark" : "Add remark"}
             >
-              <MessageSquare className={`h-3.5 w-3.5 ${remarkText ? "fill-indigo-500/20" : ""}`} />
+              <MessageSquare
+                className={`h-3.5 w-3.5 ${remarkText ? "fill-indigo-500/20" : ""}`}
+              />
             </button>
           )}
         </div>
@@ -103,4 +117,3 @@ export const DealCard = memo(function DealCard({ deal, overlay = false, onRemark
     </article>
   );
 });
-

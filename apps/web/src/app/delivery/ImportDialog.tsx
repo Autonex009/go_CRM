@@ -48,7 +48,9 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
     if (!preview) return;
     // "unchanged" rows are dropped rather than sent: writing them would bump
     // updated_by and make it look like someone edited every line.
-    const rows = preview.rows.filter((r) => r.action !== "unchanged").map((r) => r.values);
+    const rows = preview.rows
+      .filter((r) => r.action !== "unchanged")
+      .map((r) => r.values);
     if (rows.length === 0) {
       onClose();
       return;
@@ -98,15 +100,16 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
 
             {preview.ignoredColumns && preview.ignoredColumns.length > 0 && (
               <Alert tone="neutral">
-                These columns have no home in the tracker and will not be imported:{" "}
-                {preview.ignoredColumns.join(", ")}.
+                These columns have no home in the tracker and will not be
+                imported: {preview.ignoredColumns.join(", ")}.
               </Alert>
             )}
 
             {preview.errors && preview.errors.length > 0 && (
               <Alert>
-                {preview.errors.length} row{preview.errors.length === 1 ? "" : "s"} could not be
-                read and will be skipped: {preview.errors.slice(0, 3).join("; ")}
+                {preview.errors.length} row
+                {preview.errors.length === 1 ? "" : "s"} could not be read and
+                will be skipped: {preview.errors.slice(0, 3).join("; ")}
                 {preview.errors.length > 3 ? "…" : ""}
               </Alert>
             )}
@@ -116,14 +119,23 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
                 <thead className="sticky top-0 bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
                   <tr>
                     <th className="px-sm py-xs text-left font-semibold">Row</th>
-                    <th className="px-sm py-xs text-left font-semibold">Client</th>
-                    <th className="px-sm py-xs text-left font-semibold">Action</th>
-                    <th className="px-sm py-xs text-left font-semibold">Changes</th>
+                    <th className="px-sm py-xs text-left font-semibold">
+                      Client
+                    </th>
+                    <th className="px-sm py-xs text-left font-semibold">
+                      Action
+                    </th>
+                    <th className="px-sm py-xs text-left font-semibold">
+                      Changes
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.rows.map((row) => (
-                    <PreviewLine key={`${row.sheetRow}-${row.values.client}`} row={row} />
+                    <PreviewLine
+                      key={`${row.sheetRow}-${row.values.client}`}
+                      row={row}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -135,8 +147,13 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={commit} disabled={busy || !preview || willWrite === 0}>
-            {willWrite === 0 ? "Nothing to import" : `Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
+          <Button
+            onClick={commit}
+            disabled={busy || !preview || willWrite === 0}
+          >
+            {willWrite === 0
+              ? "Nothing to import"
+              : `Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
           </Button>
         </div>
       </div>
@@ -145,11 +162,25 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
 }
 
 function PreviewLine({ row }: { row: PreviewRow }) {
-  const tone = row.action === "create" ? "success" : row.action === "update" ? "warning" : "neutral";
+  const tone =
+    row.action === "create"
+      ? "success"
+      : row.action === "update"
+        ? "warning"
+        : "neutral";
   return (
     <tr className="border-t border-line">
       <td className="px-sm py-xs tabular-nums text-fg-muted">{row.sheetRow}</td>
-      <td className="px-sm py-xs font-medium text-fg">{row.values.client}</td>
+      <td className="px-sm py-xs font-medium text-fg">
+        {row.values.client}
+        {/* A client can have several tracker rows once deals are linked, so
+            naming the deal is what makes "will update" unambiguous. */}
+        {row.matchedDeal && (
+          <span className="block text-[11px] font-normal text-fg-subtle">
+            → {row.matchedDeal}
+          </span>
+        )}
+      </td>
       <td className="px-sm py-xs">
         <Badge tone={tone}>{row.action}</Badge>
       </td>

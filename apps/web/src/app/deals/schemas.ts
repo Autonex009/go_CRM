@@ -12,12 +12,25 @@ import { normalizeDealStage } from "./stages";
  * nullable, because a deal without a number attached is really still a lead.
  */
 export const dealFormSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(160, "160 characters or fewer"),
-  description: z.string().trim().max(5000, "5000 characters or fewer").optional(),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(160, "160 characters or fewer"),
+  description: z
+    .string()
+    .trim()
+    .max(5000, "5000 characters or fewer")
+    .optional(),
   // Cleared number inputs yield "" or NaN; both mean zero here, not "unset".
   amount: z.preprocess(
-    (v) => (v === "" || v === null || (typeof v === "number" && Number.isNaN(v)) ? 0 : v),
-    z.number({ invalid_type_error: "Enter a number" }).nonnegative("Must be 0 or more"),
+    (v) =>
+      v === "" || v === null || (typeof v === "number" && Number.isNaN(v))
+        ? 0
+        : v,
+    z
+      .number({ invalid_type_error: "Enter a number" })
+      .nonnegative("Must be 0 or more"),
   ),
   stage: z.preprocess(
     (v) => (typeof v === "string" ? normalizeDealStage(v) : "discovery"),
@@ -29,6 +42,27 @@ export const dealFormSchema = z.object({
   expectedCloseDate: z.string().optional(),
   accountId: z.string().optional(),
   leadId: z.string().optional(),
+
+  // A cleared number input yields "" or NaN. Unlike `amount`, an empty camera
+  // count means "not known yet", not zero — a deal with no number attached has
+  // not been scoped, and storing 0 would claim it was scoped at nothing.
+  totalCameras: z.preprocess(
+    (v) =>
+      v === "" ||
+      v === null ||
+      v === undefined ||
+      (typeof v === "number" && Number.isNaN(v))
+        ? null
+        : v,
+    z
+      .number({ invalid_type_error: "Enter a number" })
+      .int("Whole cameras only")
+      .nonnegative("Must be 0 or more")
+      .max(1_000_000, "That is too many")
+      .nullable(),
+  ),
+  location: z.string().trim().max(500, "500 characters or fewer").optional(),
+  products: z.string().trim().max(500, "500 characters or fewer").optional(),
 });
 
 export type DealFormValues = z.infer<typeof dealFormSchema>;
@@ -55,5 +89,8 @@ export function toPayload(values: DealFormValues): DealInput {
       : undefined,
     accountId: text(values.accountId),
     leadId: text(values.leadId),
+    totalCameras: values.totalCameras,
+    location: text(values.location),
+    products: text(values.products),
   };
 }

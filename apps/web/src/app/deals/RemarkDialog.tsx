@@ -54,7 +54,9 @@ export function RemarkDialog({ deal, onClose, onSubmit }: RemarkDialogProps) {
             </Badge>
           </div>
           {deal.contactName && (
-            <span className="text-xs text-fg-subtle">Contact: {deal.contactName}</span>
+            <span className="text-xs text-fg-subtle">
+              Contact: {deal.contactName}
+            </span>
           )}
         </div>
 
@@ -68,7 +70,12 @@ export function RemarkDialog({ deal, onClose, onSubmit }: RemarkDialogProps) {
         />
 
         <div className="flex justify-end gap-sm pt-xs">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>

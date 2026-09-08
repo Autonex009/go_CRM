@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "../lib/api";
-import { Alert, Button, Card, Icon, Spinner } from "../ui";
+import { getStageMeta, stageLabel } from "../deals/stages";
+import { Alert, Badge, Button, Card, Icon, Spinner } from "../ui";
 import { ImportDialog } from "./ImportDialog";
 import { RowMenu, type RowMenuTarget } from "./RowMenu";
 import { TrackerCell } from "./TrackerCell";
@@ -290,7 +291,7 @@ export function TrackerTable() {
             {query.isPending && (
               <tr>
                 <td
-                  colSpan={TRACKER_COLUMNS.length + 2}
+                  colSpan={TRACKER_COLUMNS.length + 3}
                   className="px-lg py-xl text-center"
                 >
                   <Spinner />
@@ -301,7 +302,7 @@ export function TrackerTable() {
             {!query.isPending && visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={TRACKER_COLUMNS.length + 2}
+                  colSpan={TRACKER_COLUMNS.length + 3}
                   className="px-lg py-xl text-center text-sm text-fg-muted"
                 >
                   {filter
@@ -332,23 +333,30 @@ export function TrackerTable() {
                   {rowIndex + 1}
                 </td>
                 {TRACKER_COLUMNS.map((column, colIndex) => (
-                  <td
-                    key={column.key}
-                    className={`border-b border-r border-line p-0 align-middle ${
-                      // Opaque, because the row scrolls underneath it.
-                      colIndex === 0
-                        ? "sticky left-[44px] z-10 bg-surface"
-                        : "bg-surface"
-                    }`}
-                  >
-                    <TrackerCell
-                      cellId={`${rowIndex}-${colIndex}`}
-                      column={column}
-                      value={toInput(row)[column.key]}
-                      onCommit={(value) => onCommit(row, column, value)}
-                      onNavigate={(key) => navigate(rowIndex, colIndex, key)}
-                    />
-                  </td>
+                  <Fragment key={column.key}>
+                    <td
+                      className={`border-b border-r border-line p-0 align-middle ${
+                        // Opaque, because the row scrolls underneath it.
+                        colIndex === 0
+                          ? "sticky left-[44px] z-10 bg-surface"
+                          : "bg-surface"
+                      }`}
+                    >
+                      <TrackerCell
+                        cellId={`${rowIndex}-${colIndex}`}
+                        column={column}
+                        value={toInput(row)[column.key]}
+                        onCommit={(value) => onCommit(row, column, value)}
+                        onNavigate={(key) => navigate(rowIndex, colIndex, key)}
+                      />
+                    </td>
+
+                    {colIndex === 0 && (
+                      <td className="border-b border-r border-line bg-surface px-sm py-xs align-middle">
+                        <DealLink row={row} />
+                      </td>
+                    )}
+                  </Fragment>
                 ))}
                 <td className="sticky right-0 z-10 w-[48px] min-w-[48px] border-b border-l border-line bg-surface px-[2px] text-center">
                   {/* Always visible, not hover-only: a delete you have to
@@ -446,6 +454,40 @@ function NewRow({
         Add row
       </Button>
     </div>
+  );
+}
+
+/**
+ * The deal a tracker row is delivering.
+ *
+ * Read-only on purpose: the stage is the pipeline's answer, and letting someone
+ * retype it here would give the same fact two owners. Moving the card on the
+ * board is how it changes.
+ */
+function DealLink({ row }: { row: TrackerRow }) {
+  if (!row.dealId) {
+    return (
+      <span
+        className="text-xs text-fg-subtle"
+        title="Not linked to a deal. Rows created from a deal in the Delivery stage link automatically."
+      >
+        —
+      </span>
+    );
+  }
+
+  const meta = getStageMeta(row.dealStage);
+  return (
+    <a
+      href="/deals"
+      title={`${row.dealTitle ?? "Deal"} · ${stageLabel(row.dealStage ?? "")}`}
+      className="flex min-w-0 items-center gap-xs text-xs text-fg hover:underline"
+    >
+      <Badge tone={meta.tone} dot>
+        {stageLabel(row.dealStage ?? "")}
+      </Badge>
+      <span className="truncate text-fg-muted">{row.dealTitle}</span>
+    </a>
   );
 }
 

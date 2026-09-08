@@ -84,6 +84,10 @@ export interface LinkedDeal {
   siteAssessmentLocation: string | null;
   expectedCloseDate: string | null;
   remark?: string | null;
+  /** What the deal is deploying — mirrors deals.Deal. */
+  totalCameras: number | null;
+  location: string | null;
+  products: string | null;
   createdAt: string;
 }
 
@@ -167,7 +171,10 @@ export const accountsApi = {
     apiFetch<AccountPage>(`${BASE}?limit=${limit}&offset=${offset}`),
 
   create: (input: AccountFormValues) =>
-    apiFetch<Account>(BASE, { method: "POST", body: JSON.stringify(toPayload(input)) }),
+    apiFetch<Account>(BASE, {
+      method: "POST",
+      body: JSON.stringify(toPayload(input)),
+    }),
 
   update: (id: string, input: AccountFormValues) =>
     apiFetch<Account>(`${BASE}/${id}`, {
@@ -177,7 +184,8 @@ export const accountsApi = {
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),
 
-  getProfile: (id: string) => apiFetch<FullCompanyProfilePayload>(`${BASE}/${id}/profile`),
+  getProfile: (id: string) =>
+    apiFetch<FullCompanyProfilePayload>(`${BASE}/${id}/profile`),
 
   updateProfile: (id: string, payload: ProfileInput) =>
     apiFetch<FullCompanyProfilePayload>(`${BASE}/${id}/profile`, {
@@ -185,7 +193,6 @@ export const accountsApi = {
       body: JSON.stringify(payload),
     }),
 };
-
 
 /**
  * Form contract. Reuses the shared account rules; the website is intentionally

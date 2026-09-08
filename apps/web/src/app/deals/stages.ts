@@ -17,7 +17,11 @@ interface StageMeta {
  */
 export const STAGE_META: Record<DealStage, StageMeta> = {
   discovery: { label: "Discovery", tone: "neutral", bar: "bg-purple-300" },
-  site_assessment: { label: "Site assessment", tone: "brand", bar: "bg-purple-500" },
+  site_assessment: {
+    label: "Site assessment",
+    tone: "brand",
+    bar: "bg-purple-500",
+  },
   quote_sent: { label: "Quote sent", tone: "info", bar: "bg-indigo-500" },
   negotiation: { label: "Negotiation", tone: "warning", bar: "bg-amber-500" },
   delivery: { label: "Delivery", tone: "info", bar: "bg-sky-500" },
@@ -27,7 +31,10 @@ export const STAGE_META: Record<DealStage, StageMeta> = {
 
 export function normalizeDealStage(raw?: string | null): DealStage {
   if (!raw) return "discovery";
-  const s = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
   switch (s) {
     case "prospect":
     case "lead":
@@ -46,7 +53,13 @@ export function normalizeDealStage(raw?: string | null): DealStage {
 
 export function getStageMeta(stage?: string | null): StageMeta {
   const norm = normalizeDealStage(stage);
-  return STAGE_META[norm] ?? { label: stage || "Discovery", tone: "neutral", bar: "bg-purple-300" };
+  return (
+    STAGE_META[norm] ?? {
+      label: stage || "Discovery",
+      tone: "neutral",
+      bar: "bg-purple-300",
+    }
+  );
 }
 
 export function stageLabel(stage: string): string {
@@ -54,10 +67,12 @@ export function stageLabel(stage: string): string {
 }
 
 /** Column definitions for the shared KanbanBoard. Module-level, so stable. */
-export const DEAL_COLUMNS: readonly KanbanColumnDef[] = DEAL_STAGES.map((stage) => ({
-  key: stage,
-  ...STAGE_META[stage],
-}));
+export const DEAL_COLUMNS: readonly KanbanColumnDef[] = DEAL_STAGES.map(
+  (stage) => ({
+    key: stage,
+    ...STAGE_META[stage],
+  }),
+);
 
 /** True once the deal is closed either way — used to grey out the close date. */
 export function isClosed(stage: string): boolean {

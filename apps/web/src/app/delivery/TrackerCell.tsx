@@ -101,7 +101,9 @@ export const TrackerCell = memo(function TrackerCell({
       // cell reads as a form, not a sheet. Focus is a ring drawn inside the
       // cell, so selecting a cell never shifts the grid by a pixel.
       className={`h-[34px] w-full border-0 bg-transparent px-sm text-sm text-fg outline-none transition-shadow duration-75 placeholder:text-fg-subtle focus:relative focus:z-10 focus:bg-surface focus:shadow-[inset_0_0_0_2px_rgb(var(--accent))] ${
-        invalid ? "bg-bad-soft/40 shadow-[inset_0_0_0_1px_rgb(var(--bad-fg))]" : ""
+        invalid
+          ? "bg-bad-soft/40 shadow-[inset_0_0_0_1px_rgb(var(--bad-fg))]"
+          : ""
       } ${column.type === "number" ? "text-right tabular-nums" : ""}`}
     />
   );
@@ -110,12 +112,16 @@ export const TrackerCell = memo(function TrackerCell({
 function toText(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
   // A DATE arrives as a full timestamp; a date input accepts only YYYY-MM-DD.
-  if (typeof value === "string") return value.length > 10 ? value.slice(0, 10) : value;
+  if (typeof value === "string")
+    return value.length > 10 ? value.slice(0, 10) : value;
   return String(value);
 }
 
 /** Empty means NULL, not "" or 0 — an untouched cell has no value, not a zero. */
-function fromText(text: string, type: TrackerColumn["type"]): string | number | null {
+function fromText(
+  text: string,
+  type: TrackerColumn["type"],
+): string | number | null {
   const trimmed = text.trim();
   if (trimmed === "") return null;
   if (type !== "number") return trimmed;

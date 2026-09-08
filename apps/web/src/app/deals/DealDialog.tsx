@@ -83,6 +83,9 @@ export function DealDialog({
       expectedCloseDate: deal?.expectedCloseDate?.slice(0, 10) ?? "",
       accountId: deal?.accountId ?? "",
       leadId: "",
+      totalCameras: deal?.totalCameras ?? null,
+      location: deal?.location ?? "",
+      products: deal?.products ?? "",
     },
   });
 
@@ -171,6 +174,36 @@ export function DealDialog({
           label="Title"
           error={errors.title?.message}
           {...register("title")}
+        />
+
+        {/* What is being deployed. Grouped above the commercials because it is
+            what the rest of the deal is priced against, and it is the same
+            information the company profile totals up. */}
+        <div className="grid gap-md sm:grid-cols-2">
+          <Field
+            label="Products"
+            placeholder="VIGIL Pro; ANPR add-on"
+            error={errors.products?.message}
+            {...register("products")}
+          />
+          <Field
+            label="No. of cameras"
+            type="number"
+            min={0}
+            step={1}
+            placeholder="24"
+            error={errors.totalCameras?.message}
+            // valueAsNumber turns a cleared input into NaN, which the schema
+            // maps to null — "not scoped yet" rather than zero cameras.
+            {...register("totalCameras", { valueAsNumber: true })}
+          />
+        </div>
+
+        <Field
+          label="Location"
+          placeholder="Pune (Plant 1); Nashik"
+          error={errors.location?.message}
+          {...register("location")}
         />
 
         <div className="grid gap-md sm:grid-cols-2">

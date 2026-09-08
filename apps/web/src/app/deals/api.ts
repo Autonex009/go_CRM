@@ -16,6 +16,10 @@ export interface Deal {
   contactId: string | null;
   contactName: string | null;
   accountId: string | null;
+  /** What is being deployed on this deal. */
+  totalCameras: number | null;
+  location: string | null;
+  products: string | null;
   expectedCloseDate: string | null;
   position: number;
   createdAt: string;
@@ -40,6 +44,9 @@ export interface DealInput {
   expectedCloseDate?: string;
   accountId?: string;
   leadId?: string;
+  totalCameras?: number | null;
+  location?: string;
+  products?: string;
 }
 
 const BASE = "/api/v1/deals";
@@ -51,7 +58,10 @@ export const dealsApi = {
     apiFetch<Deal>(BASE, { method: "POST", body: JSON.stringify(input) }),
 
   update: (id: string, input: DealInput) =>
-    apiFetch<Deal>(`${BASE}/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+    apiFetch<Deal>(`${BASE}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),
 

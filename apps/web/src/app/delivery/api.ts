@@ -15,6 +15,13 @@ export interface TrackerRow {
   nextSteps: string | null;
   notes: string | null;
   position: number;
+  /**
+   * The deal this row is delivering, denormalized by the server. Null for rows
+   * typed or imported before any deal existed.
+   */
+  dealId: string | null;
+  dealTitle: string | null;
+  dealStage: string | null;
   updatedBy: string | null;
   updatedByName: string | null;
   createdAt: string;
@@ -46,6 +53,8 @@ export interface PreviewRow {
   action: "create" | "update" | "unchanged";
   values: TrackerInput;
   existingId: string | null;
+  /** The deal behind the matched row, when it has one. */
+  matchedDeal: string | null;
   changes: string[] | null;
 }
 
@@ -71,20 +80,64 @@ export interface CommitResult {
  */
 export const TRACKER_COLUMNS = [
   { key: "client", label: "Client", type: "text", width: "min-w-[180px]" },
-  { key: "products", label: "Product(s)", type: "text", width: "min-w-[160px]" },
-  { key: "locations", label: "Key Location(s)", type: "text", width: "min-w-[180px]" },
-  { key: "totalCameras", label: "Total Cameras", type: "number", width: "min-w-[110px]" },
+  {
+    key: "products",
+    label: "Product(s)",
+    type: "text",
+    width: "min-w-[160px]",
+    syncedWithDeal: true,
+  },
+  {
+    key: "locations",
+    label: "Key Location(s)",
+    type: "text",
+    width: "min-w-[180px]",
+    syncedWithDeal: true,
+  },
+  {
+    key: "totalCameras",
+    label: "Total Cameras",
+    type: "number",
+    width: "min-w-[110px]",
+    syncedWithDeal: true,
+  },
   { key: "status", label: "Status", type: "text", width: "min-w-[140px]" },
-  { key: "implementationDate", label: "Implementation Date", type: "date", width: "min-w-[150px]" },
-  { key: "currentStages", label: "Current Stage(s)", type: "text", width: "min-w-[160px]" },
-  { key: "keyContacts", label: "Key Contacts", type: "text", width: "min-w-[160px]" },
-  { key: "nextSteps", label: "Next Steps", type: "text", width: "min-w-[180px]" },
+  {
+    key: "implementationDate",
+    label: "Implementation Date",
+    type: "date",
+    width: "min-w-[150px]",
+  },
+  {
+    key: "currentStages",
+    label: "Current Stage(s)",
+    type: "text",
+    width: "min-w-[160px]",
+  },
+  {
+    key: "keyContacts",
+    label: "Key Contacts",
+    type: "text",
+    width: "min-w-[160px]",
+  },
+  {
+    key: "nextSteps",
+    label: "Next Steps",
+    type: "text",
+    width: "min-w-[180px]",
+  },
   { key: "notes", label: "Notes", type: "text", width: "min-w-[200px]" },
 ] as const satisfies readonly {
   key: keyof TrackerInput;
   label: string;
   type: "text" | "number" | "date";
   width: string;
+  /**
+   * Also stored on the linked deal. Editing either side writes both, so
+   * these are flagged in the header rather than locked — the point of the
+   * link is being able to fix a camera count wherever you are looking.
+   */
+  syncedWithDeal?: boolean;
 }[];
 
 export type TrackerColumn = (typeof TRACKER_COLUMNS)[number];
@@ -132,18 +185,27 @@ export const deliveryApi = {
     apiFetch<TrackerRow>(BASE, { method: "POST", body: JSON.stringify(input) }),
 
   update: (id: string, input: TrackerInput) =>
-    apiFetch<TrackerRow>(`${BASE}/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+    apiFetch<TrackerRow>(`${BASE}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),
 
   reorder: (ids: string[]) =>
-    apiFetch<void>(`${BASE}/reorder`, { method: "POST", body: JSON.stringify({ ids }) }),
+    apiFetch<void>(`${BASE}/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
 
   /** Uploads a sheet and reports what committing it would do. Writes nothing. */
   previewImport: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return apiFetch<ImportPreview>(`${BASE}/import/preview`, { method: "POST", body: form });
+    return apiFetch<ImportPreview>(`${BASE}/import/preview`, {
+      method: "POST",
+      body: form,
+    });
   },
 
   /** Applies rows the user accepted in the preview. */
