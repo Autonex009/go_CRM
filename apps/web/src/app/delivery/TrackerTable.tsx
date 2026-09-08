@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { ApiError } from "../lib/api";
 import { Alert, Button, Card, Icon, Spinner } from "../ui";
 import { ImportDialog } from "./ImportDialog";
+import { RowMenu, type RowMenuTarget } from "./RowMenu";
 import { TrackerCell } from "./TrackerCell";
 import {
   TRACKER_COLUMNS,
@@ -32,6 +33,7 @@ export function TrackerTable() {
   const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [menu, setMenu] = useState<RowMenuTarget | null>(null);
   const gridRef = useRef<HTMLTableSectionElement>(null);
 
   const rows = query.data?.items ?? [];
@@ -42,7 +44,11 @@ export function TrackerTable() {
     // Search the whole row: people look for a location or a contact as often as
     // a client name, and a per-column filter UI is more chrome than this earns.
     return rows.filter((row) =>
-      TRACKER_COLUMNS.some((col) => String(row[col.key] ?? "").toLowerCase().includes(needle)),
+      TRACKER_COLUMNS.some((col) =>
+        String(row[col.key] ?? "")
+          .toLowerCase()
+          .includes(needle),
+      ),
     );
   }, [rows, filter]);
 
@@ -50,11 +56,14 @@ export function TrackerTable() {
     void queryClient.invalidateQueries({ queryKey: ["delivery"] });
   }, [queryClient]);
 
-  const fail = useCallback((err: unknown, fallback: string) => {
-    setError(err instanceof ApiError ? err.message : fallback);
-    // The optimistic edit and the server have diverged; the server wins.
-    invalidate();
-  }, [invalidate]);
+  const fail = useCallback(
+    (err: unknown, fallback: string) => {
+      setError(err instanceof ApiError ? err.message : fallback);
+      // The optimistic edit and the server have diverged; the server wins.
+      invalidate();
+    },
+    [invalidate],
+  );
 
   const save = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TrackerInput }) =>
@@ -84,6 +93,23 @@ export function TrackerTable() {
     onError: (err) => fail(err, "Could not delete that row"),
   });
 
+  // One delete path for both affordances, so the confirmation copy and the
+  // behaviour cannot drift apart. The tracker has no soft delete — the row is
+  // gone — which is what the confirm is for.
+  const confirmDelete = useCallback(
+    (id: string, client: string) => {
+      setMenu(null);
+      if (
+        window.confirm(
+          `Delete the tracker row for ${client}? This cannot be undone.`,
+        )
+      ) {
+        remove.mutate(id);
+      }
+    },
+    [remove],
+  );
+
   const onCommit = useCallback(
     (row: TrackerRow, column: TrackerColumn, value: string | number | null) => {
       // The client names the row for the importer's upsert, so blanking it would
@@ -93,7 +119,10 @@ export function TrackerTable() {
         invalidate();
         return;
       }
-      save.mutate({ id: row.id, input: { ...toInput(row), [column.key]: value } });
+      save.mutate({
+        id: row.id,
+        input: { ...toInput(row), [column.key]: value },
+      });
     },
     [save, invalidate],
   );
@@ -101,8 +130,17 @@ export function TrackerTable() {
   // Arrow/Tab movement across the grid. Cells are addressed by data attributes
   // rather than a ref matrix, so adding a column does not mean rewiring this.
   const navigate = useCallback(
-    (rowIndex: number, colIndex: number, key: "up" | "down" | "left" | "right") => {
-      const deltas = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] } as const;
+    (
+      rowIndex: number,
+      colIndex: number,
+      key: "up" | "down" | "left" | "right",
+    ) => {
+      const deltas = {
+        up: [-1, 0],
+        down: [1, 0],
+        left: [0, -1],
+        right: [0, 1],
+      } as const;
       const [dr, dc] = deltas[key];
 
       let nextRow = rowIndex + dr;
@@ -132,7 +170,9 @@ export function TrackerTable() {
     const body = visible.map((row) =>
       TRACKER_COLUMNS.map((col) => {
         const raw = row[col.key];
-        return col.type === "date" && typeof raw === "string" ? raw.slice(0, 10) : (raw ?? "");
+        return col.type === "date" && typeof raw === "string"
+          ? raw.slice(0, 10)
+          : (raw ?? "");
       }),
     );
     downloadCsv([header, ...body]);
@@ -142,7 +182,9 @@ export function TrackerTable() {
     <Card padded={false} className="overflow-hidden">
       <header className="flex flex-wrap items-center justify-between gap-sm border-b border-line px-lg py-md">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-fg">Client delivery tracker</h2>
+          <h2 className="text-sm font-semibold text-fg">
+            Client delivery tracker
+          </h2>
           <p className="text-xs text-fg-muted">
             {query.isPending
               ? "Loading…"
@@ -167,10 +209,20 @@ export function TrackerTable() {
               className="h-[30px] w-[160px] rounded-md border border-line bg-surface pl-[28px] pr-sm text-xs text-fg outline-none focus:border-accent"
             />
           </label>
-          <Button variant="secondary" size="sm" icon="download" onClick={exportCsv}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="download"
+            onClick={exportCsv}
+          >
             Export
           </Button>
-          <Button variant="secondary" size="sm" icon="plus" onClick={() => setImporting(true)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            onClick={() => setImporting(true)}
+          >
             Import sheet
           </Button>
         </div>
@@ -222,11 +274,14 @@ export function TrackerTable() {
                   {column.label}
                 </th>
               ))}
+              {/* Pinned to the right edge: with ten columns the actions used to
+                  sit past the horizontal scroll, where nobody found them. */}
               <th
                 scope="col"
-                className="sticky top-0 z-20 w-[40px] border-b border-white/25 bg-[#1e3a5f] px-xs py-sm"
+                className="sticky right-0 top-0 z-30 w-[48px] min-w-[48px] border-b border-l border-white/25 bg-[#1e3a5f] px-xs py-sm text-center text-xs font-semibold uppercase tracking-wide"
               >
-                <span className="sr-only">Row actions</span>
+                <span className="sr-only">Delete row</span>
+                <Icon name="close" size={13} className="mx-auto opacity-70" />
               </th>
             </tr>
           </thead>
@@ -234,7 +289,10 @@ export function TrackerTable() {
           <tbody ref={gridRef}>
             {query.isPending && (
               <tr>
-                <td colSpan={TRACKER_COLUMNS.length + 2} className="px-lg py-xl text-center">
+                <td
+                  colSpan={TRACKER_COLUMNS.length + 2}
+                  className="px-lg py-xl text-center"
+                >
                   <Spinner />
                 </td>
               </tr>
@@ -254,8 +312,23 @@ export function TrackerTable() {
             )}
 
             {visible.map((row, rowIndex) => (
-              <tr key={row.id} className="group">
-                <td className="sticky left-0 z-10 w-[44px] min-w-[44px] border-b border-r border-line bg-surface-muted px-xs text-center text-xs tabular-nums text-fg-subtle">
+              <tr
+                key={row.id}
+                className="group"
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    id: row.id,
+                    client: row.client,
+                  });
+                }}
+              >
+                <td
+                  title="Right-click for row actions"
+                  className="sticky left-0 z-10 w-[44px] min-w-[44px] cursor-context-menu border-b border-r border-line bg-surface-muted px-xs text-center text-xs tabular-nums text-fg-subtle"
+                >
                   {rowIndex + 1}
                 </td>
                 {TRACKER_COLUMNS.map((column, colIndex) => (
@@ -263,7 +336,9 @@ export function TrackerTable() {
                     key={column.key}
                     className={`border-b border-r border-line p-0 align-middle ${
                       // Opaque, because the row scrolls underneath it.
-                      colIndex === 0 ? "sticky left-[44px] z-10 bg-surface" : "bg-surface"
+                      colIndex === 0
+                        ? "sticky left-[44px] z-10 bg-surface"
+                        : "bg-surface"
                     }`}
                   >
                     <TrackerCell
@@ -275,16 +350,17 @@ export function TrackerTable() {
                     />
                   </td>
                 ))}
-                <td className="border-b border-line bg-surface px-[2px] text-center">
+                <td className="sticky right-0 z-10 w-[48px] min-w-[48px] border-b border-l border-line bg-surface px-[2px] text-center">
+                  {/* Always visible, not hover-only: a delete you have to
+                      discover by sweeping the pointer over a row is a delete
+                      nobody finds. It stays quiet until you approach it. */}
                   <button
                     type="button"
                     aria-label={`Delete ${row.client}`}
-                    onClick={() => {
-                      if (window.confirm(`Delete the tracker row for ${row.client}?`)) {
-                        remove.mutate(row.id);
-                      }
-                    }}
-                    className="rounded-sm p-xs text-fg-subtle opacity-0 transition-all duration-100 hover:bg-bad-soft hover:text-bad-fg focus-visible:opacity-100 group-hover:opacity-100"
+                    title={`Delete ${row.client}`}
+                    disabled={remove.isPending}
+                    onClick={() => confirmDelete(row.id, row.client)}
+                    className="rounded-sm p-xs text-fg-subtle opacity-60 transition-all duration-100 hover:bg-bad-soft hover:text-bad-fg hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed group-hover:opacity-100"
                   >
                     <Icon name="close" size={13} />
                   </button>
@@ -297,12 +373,22 @@ export function TrackerTable() {
 
       <NewRow onAdd={(input) => add.mutate(input)} busy={add.isPending} />
 
+      {menu && (
+        <RowMenu
+          target={menu}
+          onDelete={() => confirmDelete(menu.id, menu.client)}
+          onClose={() => setMenu(null)}
+        />
+      )}
+
       {importing && (
         <ImportDialog
           onClose={() => setImporting(false)}
           onImported={(created, updated) => {
             setImporting(false);
-            setToast(`Imported ${created} new and ${updated} updated row${updated === 1 ? "" : "s"}.`);
+            setToast(
+              `Imported ${created} new and ${updated} updated row${updated === 1 ? "" : "s"}.`,
+            );
             invalidate();
             window.setTimeout(() => setToast(null), 6000);
           }}
@@ -319,7 +405,13 @@ export function TrackerTable() {
  * be typed into, and asking for ten fields up front is the modal this table is
  * trying not to be.
  */
-function NewRow({ onAdd, busy }: { onAdd: (input: TrackerInput) => void; busy: boolean }) {
+function NewRow({
+  onAdd,
+  busy,
+}: {
+  onAdd: (input: TrackerInput) => void;
+  busy: boolean;
+}) {
   const [client, setClient] = useState("");
 
   const submit = () => {
@@ -345,7 +437,12 @@ function NewRow({ onAdd, busy }: { onAdd: (input: TrackerInput) => void; busy: b
         aria-label="New client name"
         className="h-[28px] flex-1 rounded-sm border border-transparent bg-transparent px-xs text-sm text-fg outline-none placeholder:text-fg-subtle focus:border-accent focus:bg-surface"
       />
-      <Button size="sm" variant="ghost" onClick={submit} disabled={busy || !client.trim()}>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={submit}
+        disabled={busy || !client.trim()}
+      >
         Add row
       </Button>
     </div>
@@ -367,7 +464,9 @@ function downloadCsv(grid: (string | number)[][]) {
     )
     .join("\n");
 
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const url = URL.createObjectURL(
+    new Blob([csv], { type: "text/csv;charset=utf-8" }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = `delivery-tracker-${new Date().toISOString().slice(0, 10)}.csv`;

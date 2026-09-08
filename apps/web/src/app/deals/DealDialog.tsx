@@ -11,10 +11,25 @@ import { contactName, contactsApi } from "../contacts/api";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
-import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField } from "../ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Field,
+  Modal,
+  SelectField,
+  TextareaField,
+} from "../ui";
 import type { Deal, DealInput } from "./api";
 import { dealFormSchema, toPayload, type DealFormValues } from "./schemas";
-import { DEAL_STAGES, STAGE_META, stageLabel, getStageMeta, normalizeDealStage, type DealStage } from "./stages";
+import {
+  DEAL_STAGES,
+  STAGE_META,
+  stageLabel,
+  getStageMeta,
+  normalizeDealStage,
+  type DealStage,
+} from "./stages";
 
 interface DealDialogProps {
   /** Existing deal to edit, or null to create. */
@@ -27,7 +42,13 @@ interface DealDialogProps {
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: DealDialogProps) {
+export function DealDialog({
+  deal,
+  defaultStage,
+  onClose,
+  onSubmit,
+  onDelete,
+}: DealDialogProps) {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -89,9 +110,12 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
     if (leadId && allLeads.data) {
       const selectedLead = allLeads.data.items.find((l) => l.id === leadId);
       if (selectedLead) {
-        if (selectedLead.accountId) setValue("accountId", selectedLead.accountId);
-        if (selectedLead.contactId) setValue("contactId", selectedLead.contactId);
-        if (selectedLead.ownerUserId) setValue("ownerUserId", selectedLead.ownerUserId);
+        if (selectedLead.accountId)
+          setValue("accountId", selectedLead.accountId);
+        if (selectedLead.contactId)
+          setValue("contactId", selectedLead.contactId);
+        if (selectedLead.ownerUserId)
+          setValue("ownerUserId", selectedLead.ownerUserId);
         if (selectedLead.value) setValue("amount", selectedLead.value);
         // The deal title is the deal's own name, not the lead's. Pre-fill from the
         // lead's company (what the deal is actually about) and only when the user
@@ -111,7 +135,9 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
       await onSubmit(toPayload(values));
       onClose();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not save this deal");
+      setFormError(
+        err instanceof ApiError ? err.message : "Could not save this deal",
+      );
     }
   });
 
@@ -141,7 +167,11 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
           </div>
         )}
 
-        <Field label="Title" error={errors.title?.message} {...register("title")} />
+        <Field
+          label="Title"
+          error={errors.title?.message}
+          {...register("title")}
+        />
 
         <div className="grid gap-md sm:grid-cols-2">
           <Field
@@ -159,7 +189,11 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
             {...register("expectedCloseDate")}
           />
 
-          <SelectField label="Stage" error={errors.stage?.message} {...register("stage")}>
+          <SelectField
+            label="Stage"
+            error={errors.stage?.message}
+            {...register("stage")}
+          >
             {DEAL_STAGES.map((stage) => (
               <option key={stage} value={stage}>
                 {stageLabel(stage)}
@@ -182,7 +216,11 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
         </div>
 
         <div className="grid gap-md sm:grid-cols-2">
-          <SelectField label="Contact" error={errors.contactId?.message} {...register("contactId")}>
+          <SelectField
+            label="Contact"
+            error={errors.contactId?.message}
+            {...register("contactId")}
+          >
             <option value="">—</option>
             {(contacts.data?.items ?? []).map((c) => (
               <option key={c.id} value={c.id}>
@@ -191,10 +229,17 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
             ))}
           </SelectField>
 
-          <AccountSelect error={errors.accountId?.message} {...register("accountId")} />
+          <AccountSelect
+            error={errors.accountId?.message}
+            {...register("accountId")}
+          />
         </div>
-        
-        <SelectField label="Lead" error={errors.leadId?.message} {...register("leadId")}>
+
+        <SelectField
+          label="Lead"
+          error={errors.leadId?.message}
+          {...register("leadId")}
+        >
           <option value="">—</option>
           {(allLeads.data?.items ?? []).map((l) => (
             <option key={l.id} value={l.id}>
@@ -210,8 +255,11 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
           {...register("description")}
         />
 
-        {/* Existing deals carry a history; a new one has nothing to show yet. */}
-        {deal && <Timeline scope={{ dealId: deal.id }} />}
+        {/* Existing deals carry a history; a new one has nothing to show yet.
+            Collapsible here because the timeline sits between the fields and the
+            Save button — on a deal with a long history, Save ends up off the
+            bottom of the dialog. */}
+        {deal && <Timeline scope={{ dealId: deal.id }} collapsible />}
 
         <div className="flex justify-end gap-sm">
           {deal && (
