@@ -10,6 +10,7 @@ import {
   type ProfileInput,
 } from "../accounts/api";
 import { Timeline } from "../activities/Timeline";
+import { stageLabel } from "../deals/stages";
 import { ApiError } from "../lib/api";
 import {
   Alert,
@@ -746,8 +747,8 @@ export default function CompanyProfilePage() {
                       <span>${deal.amount.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-fg-muted">
-                      <span>Stage: {deal.stage}</span>
-                      {deal.siteAssessmentDate && <span>Site Audit: {deal.siteAssessmentDate}</span>}
+                      <Badge tone="neutral">{stageLabel(deal.stage)}</Badge>
+                      {deal.expectedCloseDate && <span>Close: {deal.expectedCloseDate}</span>}
                     </div>
                   </div>
                 ))}
@@ -863,6 +864,9 @@ export default function CompanyProfilePage() {
                       <span>Stage: {lead.stage}</span>
                       {lead.title && <span>{lead.title}</span>}
                     </div>
+                    {lead.email && (
+                      <div className="text-fg-subtle truncate">{lead.email}</div>
+                    )}
                   </div>
                 ))}
               </div>
