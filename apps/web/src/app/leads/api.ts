@@ -110,6 +110,10 @@ export interface AdvanceInput {
   meetingAt?: string;
   /** Meeting length in minutes; the server defaults to 30. */
   meetingMinutes?: number;
+  /** Addresses to invite. Ignored unless inviteConfirmed is true. */
+  attendees?: string[];
+  /** A person ticked the box that emails these addresses. */
+  inviteConfirmed?: boolean;
 }
 
 /** A booked Google Calendar event, returned when advancing created one. */

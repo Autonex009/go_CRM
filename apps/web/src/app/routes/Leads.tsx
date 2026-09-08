@@ -113,13 +113,25 @@ export default function Leads() {
       followUpAt,
       meetingAt,
       meetingMinutes,
+      attendees,
+      inviteConfirmed,
     }: {
       id: string;
       toStage: LeadStage;
       followUpAt?: string;
       meetingAt?: string;
       meetingMinutes?: number;
-    }) => leadsApi.advance(id, { toStage, followUpAt, meetingAt, meetingMinutes }),
+      attendees?: string[];
+      inviteConfirmed?: boolean;
+    }) =>
+      leadsApi.advance(id, {
+        toStage,
+        followUpAt,
+        meetingAt,
+        meetingMinutes,
+        attendees,
+        inviteConfirmed,
+      }),
     onSuccess: (result) => {
       setError(null);
       // Surface the Meet link straight away: the person who booked the call is
@@ -427,13 +439,15 @@ export default function Leads() {
         <BookCallDialog
           lead={booking}
           onClose={() => setBooking(null)}
-          onSubmit={(date, meetingAt, minutes) => {
+          onSubmit={(date, meetingAt, minutes, attendees, inviteConfirmed) => {
             advance.mutate({
               id: booking.id,
               toStage: "call scheduled",
               followUpAt: date,
               meetingAt,
               meetingMinutes: minutes,
+              attendees,
+              inviteConfirmed,
             });
             setBooking(null);
           }}
@@ -521,6 +535,9 @@ function Row({
           <span className="min-w-0">
             <span className="block font-medium text-fg">{leadName(lead)}</span>
             {lead.title && <span className="block text-xs text-fg-muted">{lead.title}</span>}
+            {lead.email && (
+              <span className="block truncate text-xs text-fg-muted">{lead.email}</span>
+            )}
           </span>
         </button>
       </td>
@@ -594,13 +611,22 @@ function BookCallDialog({
 }: {
   lead: Lead;
   onClose: () => void;
-  onSubmit: (isoDate: string, meetingAt: string, minutes: number) => void;
+  onSubmit: (
+    isoDate: string,
+    meetingAt: string,
+    minutes: number,
+    attendees: string[],
+    inviteConfirmed: boolean,
+  ) => void;
 }) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const [date, setDate] = useState(tomorrow.toISOString().slice(0, 10));
   const [time, setTime] = useState("10:00");
   const [minutes, setMinutes] = useState(30);
+  // Off by default: ticking this is the moment a person decides to email a
+  // customer, and it should be a decision rather than the shape of the form.
+  const [inviteLead, setInviteLead] = useState(false);
 
   const field =
     "h-[36px] w-full rounded-md border border-line bg-surface px-md text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25";
@@ -614,8 +640,31 @@ function BookCallDialog({
       <p className="text-sm font-medium text-fg">Book a call with {leadName(lead)}</p>
       <p className="mt-xs text-xs text-fg-muted">
         Sets the follow-up date and books a Google Calendar event with a Meet link.
-        The lead is not invited — the link is yours to send.
       </p>
+
+      <div className="mt-md rounded-md border border-line bg-surface-muted p-md">
+        {lead.email ? (
+          <label className="flex items-start gap-sm">
+            <input
+              type="checkbox"
+              checked={inviteLead}
+              onChange={(e) => setInviteLead(e.target.checked)}
+              className="mt-[3px]"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm text-fg">
+                Email a calendar invitation to {leadName(lead)}
+              </span>
+              <span className="block truncate text-xs text-fg-muted">{lead.email}</span>
+            </span>
+          </label>
+        ) : (
+          <p className="text-xs text-fg-muted">
+            {leadName(lead)} has no email address, so no invitation can be sent. The
+            meeting will be booked on your calendar with a Meet link to share.
+          </p>
+        )}
+      </div>
       <div className="mt-md grid grid-cols-3 gap-sm">
         <label className="flex flex-col gap-xs">
           <span className="text-xs font-medium text-fg-muted">Date</span>
@@ -645,9 +694,17 @@ function BookCallDialog({
         </Button>
         <Button
           disabled={!date || !time}
-          onClick={() => onSubmit(`${date}T00:00:00Z`, meetingAt, minutes)}
+          onClick={() =>
+            onSubmit(
+              `${date}T00:00:00Z`,
+              meetingAt,
+              minutes,
+              inviteLead && lead.email ? [lead.email] : [],
+              inviteLead && Boolean(lead.email),
+            )
+          }
         >
-          Book with Meet
+          {inviteLead && lead.email ? "Book and send invite" : "Book with Meet"}
         </Button>
       </div>
     </Card>
