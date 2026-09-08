@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 
 import { accountsApi } from "../accounts/api";
 import { AccountSelect } from "../accounts/AccountSelect";
@@ -27,6 +28,7 @@ interface DealDialogProps {
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
 export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: DealDialogProps) {
+  const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
 
   // Both pickers reuse queries the rest of the app already caches.
@@ -45,6 +47,7 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<DealFormValues>({
     resolver: zodResolver(dealFormSchema),
@@ -79,6 +82,21 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
     queryFn: () => leadsApi.list(),
     staleTime: 60_000,
   });
+
+  const leadId = useWatch({ control, name: "leadId" });
+
+  useEffect(() => {
+    if (leadId && allLeads.data) {
+      const selectedLead = allLeads.data.items.find((l) => l.id === leadId);
+      if (selectedLead) {
+        if (selectedLead.accountId) setValue("accountId", selectedLead.accountId);
+        if (selectedLead.contactId) setValue("contactId", selectedLead.contactId);
+        if (selectedLead.ownerUserId) setValue("ownerUserId", selectedLead.ownerUserId);
+        if (selectedLead.value) setValue("amount", selectedLead.value);
+        if (!deal?.title) setValue("title", `${selectedLead.firstName} ${selectedLead.lastName || ""} - Deal`);
+      }
+    }
+  }, [leadId, allLeads.data, setValue, deal]);
 
   const submit = handleSubmit(async (values) => {
     setFormError(null);
@@ -189,6 +207,26 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
         {deal && <Timeline scope={{ dealId: deal.id }} />}
 
         <div className="flex justify-end gap-sm">
+          {deal && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                navigate("/quotes/new", {
+                  state: {
+                    accountId: deal.accountId,
+                    dealId: deal.id,
+                    contactId: deal.contactId,
+                    title: `${deal.title} - Quote`,
+                  },
+                });
+                onClose();
+              }}
+            >
+              Generate Quote
+            </Button>
+          )}
+          <div className="flex-1" />
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>

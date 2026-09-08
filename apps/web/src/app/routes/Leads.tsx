@@ -22,6 +22,7 @@ import {
   PAGE_SIZE,
   STAGE_META,
   type Lead,
+  type LeadInput,
   type LeadStage,
 } from "../leads/api";
 import { ApiError } from "../lib/api";
@@ -56,7 +57,7 @@ export default function Leads() {
   const [filter, setFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [offset, setOffset] = useState(0);
-  const [dialog, setDialog] = useState<{ lead: Lead | null } | null>(null);
+  const [dialog, setDialog] = useState<{ lead: Lead | null; initialState?: Partial<LeadInput> } | null>(null);
   const [converting, setConverting] = useState<Lead | null>(null);
   const [booking, setBooking] = useState<Lead | null>(null);
   const [meeting, setMeeting] = useState<Meeting | null>(null);
@@ -67,7 +68,13 @@ export default function Leads() {
 
   useEffect(() => {
     if (location.state?.new) {
-      setDialog({ lead: null });
+      setDialog({ 
+        lead: null, 
+        initialState: { 
+          accountId: location.state.accountId, 
+          company: location.state.accountName 
+        } 
+      });
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, location.pathname, navigate]);
@@ -392,6 +399,7 @@ export default function Leads() {
       {dialog && (
         <LeadDialog
           lead={dialog.lead}
+          initialState={dialog.initialState}
           onClose={() => setDialog(null)}
           onSubmit={(input) => save.mutateAsync({ id: dialog.lead?.id, input })}
           onDelete={

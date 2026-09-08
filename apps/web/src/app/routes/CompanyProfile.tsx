@@ -9,6 +9,7 @@ import {
   type CustomSection,
   type ProfileInput,
 } from "../accounts/api";
+import { Timeline } from "../activities/Timeline";
 import { ApiError } from "../lib/api";
 import {
   Alert,
@@ -41,6 +42,7 @@ export default function CompanyProfilePage() {
   const [mode, setMode] = useState<"preview" | "edit">("preview");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "contacts" | "pipeline" | "financials">("overview");
 
   const query = useQuery({
     queryKey: ["companyProfile", id],
@@ -355,8 +357,32 @@ export default function CompanyProfilePage() {
         )}
       </div>
 
-      {/* Main Grid: Overview & VIGIL Tech Specs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-lg">
+      {/* Tabs */}
+      <div className="flex items-center gap-md border-b border-line px-sm">
+        {(
+          [
+            { id: "overview", label: "Overview" },
+            { id: "contacts", label: "Contacts & Leads" },
+            { id: "pipeline", label: "Pipeline" },
+            { id: "financials", label: "Financials" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-sm py-sm text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? "border-brand text-brand"
+                : "border-transparent text-fg-muted hover:text-fg hover:border-line"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-lg mt-md">
         {/* Left Column: Description & Plant Sites */}
         <div className="md:col-span-2 flex flex-col gap-lg">
           {/* Company Description Card */}
@@ -700,7 +726,14 @@ export default function CompanyProfilePage() {
               </div>
             </div>
           </Card>
+          
+          <Timeline scope={{ accountId: id! }} />
+        </div>
+      </div>
+    )}
 
+      {activeTab === "pipeline" && (
+        <div className="flex flex-col gap-lg mt-md">
           {/* Linked Deals */}
           <Card>
             <CardHeader title={`Active Deals (${deals.length})`} className="mb-md" />
@@ -723,7 +756,11 @@ export default function CompanyProfilePage() {
               <p className="text-xs text-fg-subtle">No active deals for this company.</p>
             )}
           </Card>
+        </div>
+      )}
 
+      {activeTab === "financials" && (
+        <div className="flex flex-col gap-lg mt-md">
           {/* Quotes & Proposals */}
           <Card>
             <CardHeader title={`Quotes & Proposals (${quotes.length})`} className="mb-md" />
@@ -773,7 +810,11 @@ export default function CompanyProfilePage() {
               <p className="text-xs text-fg-subtle">No invoices issued yet.</p>
             )}
           </Card>
+        </div>
+      )}
 
+      {activeTab === "contacts" && (
+        <div className="flex flex-col gap-lg mt-md">
           {/* Key Contacts */}
           <Card>
             <CardHeader title={`Key Contacts (${contacts.length})`} className="mb-md" />
@@ -798,7 +839,18 @@ export default function CompanyProfilePage() {
 
           {/* Leads */}
           <Card>
-            <CardHeader title={`Leads (${leads?.length || 0})`} className="mb-md" />
+            <CardHeader 
+              title={`Leads (${leads?.length || 0})`} 
+              className="mb-md" 
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => navigate('/leads', { state: { new: true, accountId: id, accountName: formData.name }})}
+                >
+                  Add Lead
+                </Button>
+              }
+            />
             {leads && leads.length > 0 ? (
               <div className="flex flex-col gap-sm">
                 {leads.map((lead) => (
@@ -819,7 +871,7 @@ export default function CompanyProfilePage() {
             )}
           </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 }

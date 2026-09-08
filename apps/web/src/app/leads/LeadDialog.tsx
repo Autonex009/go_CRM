@@ -27,13 +27,15 @@ const LEAD_SOURCES = [
 interface LeadDialogProps {
   /** Existing lead to edit, or null to create. */
   lead: Lead | null;
+  /** Pre-filled values when creating a lead from context. */
+  initialState?: Partial<LeadInput>;
   onClose: () => void;
   onSubmit: (input: LeadInput) => Promise<unknown>;
   onDelete?: () => void;
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-export function LeadDialog({ lead, onClose, onSubmit, onDelete }: LeadDialogProps) {
+export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: LeadDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -50,14 +52,14 @@ export function LeadDialog({ lead, onClose, onSubmit, onDelete }: LeadDialogProp
   } = useForm<LeadFormValues>({
     resolver: zodResolver(leadFormSchema),
     defaultValues: {
-      firstName: lead?.firstName ?? "",
-      lastName: lead?.lastName ?? "",
-      title: lead?.title ?? "",
-      email: lead?.email ?? "",
-      phone: lead?.phone ?? "",
-      linkedinUrl: lead?.linkedinUrl ?? "",
-      accountId: lead?.accountId ?? "",
-      company: lead?.company ?? "",
+      firstName: lead?.firstName ?? initialState?.firstName ?? "",
+      lastName: lead?.lastName ?? initialState?.lastName ?? "",
+      title: lead?.title ?? initialState?.title ?? "",
+      email: lead?.email ?? initialState?.email ?? "",
+      phone: lead?.phone ?? initialState?.phone ?? "",
+      linkedinUrl: lead?.linkedinUrl ?? initialState?.linkedinUrl ?? "",
+      accountId: lead?.accountId ?? initialState?.accountId ?? "",
+      company: lead?.company ?? initialState?.company ?? "",
       source: lead?.source ?? "",
       notes: lead?.notes ?? "",
       value: lead?.value ?? undefined,

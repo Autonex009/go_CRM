@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useAuthStore } from "../auth/store";
 import { API_URL } from "../lib/config";
@@ -52,15 +52,15 @@ interface Header {
   notes: string;
 }
 
-const emptyHeader = (): Header => ({
-  title: "",
-  accountId: "",
-  contactId: "",
-  dealId: "",
-  ownerUserId: "",
-  issueDate: "",
-  dueDate: "",
-  notes: "",
+const emptyHeader = (state?: Partial<Header> | null): Header => ({
+  title: state?.title ?? "",
+  accountId: state?.accountId ?? "",
+  contactId: state?.contactId ?? "",
+  dealId: state?.dealId ?? "",
+  ownerUserId: state?.ownerUserId ?? "",
+  issueDate: state?.issueDate ?? "",
+  dueDate: state?.dueDate ?? "",
+  notes: state?.notes ?? "",
 });
 
 /**
@@ -79,7 +79,8 @@ export default function InvoiceEditor() {
 
   const pdfUrl = `/api/v1/invoices/${id}/pdf${token ? `?token=${token}` : ""}`;
 
-  const [header, setHeader] = useState<Header>(emptyHeader);
+  const location = useLocation();
+  const [header, setHeader] = useState<Header>(() => emptyHeader(location.state as Partial<Header> | null));
   const [items, setItems] = useState<DocumentItemInput[]>(() => [emptyDocumentItem()]);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
