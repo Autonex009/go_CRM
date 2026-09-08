@@ -14,7 +14,7 @@ import { memberLabel, orgApi } from "../org/api";
 import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField } from "../ui";
 import type { Deal, DealInput } from "./api";
 import { dealFormSchema, toPayload, type DealFormValues } from "./schemas";
-import { DEAL_STAGES, STAGE_META, stageLabel, type DealStage } from "./stages";
+import { DEAL_STAGES, STAGE_META, stageLabel, getStageMeta, normalizeDealStage, type DealStage } from "./stages";
 
 interface DealDialogProps {
   /** Existing deal to edit, or null to create. */
@@ -55,7 +55,7 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
       title: deal?.title ?? "",
       description: deal?.description ?? "",
       amount: deal?.amount ?? 0,
-      stage: deal?.stage ?? defaultStage,
+      stage: normalizeDealStage(deal?.stage ?? defaultStage),
       ownerUserId: deal?.ownerUserId ?? "",
       contactId: deal?.contactId ?? "",
       // A native date input needs exactly YYYY-MM-DD.
@@ -125,7 +125,7 @@ export function DealDialog({ deal, defaultStage, onClose, onSubmit, onDelete }: 
 
         {deal && (
           <div className="flex items-center gap-sm">
-            <Badge tone={STAGE_META[deal.stage].tone} dot>
+            <Badge tone={getStageMeta(deal.stage).tone} dot>
               {stageLabel(deal.stage)}
             </Badge>
             <span className="text-xs text-fg-subtle">

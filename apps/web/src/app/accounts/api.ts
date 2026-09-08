@@ -20,6 +20,7 @@ export interface Account {
   /** What hangs off this company — also what blocks deletion. */
   contactCount: number;
   dealCount: number;
+  leadCount: number;
 }
 
 /** Mirrors accounts.Page. */
@@ -82,6 +83,7 @@ export interface LinkedDeal {
   siteAssessmentDate: string | null;
   siteAssessmentLocation: string | null;
   expectedCloseDate: string | null;
+  remark?: string | null;
   createdAt: string;
 }
 

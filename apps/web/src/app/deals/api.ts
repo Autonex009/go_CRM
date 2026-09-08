@@ -6,6 +6,7 @@ export interface Deal {
   id: string;
   title: string;
   description: string | null;
+  remark?: string | null;
   amount: number;
   stage: DealStage;
   ownerUserId: string | null;
@@ -31,6 +32,7 @@ export interface Board {
 export interface DealInput {
   title: string;
   description?: string;
+  remark?: string;
   amount: number;
   stage: DealStage;
   ownerUserId?: string;

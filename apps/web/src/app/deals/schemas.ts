@@ -2,6 +2,7 @@ import { DEAL_STAGES } from "@go-crm/schemas";
 import { z } from "zod";
 
 import type { DealInput } from "./api";
+import { normalizeDealStage } from "./stages";
 
 /**
  * Form contract for creating/editing a deal. Mirrors the server's validation
@@ -18,7 +19,10 @@ export const dealFormSchema = z.object({
     (v) => (v === "" || v === null || (typeof v === "number" && Number.isNaN(v)) ? 0 : v),
     z.number({ invalid_type_error: "Enter a number" }).nonnegative("Must be 0 or more"),
   ),
-  stage: z.enum(DEAL_STAGES),
+  stage: z.preprocess(
+    (v) => (typeof v === "string" ? normalizeDealStage(v) : "discovery"),
+    z.enum(DEAL_STAGES),
+  ),
   ownerUserId: z.string().optional(),
   contactId: z.string().optional(),
   // A native date input gives "" or YYYY-MM-DD.
@@ -40,7 +44,7 @@ export function toPayload(values: DealFormValues): DealInput {
     title: values.title.trim(),
     description: text(values.description),
     amount: values.amount,
-    stage: values.stage,
+    stage: normalizeDealStage(values.stage),
     ownerUserId: text(values.ownerUserId),
     contactId: text(values.contactId),
     // The server decodes this into a *time.Time, which only parses RFC3339 — a

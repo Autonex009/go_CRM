@@ -24,8 +24,32 @@ export const STAGE_META: Record<DealStage, StageMeta> = {
   lost: { label: "Lost", tone: "danger", bar: "bg-danger-500" },
 };
 
+export function normalizeDealStage(raw?: string | null): DealStage {
+  if (!raw) return "discovery";
+  const s = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  switch (s) {
+    case "prospect":
+    case "lead":
+      return "discovery";
+    case "proposal":
+      return "quote_sent";
+    case "qualified":
+      return "site_assessment";
+    default:
+      if ((DEAL_STAGES as readonly string[]).includes(s)) {
+        return s as DealStage;
+      }
+      return "discovery";
+  }
+}
+
+export function getStageMeta(stage?: string | null): StageMeta {
+  const norm = normalizeDealStage(stage);
+  return STAGE_META[norm] ?? { label: stage || "Discovery", tone: "neutral", bar: "bg-purple-300" };
+}
+
 export function stageLabel(stage: string): string {
-  return STAGE_META[stage as DealStage]?.label ?? stage;
+  return getStageMeta(stage).label;
 }
 
 /** Column definitions for the shared KanbanBoard. Module-level, so stable. */

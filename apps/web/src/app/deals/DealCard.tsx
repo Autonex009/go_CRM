@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { User, Calendar, Building2, AlertTriangle } from "lucide-react";
+import { User, Calendar, AlertTriangle, MessageSquare } from "lucide-react";
 
 import { formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
@@ -10,12 +10,14 @@ import { daysUntil, formatDate, isClosed } from "./stages";
 interface DealCardProps {
   deal: Deal;
   overlay?: boolean;
+  onRemark?: (deal: Deal) => void;
 }
 
-export const DealCard = memo(function DealCard({ deal, overlay = false }: DealCardProps) {
+export const DealCard = memo(function DealCard({ deal, overlay = false, onRemark }: DealCardProps) {
   const currency = useCurrency();
   const owner = deal.ownerName?.trim() || deal.ownerEmail;
   const days = isClosed(deal.stage) ? null : daysUntil(deal.expectedCloseDate);
+  const remarkText = deal.remark?.trim() || deal.description?.trim();
 
   return (
     <article
@@ -39,15 +41,51 @@ export const DealCard = memo(function DealCard({ deal, overlay = false }: DealCa
         </p>
       )}
 
+      {remarkText && (
+        <div
+          onClick={(e) => {
+            if (onRemark) {
+              e.stopPropagation();
+              onRemark(deal);
+            }
+          }}
+          className="mt-2 flex items-start gap-1.5 text-xs text-fg-subtle bg-surface-muted/70 hover:bg-surface-muted rounded-lg p-2 border border-line/50 cursor-pointer transition-colors"
+          title="Click to edit remark"
+        >
+          <MessageSquare className="h-3.5 w-3.5 text-indigo-500 shrink-0 mt-0.5" />
+          <span className="line-clamp-2 italic font-normal text-fg-muted">{remarkText}</span>
+        </div>
+      )}
+
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-line/60 pt-2.5">
-        {owner ? (
-          <div className="flex items-center gap-1.5">
-            <Avatar name={owner} title={deal.ownerEmail ?? owner} size="xs" />
-            <span className="text-[11px] font-medium text-fg-muted truncate max-w-24">{owner}</span>
-          </div>
-        ) : (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">Unassigned</span>
-        )}
+        <div className="flex items-center gap-2">
+          {owner ? (
+            <div className="flex items-center gap-1.5">
+              <Avatar name={owner} title={deal.ownerEmail ?? owner} size="xs" />
+              <span className="text-[11px] font-medium text-fg-muted truncate max-w-24">{owner}</span>
+            </div>
+          ) : (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">Unassigned</span>
+          )}
+
+          {onRemark && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemark(deal);
+              }}
+              className={`p-1 rounded-md transition-colors ${
+                remarkText
+                  ? "text-indigo-500 hover:bg-indigo-500/10"
+                  : "text-fg-subtle hover:text-indigo-500 hover:bg-surface-muted"
+              }`}
+              title={remarkText ? "Edit remark" : "Add remark"}
+            >
+              <MessageSquare className={`h-3.5 w-3.5 ${remarkText ? "fill-indigo-500/20" : ""}`} />
+            </button>
+          )}
+        </div>
 
         {deal.expectedCloseDate &&
           (days !== null && days < 0 ? (

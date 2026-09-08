@@ -239,9 +239,10 @@ function Row({
       </td>
       <td className="px-lg py-sm">
         <span className="flex flex-wrap gap-xs">
-          {account.contactCount > 0 && <Badge tone="brand">{account.contactCount} contacts</Badge>}
+          {account.leadCount > 0 && <Badge tone="warning">{account.leadCount} leads</Badge>}
           {account.dealCount > 0 && <Badge tone="success">{account.dealCount} deals</Badge>}
-          {account.contactCount === 0 && account.dealCount === 0 && (
+          {account.contactCount > 0 && <Badge tone="brand">{account.contactCount} contacts</Badge>}
+          {account.leadCount === 0 && account.contactCount === 0 && account.dealCount === 0 && (
             <span className="text-fg-subtle">—</span>
           )}
         </span>

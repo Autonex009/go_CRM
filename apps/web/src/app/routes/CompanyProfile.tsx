@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { MessageSquare, Plus, ArrowRight, TrendingUp, DollarSign, Users, Briefcase } from "lucide-react";
 
 import {
   accountsApi,
@@ -8,9 +9,15 @@ import {
   type PlantLocation,
   type CustomSection,
   type ProfileInput,
+  type LinkedDeal,
+  type LinkedLead,
 } from "../accounts/api";
 import { Timeline } from "../activities/Timeline";
-import { stageLabel } from "../deals/stages";
+import { DealDialog } from "../deals/DealDialog";
+import { dealsApi, type Deal, type DealInput } from "../deals/api";
+import { getStageMeta, normalizeDealStage, stageLabel, type DealStage } from "../deals/stages";
+import { LeadDialog } from "../leads/LeadDialog";
+import { leadsApi, type LeadInput } from "../leads/api";
 import { ApiError } from "../lib/api";
 import {
   Alert,
@@ -95,6 +102,40 @@ export default function CompanyProfilePage() {
     },
   });
 
+  const [isDealDialogOpen, setIsDealDialogOpen] = useState(false);
+  const [dealToEdit, setDealToEdit] = useState<LinkedDeal | null>(null);
+  const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
+
+  const createDealMutation = useMutation({
+    mutationFn: (data: DealInput) => dealsApi.create({ ...data, accountId: id }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
+      void queryClient.invalidateQueries({ queryKey: ["deals"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      setIsDealDialogOpen(false);
+    },
+  });
+
+  const updateDealMutation = useMutation({
+    mutationFn: ({ dealId, data }: { dealId: string; data: DealInput }) => dealsApi.update(dealId, data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
+      void queryClient.invalidateQueries({ queryKey: ["deals"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      setDealToEdit(null);
+    },
+  });
+
+  const createLeadMutation = useMutation({
+    mutationFn: (data: LeadInput) => leadsApi.create({ ...data, accountId: id }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["companyProfile", id] });
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      setIsLeadDialogOpen(false);
+    },
+  });
+
   if (query.isPending || !formData) {
     return (
       <div className="flex flex-col gap-lg p-lg">
@@ -122,6 +163,28 @@ export default function CompanyProfilePage() {
 
   const { deals, quotes, invoices, contacts, leads } = query.data;
   const brandColor = formData.primaryColor || "#6366f1";
+
+  const totalDealAmount = deals.reduce((sum, d) => sum + (d.amount || 0), 0);
+  const totalLeadEstimate = leads.reduce((sum, l) => sum + (l.value || 0), 0);
+
+  const linkedToFullDeal = (ld: LinkedDeal): Deal => ({
+    id: ld.id,
+    title: ld.title,
+    description: "",
+    remark: ld.remark,
+    amount: ld.amount,
+    stage: normalizeDealStage(ld.stage),
+    ownerUserId: formData?.ownerUserId || null,
+    ownerName: null,
+    ownerEmail: null,
+    contactId: null,
+    contactName: null,
+    accountId: id || null,
+    expectedCloseDate: ld.expectedCloseDate,
+    position: 0,
+    createdAt: ld.createdAt,
+    updatedAt: ld.createdAt,
+  });
 
   const handleSave = () => {
     if (!formData) return;
@@ -191,14 +254,30 @@ export default function CompanyProfilePage() {
               </Button>
             </>
           ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon="edit"
-              onClick={() => setMode("edit")}
-            >
-              Edit Profile
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsLeadDialogOpen(true)}
+              >
+                + New Lead
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsDealDialogOpen(true)}
+              >
+                + New Deal
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="edit"
+                onClick={() => setMode("edit")}
+              >
+                Edit Profile
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -359,31 +438,259 @@ export default function CompanyProfilePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-md border-b border-line px-sm">
+      <div className="flex items-center gap-md border-b border-line px-sm overflow-x-auto">
         {(
           [
-            { id: "overview", label: "Overview" },
-            { id: "contacts", label: "Contacts & Leads" },
-            { id: "pipeline", label: "Pipeline" },
-            { id: "financials", label: "Financials" },
+            { id: "overview", label: "Overview", count: null },
+            { id: "pipeline", label: "Pipeline & Deals", count: deals.length + leads.length },
+            { id: "contacts", label: "Contacts & Leads", count: contacts.length + leads.length },
+            { id: "financials", label: "Financials", count: quotes.length + invoices.length },
           ] as const
         ).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-sm py-sm text-sm font-medium border-b-2 transition-colors ${
+            className={`px-sm py-sm text-sm font-medium border-b-2 transition-colors flex items-center gap-xs ${
               activeTab === tab.id
                 ? "border-brand text-brand"
                 : "border-transparent text-fg-muted hover:text-fg hover:border-line"
             }`}
           >
-            {tab.label}
+            <span>{tab.label}</span>
+            {typeof tab.count === "number" && tab.count > 0 && (
+              <span
+                className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${
+                  activeTab === tab.id
+                    ? "bg-brand/15 text-brand"
+                    : "bg-surface-muted text-fg-muted"
+                }`}
+              >
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {activeTab === "overview" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-lg mt-md">
+        <div className="flex flex-col gap-lg mt-md">
+          {/* Commercial & Pipeline Metrics Banner */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-md">
+            {/* Active Deals Metric Card */}
+            <div
+              onClick={() => setActiveTab("pipeline")}
+              className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
+            >
+              <div className="flex items-center justify-between text-xs text-fg-muted">
+                <span className="font-medium">Active Deals</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+              </div>
+              <div className="text-xl font-bold text-fg mt-xs">
+                {deals.length} <span className="text-xs font-normal text-fg-muted">({deals.length === 1 ? "Deal" : "Deals"})</span>
+              </div>
+              <div className="text-xs text-brand font-medium mt-xs truncate">
+                ${totalDealAmount.toLocaleString()} total pipeline
+              </div>
+            </div>
+
+            {/* Active Leads Metric Card */}
+            <div
+              onClick={() => setActiveTab("pipeline")}
+              className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
+            >
+              <div className="flex items-center justify-between text-xs text-fg-muted">
+                <span className="font-medium">Active Leads</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+              </div>
+              <div className="text-xl font-bold text-fg mt-xs">
+                {leads.length} <span className="text-xs font-normal text-fg-muted">({leads.length === 1 ? "Lead" : "Leads"})</span>
+              </div>
+              <div className="text-xs text-amber-500 font-medium mt-xs truncate">
+                {totalLeadEstimate > 0 ? `$${totalLeadEstimate.toLocaleString()} est.` : "Top of funnel"}
+              </div>
+            </div>
+
+            {/* Key Contacts Metric Card */}
+            <div
+              onClick={() => setActiveTab("contacts")}
+              className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
+            >
+              <div className="flex items-center justify-between text-xs text-fg-muted">
+                <span className="font-medium">Key Contacts</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+              </div>
+              <div className="text-xl font-bold text-fg mt-xs">
+                {contacts.length} <span className="text-xs font-normal text-fg-muted">({contacts.length === 1 ? "Contact" : "Contacts"})</span>
+              </div>
+              <div className="text-xs text-fg-muted mt-xs truncate">
+                Decision makers & SPOCs
+              </div>
+            </div>
+
+            {/* Commercial Documents Metric Card */}
+            <div
+              onClick={() => setActiveTab("financials")}
+              className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
+            >
+              <div className="flex items-center justify-between text-xs text-fg-muted">
+                <span className="font-medium">Financials</span>
+                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">→</span>
+              </div>
+              <div className="text-xl font-bold text-fg mt-xs">
+                {quotes.length + invoices.length} <span className="text-xs font-normal text-fg-muted">Docs</span>
+              </div>
+              <div className="text-xs text-emerald-500 font-medium mt-xs truncate">
+                {quotes.length} Quotes · {invoices.length} Invoices
+              </div>
+            </div>
+          </div>
+
+          {/* Deals & Leads Snapshot Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+            {/* Deals Preview Card */}
+            <Card>
+              <CardHeader
+                title={`Active Deals (${deals.length})`}
+                action={
+                  <div className="flex items-center gap-xs">
+                    <Button size="sm" variant="secondary" onClick={() => setIsDealDialogOpen(true)}>
+                      + New Deal
+                    </Button>
+                    {deals.length > 0 && (
+                      <Button size="sm" variant="ghost" onClick={() => setActiveTab("pipeline")}>
+                        View All →
+                      </Button>
+                    )}
+                  </div>
+                }
+                className="mb-md"
+              />
+              {deals.length > 0 ? (
+                <div className="flex flex-col gap-sm">
+                  {deals.slice(0, 3).map((deal) => {
+                    const meta = getStageMeta(deal.stage);
+                    return (
+                      <div
+                        key={deal.id}
+                        className="p-sm rounded-lg border border-line bg-surface-muted/50 hover:bg-surface-muted transition-colors flex flex-col gap-xs cursor-pointer"
+                        onClick={() => setDealToEdit(deal)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm text-fg truncate hover:text-brand transition-colors">
+                            {deal.title}
+                          </span>
+                          <span className="font-semibold text-sm text-fg ml-sm shrink-0">
+                            ${deal.amount.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-fg-muted">
+                          <Badge tone={meta.tone} dot>{stageLabel(deal.stage)}</Badge>
+                          {deal.expectedCloseDate && (
+                            <span className="text-[11px] text-fg-subtle">
+                              Close: {deal.expectedCloseDate}
+                            </span>
+                          )}
+                        </div>
+                        {deal.remark && (
+                          <div className="mt-xs flex items-start gap-xs text-[11px] text-fg-subtle bg-surface/80 rounded p-1.5 border border-line/50 italic">
+                            <MessageSquare className="h-3 w-3 text-brand shrink-0 mt-0.5" />
+                            <span className="line-clamp-2">{deal.remark}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {deals.length > 3 && (
+                    <button
+                      onClick={() => setActiveTab("pipeline")}
+                      className="text-xs text-brand font-medium hover:underline text-center py-xs"
+                    >
+                      + {deals.length - 3} more deals in Pipeline →
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-xs">
+                  <p className="text-xs text-fg-muted">No active deals yet for this company.</p>
+                  <Button size="sm" variant="secondary" onClick={() => setIsDealDialogOpen(true)}>
+                    + Create First Deal
+                  </Button>
+                </div>
+              )}
+            </Card>
+
+            {/* Leads Preview Card */}
+            <Card>
+              <CardHeader
+                title={`Active Leads (${leads.length})`}
+                action={
+                  <div className="flex items-center gap-xs">
+                    <Button size="sm" variant="secondary" onClick={() => setIsLeadDialogOpen(true)}>
+                      + New Lead
+                    </Button>
+                    {leads.length > 0 && (
+                      <Button size="sm" variant="ghost" onClick={() => setActiveTab("pipeline")}>
+                        View All →
+                      </Button>
+                    )}
+                  </div>
+                }
+                className="mb-md"
+              />
+              {leads.length > 0 ? (
+                <div className="flex flex-col gap-sm">
+                  {leads.slice(0, 3).map((lead) => (
+                    <div
+                      key={lead.id}
+                      className="p-sm rounded-lg border border-line bg-surface-muted/50 hover:bg-surface-muted transition-colors flex flex-col gap-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm text-fg truncate">
+                          {lead.firstName} {lead.lastName || ""}
+                        </span>
+                        {lead.value ? (
+                          <span className="font-semibold text-xs text-amber-500 ml-sm shrink-0">
+                            ${lead.value.toLocaleString()}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-fg-muted">
+                        <Badge tone="brand">{lead.stage}</Badge>
+                        {lead.title && (
+                          <span className="text-[11px] text-fg-subtle truncate max-w-[150px]">
+                            {lead.title}
+                          </span>
+                        )}
+                      </div>
+                      {(lead.email || lead.phone) && (
+                        <div className="text-[11px] text-fg-subtle truncate flex items-center gap-sm mt-xs">
+                          {lead.email && <span>{lead.email}</span>}
+                          {lead.phone && <span>• {lead.phone}</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {leads.length > 3 && (
+                    <button
+                      onClick={() => setActiveTab("pipeline")}
+                      className="text-xs text-brand font-medium hover:underline text-center py-xs"
+                    >
+                      + {leads.length - 3} more leads in Pipeline →
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-md text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-xs">
+                  <p className="text-xs text-fg-muted">No leads currently linked to this company.</p>
+                  <Button size="sm" variant="secondary" onClick={() => setIsLeadDialogOpen(true)}>
+                    + Add First Lead
+                  </Button>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-lg">
         {/* Left Column: Description & Plant Sites */}
         <div className="md:col-span-2 flex flex-col gap-lg">
           {/* Company Description Card */}
@@ -731,30 +1038,163 @@ export default function CompanyProfilePage() {
           <Timeline scope={{ accountId: id! }} />
         </div>
       </div>
-    )}
+    </div>
+  )}
 
       {activeTab === "pipeline" && (
         <div className="flex flex-col gap-lg mt-md">
-          {/* Linked Deals */}
+          {/* Pipeline Funnel Header */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-md p-md rounded-xl border border-line bg-surface">
+            <div>
+              <span className="text-xs text-fg-muted">Active Deals Pipeline</span>
+              <div className="text-xl font-bold text-fg mt-0.5">
+                {deals.length} Deals <span className="text-sm font-semibold text-brand">(${totalDealAmount.toLocaleString()})</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-xs text-fg-muted">Active Leads Pipeline</span>
+              <div className="text-xl font-bold text-fg mt-0.5">
+                {leads.length} Leads <span className="text-sm font-semibold text-amber-500">{totalLeadEstimate > 0 ? `($${totalLeadEstimate.toLocaleString()})` : ""}</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-xs text-fg-muted">Total Active Records</span>
+              <div className="text-xl font-bold text-fg mt-0.5">
+                {deals.length + leads.length} Records
+              </div>
+            </div>
+          </div>
+
+          {/* Section 1: Active Deals */}
           <Card>
-            <CardHeader title={`Active Deals (${deals.length})`} className="mb-md" />
+            <CardHeader
+              title={`Active Deals (${deals.length})`}
+              action={
+                <div className="flex items-center gap-xs">
+                  <Button size="sm" onClick={() => setIsDealDialogOpen(true)}>
+                    + New Deal
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => navigate("/deals")}>
+                    View Deals Board
+                  </Button>
+                </div>
+              }
+              className="mb-md"
+            />
             {deals.length > 0 ? (
               <div className="flex flex-col gap-sm">
-                {deals.map((deal) => (
-                  <div key={deal.id} className="p-sm rounded-md border border-line bg-surface-muted text-xs flex flex-col gap-xs">
-                    <div className="flex justify-between font-medium text-fg">
-                      <span>{deal.title}</span>
-                      <span>${deal.amount.toLocaleString()}</span>
+                {deals.map((deal) => {
+                  const meta = getStageMeta(deal.stage);
+                  return (
+                    <div
+                      key={deal.id}
+                      className="p-md rounded-lg border border-line bg-surface-muted/60 hover:bg-surface-muted transition-colors text-xs flex flex-col gap-xs"
+                    >
+                      <div className="flex justify-between items-start font-medium text-fg">
+                        <div className="flex items-center gap-sm">
+                          <span
+                            className="text-sm font-semibold text-fg hover:text-brand transition-colors cursor-pointer"
+                            onClick={() => setDealToEdit(deal)}
+                          >
+                            {deal.title}
+                          </span>
+                          <Badge tone={meta.tone} dot>{stageLabel(deal.stage)}</Badge>
+                        </div>
+                        <div className="flex items-center gap-sm">
+                          <span className="text-sm font-bold text-fg">${deal.amount.toLocaleString()}</span>
+                          <Button size="sm" variant="ghost" onClick={() => setDealToEdit(deal)}>
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between text-fg-muted mt-xs">
+                        {deal.expectedCloseDate ? (
+                          <span>Target Close: <strong className="text-fg">{deal.expectedCloseDate}</strong></span>
+                        ) : (
+                          <span className="text-fg-subtle">No close date</span>
+                        )}
+                        <span className="text-fg-subtle">Created: {new Date(deal.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {deal.remark && (
+                        <div className="mt-sm flex items-start gap-sm text-xs text-fg-subtle bg-surface/90 rounded-md p-sm border border-line/60">
+                          <MessageSquare className="h-4 w-4 text-brand shrink-0 mt-0.5" />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] uppercase tracking-wider font-semibold text-fg-muted">Remark</span>
+                            <span className="text-fg mt-0.5">{deal.remark}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between text-fg-muted">
-                      <Badge tone="neutral">{stageLabel(deal.stage)}</Badge>
-                      {deal.expectedCloseDate && <span>Close: {deal.expectedCloseDate}</span>}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-sm">
+                <p className="text-sm text-fg-muted">No active deals found for this company.</p>
+                <Button size="sm" onClick={() => setIsDealDialogOpen(true)}>
+                  + Create New Deal
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          {/* Section 2: Active Leads in Pipeline */}
+          <Card>
+            <CardHeader
+              title={`Active Leads in Pipeline (${leads.length})`}
+              action={
+                <div className="flex items-center gap-xs">
+                  <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
+                    + New Lead
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => navigate("/leads")}>
+                    View All Leads
+                  </Button>
+                </div>
+              }
+              className="mb-md"
+            />
+            {leads.length > 0 ? (
+              <div className="flex flex-col gap-sm">
+                {leads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="p-md rounded-lg border border-line bg-surface-muted/60 hover:bg-surface-muted transition-colors text-xs flex flex-col gap-xs"
+                  >
+                    <div className="flex justify-between items-start font-medium text-fg">
+                      <div className="flex items-center gap-sm">
+                        <span className="text-sm font-semibold text-fg">
+                          {lead.firstName} {lead.lastName || ""}
+                        </span>
+                        <Badge tone="brand">{lead.stage}</Badge>
+                        {lead.title && <span className="text-fg-muted">• {lead.title}</span>}
+                      </div>
+                      {lead.value ? (
+                        <span className="text-sm font-bold text-amber-500">${lead.value.toLocaleString()}</span>
+                      ) : null}
+                    </div>
+                    <div className="flex justify-between items-center text-fg-muted mt-xs">
+                      <div className="flex items-center gap-md text-fg-subtle">
+                        {lead.email && <span>Email: <strong className="text-fg">{lead.email}</strong></span>}
+                        {lead.phone && <span>Phone: <strong className="text-fg">{lead.phone}</strong></span>}
+                      </div>
+                      <Link
+                        to={`/leads`}
+                        className="text-brand hover:underline font-medium"
+                      >
+                        Manage in Leads →
+                      </Link>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-fg-subtle">No active deals for this company.</p>
+              <div className="p-lg text-center rounded-lg border border-dashed border-line bg-surface-muted/30 flex flex-col items-center justify-center gap-sm">
+                <p className="text-sm text-fg-muted">No leads linked to this company yet.</p>
+                <Button size="sm" onClick={() => setIsLeadDialogOpen(true)}>
+                  + Add Lead
+                </Button>
+              </div>
             )}
           </Card>
         </div>
@@ -844,12 +1284,21 @@ export default function CompanyProfilePage() {
               title={`Leads (${leads?.length || 0})`} 
               className="mb-md" 
               action={
-                <Button
-                  size="sm"
-                  onClick={() => navigate('/leads', { state: { new: true, accountId: id, accountName: formData.name }})}
-                >
-                  Add Lead
-                </Button>
+                <div className="flex items-center gap-xs">
+                  <Button
+                    size="sm"
+                    onClick={() => setIsLeadDialogOpen(true)}
+                  >
+                    + Add Lead
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => navigate('/leads', { state: { new: true, accountId: id, accountName: formData.name }})}
+                  >
+                    Open Leads Page
+                  </Button>
+                </div>
               }
             />
             {leads && leads.length > 0 ? (
@@ -875,6 +1324,40 @@ export default function CompanyProfilePage() {
             )}
           </Card>
         </div>
+      )}
+
+      {/* Modals for Creating/Editing Deals & Leads */}
+      {isDealDialogOpen && (
+        <DealDialog
+          deal={null}
+          defaultStage="discovery"
+          onClose={() => setIsDealDialogOpen(false)}
+          onSubmit={async (input) => {
+            await createDealMutation.mutateAsync(input);
+          }}
+        />
+      )}
+
+      {dealToEdit && (
+        <DealDialog
+          deal={linkedToFullDeal(dealToEdit)}
+          defaultStage={normalizeDealStage(dealToEdit.stage)}
+          onClose={() => setDealToEdit(null)}
+          onSubmit={async (input) => {
+            await updateDealMutation.mutateAsync({ dealId: dealToEdit.id, data: input });
+          }}
+        />
+      )}
+
+      {isLeadDialogOpen && (
+        <LeadDialog
+          lead={null}
+          initialState={{ accountId: id, company: formData.name }}
+          onClose={() => setIsLeadDialogOpen(false)}
+          onSubmit={async (input) => {
+            await createLeadMutation.mutateAsync(input);
+          }}
+        />
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { DealCard } from "../deals/DealCard";
 import { DealDialog } from "../deals/DealDialog";
+import { RemarkDialog } from "../deals/RemarkDialog";
 import { dealsApi, type Deal, type DealInput } from "../deals/api";
 import { DEAL_COLUMNS, type DealStage } from "../deals/stages";
 import { formatMoneyCompact } from "../lib/money";
@@ -22,6 +23,7 @@ export default function Deals() {
 
   const [moveError, setMoveError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ deal: Deal | null; stage: DealStage } | null>(null);
+  const [remarkDeal, setRemarkDeal] = useState<Deal | null>(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -86,9 +88,12 @@ export default function Deals() {
     (stage: string) => setDialog({ deal: null, stage: stage as DealStage }),
     [],
   );
+  const onRemark = useCallback((deal: Deal) => setRemarkDeal(deal), []);
   const renderCard = useCallback(
-    (deal: Deal, overlay: boolean) => <DealCard deal={deal} overlay={overlay} />,
-    [],
+    (deal: Deal, overlay: boolean) => (
+      <DealCard deal={deal} overlay={overlay} onRemark={onRemark} />
+    ),
+    [onRemark],
   );
   const columnSummary = useCallback((items: Deal[]) => {
     const amount = items.reduce((sum, d) => sum + d.amount, 0);
@@ -152,6 +157,14 @@ export default function Deals() {
                 }
               : undefined
           }
+        />
+      )}
+
+      {remarkDeal && (
+        <RemarkDialog
+          deal={remarkDeal}
+          onClose={() => setRemarkDeal(null)}
+          onSubmit={(input) => save.mutateAsync({ id: remarkDeal.id, input })}
         />
       )}
     </section>
