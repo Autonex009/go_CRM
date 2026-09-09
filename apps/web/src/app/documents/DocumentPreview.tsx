@@ -1,10 +1,61 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+
 import { useAuthStore } from "../auth/store";
 import { API_URL } from "../lib/config";
 import { buttonClass } from "../ui";
 
-export default function QuotePreview() {
+/** Which document this page is previewing. */
+export type PreviewKind = "quote" | "invoice";
+
+/**
+ * The wording each kind uses, kept as data because it is the only thing that
+ * differs between the two previews — the surrounding chrome is identical.
+ *
+ * Quotes are labelled "Purchase Order (PO)" in the heading while the
+ * navigation still says "Quote". That reads as an inconsistency but it is the
+ * copy these screens have always shipped, so it is preserved verbatim rather
+ * than tidied here.
+ */
+const COPY: Record<
+  PreviewKind,
+  {
+    /** Segment used for both the API path and the detail-page route. */
+    slug: string;
+    noun: string;
+    heading: string;
+    loadError: string;
+    loadingLabel: string;
+    frameTitle: string;
+  }
+> = {
+  quote: {
+    slug: "quotes",
+    noun: "Quote",
+    heading: "Purchase Order (PO) PDF Preview",
+    loadError: "Failed to load PO preview document",
+    loadingLabel: "Generating PO Preview...",
+    frameTitle: "PO PDF Preview",
+  },
+  invoice: {
+    slug: "invoices",
+    noun: "Invoice",
+    heading: "Invoice PDF Preview",
+    loadError: "Failed to load invoice preview document",
+    loadingLabel: "Generating PDF Preview...",
+    frameTitle: "Invoice PDF Preview",
+  },
+};
+
+/**
+ * Full-page PDF preview for a quote or an invoice.
+ *
+ * The server renders the document as HTML and this drops it into an iframe, so
+ * printing goes through the frame's own print view and reproduces the server's
+ * page breaks rather than the app shell's.
+ */
+export function DocumentPreview({ kind }: { kind: PreviewKind }) {
+  const copy = COPY[kind];
   const { id } = useParams<{ id: string }>();
   const token = useAuthStore((s) => s.token);
   const [html, setHtml] = useState<string>("");
@@ -12,17 +63,19 @@ export default function QuotePreview() {
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  const detailPath = `/${copy.slug}/${id}`;
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     setError(null);
-    fetch(`${API_URL}/api/v1/quotes/${id}/pdf`, {
+    fetch(`${API_URL}/api/v1/${copy.slug}/${id}/pdf`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     })
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to load PO preview document");
+        if (!res.ok) throw new Error(copy.loadError);
         return res.text();
       })
       .then((data) => {
@@ -33,7 +86,7 @@ export default function QuotePreview() {
         setError(err.message || "Could not load preview");
         setLoading(false);
       });
-  }, [id, token]);
+  }, [id, token, copy.slug, copy.loadError]);
 
   const handlePrint = () => {
     if (iframeRef.current?.contentWindow) {
@@ -50,14 +103,14 @@ export default function QuotePreview() {
       <header className="no-print bg-slate-900/90 backdrop-blur border-b border-slate-800 px-6 py-3.5 flex items-center justify-between sticky top-0 z-50 shadow-lg">
         <div className="flex items-center gap-4">
           <Link
-            to={`/quotes/${id}`}
+            to={detailPath}
             className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-3.5 py-1.5 rounded-md border border-slate-700/80"
           >
-            ← Back to Quote
+            ← Back to {copy.noun}
           </Link>
           <div className="h-4 w-px bg-slate-700/80" />
           <h1 className="text-sm font-semibold text-slate-200 tracking-wide">
-            Purchase Order (PO) PDF Preview
+            {copy.heading}
           </h1>
         </div>
 
@@ -82,14 +135,14 @@ export default function QuotePreview() {
         {loading ? (
           <div className="flex flex-col items-center justify-center p-16 text-slate-400 gap-3">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
-            <p className="text-sm font-medium text-slate-300">Generating PO Preview...</p>
+            <p className="text-sm font-medium text-slate-300">{copy.loadingLabel}</p>
           </div>
         ) : error ? (
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 text-red-400 max-w-md text-center">
             <p className="font-semibold text-base mb-2">Error Loading Document</p>
             <p className="text-sm text-red-300/80 mb-4">{error}</p>
-            <Link to={`/quotes/${id}`} className={buttonClass({ variant: "secondary" })}>
-              Return to Quote
+            <Link to={detailPath} className={buttonClass({ variant: "secondary" })}>
+              Return to {copy.noun}
             </Link>
           </div>
         ) : (
@@ -97,7 +150,7 @@ export default function QuotePreview() {
             <iframe
               ref={iframeRef}
               srcDoc={html}
-              title="PO PDF Preview"
+              title={copy.frameTitle}
               className="w-full min-h-[297mm] border-none"
               style={{ height: "1050px" }}
             />
