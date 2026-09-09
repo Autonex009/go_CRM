@@ -143,6 +143,36 @@ export const TRACKER_COLUMNS = [
 export type TrackerColumn = (typeof TRACKER_COLUMNS)[number];
 export type TrackerField = TrackerColumn["key"];
 
+/**
+ * One column of the rendered grid: either an editable field or the read-only
+ * deal the row is delivering.
+ *
+ * The grid has one more column than the row has fields, and the header and the
+ * body used to each work that out for themselves — the body injected a deal cell
+ * after Client and the header did not, so every heading from Product(s) rightward
+ * sat one column left of its data and the Notes value landed under the delete
+ * button. Both now walk this list, so the two cannot disagree about how many
+ * cells a row has.
+ *
+ * `fieldIndex` is the position within TRACKER_COLUMNS, kept separate from the
+ * grid position because keyboard navigation addresses editable cells only.
+ */
+export type GridColumn =
+  | { kind: "field"; column: TrackerColumn; fieldIndex: number }
+  | { kind: "deal"; label: string; width: string };
+
+export const GRID_COLUMNS: readonly GridColumn[] = TRACKER_COLUMNS.flatMap(
+  (column, fieldIndex): GridColumn[] => {
+    const field: GridColumn = { kind: "field", column, fieldIndex };
+    // The deal sits immediately after the client: the two together are what
+    // identifies a line, and pushing it to the far right would put it past the
+    // horizontal scroll on a ten-column sheet.
+    return fieldIndex === 0
+      ? [field, { kind: "deal", label: "Deal", width: "min-w-[160px]" }]
+      : [field];
+  },
+);
+
 /** An empty row, for the "add row" affordance at the bottom of the table. */
 export function blankRow(): TrackerInput {
   return {

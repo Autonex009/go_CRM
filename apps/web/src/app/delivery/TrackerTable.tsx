@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "../lib/api";
 import { getStageMeta, stageLabel } from "../deals/stages";
@@ -8,6 +8,7 @@ import { ImportDialog } from "./ImportDialog";
 import { RowMenu, type RowMenuTarget } from "./RowMenu";
 import { TrackerCell } from "./TrackerCell";
 import {
+  GRID_COLUMNS,
   TRACKER_COLUMNS,
   blankRow,
   deliveryApi,
@@ -53,8 +54,12 @@ export function TrackerTable() {
     );
   }, [rows, filter]);
 
+  // Writes here reach the linked deal's products, location and camera count, so
+  // the board above has to be refetched too — otherwise the card keeps the
+  // figure the tracker just replaced until the page is reloaded.
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["delivery"] });
+    void queryClient.invalidateQueries({ queryKey: ["deals"] });
   }, [queryClient]);
 
   const fail = useCallback(
@@ -265,30 +270,19 @@ export function TrackerTable() {
               >
                 <span className="sr-only">Row</span>#
               </th>
-              {TRACKER_COLUMNS.map((column, index) => (
-                <Fragment key={column.key}>
-                  <th
-                    scope="col"
-                    className={`sticky top-0 whitespace-nowrap border-b border-r border-white/25 bg-[#1e3a5f] px-sm py-sm text-left text-xs font-semibold uppercase tracking-wide ${column.width} ${
-                      // The client column pins alongside the gutter.
-                      index === 0 ? "left-[44px] z-30" : "z-20"
-                    }`}
-                  >
-                    {column.label}
-                  </th>
-
-                  {/* The body injects a deal cell after Client; the header has to
-                      match it or every heading from here on sits one column left
-                      of its data. */}
-                  {index === 0 && (
-                    <th
-                      scope="col"
-                      className="sticky top-0 z-20 min-w-[160px] whitespace-nowrap border-b border-r border-white/25 bg-[#1e3a5f] px-sm py-sm text-left text-xs font-semibold uppercase tracking-wide"
-                    >
-                      Deal
-                    </th>
-                  )}
-                </Fragment>
+              {GRID_COLUMNS.map((cell, index) => (
+                <th
+                  key={cell.kind === "field" ? cell.column.key : "deal"}
+                  scope="col"
+                  className={`sticky top-0 whitespace-nowrap border-b border-r border-white/25 bg-[#1e3a5f] px-sm py-sm text-left text-xs font-semibold uppercase tracking-wide ${
+                    cell.kind === "field" ? cell.column.width : cell.width
+                  } ${
+                    // The client column pins alongside the gutter.
+                    index === 0 ? "left-[44px] z-30" : "z-20"
+                  }`}
+                >
+                  {cell.kind === "field" ? cell.column.label : cell.label}
+                </th>
               ))}
               {/* Pinned to the right edge: with ten columns the actions used to
                   sit past the horizontal scroll, where nobody found them. */}
@@ -306,7 +300,7 @@ export function TrackerTable() {
             {query.isPending && (
               <tr>
                 <td
-                  colSpan={TRACKER_COLUMNS.length + 3}
+                  colSpan={GRID_COLUMNS.length + 2}
                   className="px-lg py-xl text-center"
                 >
                   <Spinner />
@@ -317,7 +311,7 @@ export function TrackerTable() {
             {!query.isPending && visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={TRACKER_COLUMNS.length + 3}
+                  colSpan={GRID_COLUMNS.length + 2}
                   className="px-lg py-xl text-center text-sm text-fg-muted"
                 >
                   {filter
@@ -347,9 +341,17 @@ export function TrackerTable() {
                 >
                   {rowIndex + 1}
                 </td>
-                {TRACKER_COLUMNS.map((column, colIndex) => (
-                  <Fragment key={column.key}>
+                {GRID_COLUMNS.map((cell, colIndex) =>
+                  cell.kind === "deal" ? (
                     <td
+                      key="deal"
+                      className="border-b border-r border-line bg-surface px-sm py-xs align-top"
+                    >
+                      <DealLink row={row} />
+                    </td>
+                  ) : (
+                    <td
+                      key={cell.column.key}
                       className={`border-b border-r border-line p-0 align-top ${
                         // Opaque, because the row scrolls underneath it.
                         colIndex === 0
@@ -358,21 +360,17 @@ export function TrackerTable() {
                       }`}
                     >
                       <TrackerCell
-                        cellId={`${rowIndex}-${colIndex}`}
-                        column={column}
-                        value={toInput(row)[column.key]}
-                        onCommit={(value) => onCommit(row, column, value)}
-                        onNavigate={(key) => navigate(rowIndex, colIndex, key)}
+                        cellId={`${rowIndex}-${cell.fieldIndex}`}
+                        column={cell.column}
+                        value={toInput(row)[cell.column.key]}
+                        onCommit={(value) => onCommit(row, cell.column, value)}
+                        onNavigate={(key) =>
+                          navigate(rowIndex, cell.fieldIndex, key)
+                        }
                       />
                     </td>
-
-                    {colIndex === 0 && (
-                      <td className="border-b border-r border-line bg-surface px-sm py-xs align-top">
-                        <DealLink row={row} />
-                      </td>
-                    )}
-                  </Fragment>
-                ))}
+                  ),
+                )}
                 <td className="sticky right-0 z-10 w-[48px] min-w-[48px] border-b border-l border-line bg-surface px-[2px] text-center">
                   {/* Always visible, not hover-only: a delete you have to
                       discover by sweeping the pointer over a row is a delete
@@ -480,7 +478,11 @@ function NewRow({
  * board is how it changes.
  */
 function DealLink({ row }: { row: TrackerRow }) {
-  if (!row.dealId) {
+  // dealStage is what this cell is for; without it there is nothing to draw but
+  // an empty badge, which is what a row left pointing at a deleted deal used to
+  // render. The server reports such a row as unlinked, and this is the guard for
+  // any that slip through.
+  if (!row.dealId || !row.dealStage) {
     return (
       <span
         className="text-xs text-fg-subtle"

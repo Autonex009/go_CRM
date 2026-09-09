@@ -43,6 +43,10 @@ export default function Deals() {
   const query = useQuery({ queryKey: ["deals"], queryFn: dealsApi.board });
 
   const [moveError, setMoveError] = useState<string | null>(null);
+  // Failures from the dialog's own actions (delete today), shown on the page
+  // rather than inside the dialog: the dialog closes on success, so an error
+  // that lived in it would vanish with it.
+  const [actionError, setActionError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ deal: Deal | null; stage: DealStage } | null>(null);
   const [remarkDeal, setRemarkDeal] = useState<Deal | null>(null);
   const [boardCollapsed, setBoardCollapsed] = useState(readCollapsed);
@@ -82,8 +86,13 @@ export default function Deals() {
     return { count: deals.length, open, won };
   }, [deals]);
 
+  // The tracker is refetched alongside the board because the two share state:
+  // reaching the delivery stage creates a row, editing the deployment fields
+  // rewrites one, and deleting a deal unlinks one. Leaving it out meant the
+  // table below the board kept showing what the deal used to say.
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["deals"] });
+    void queryClient.invalidateQueries({ queryKey: ["delivery"] });
     void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   }, [queryClient]);
 
@@ -107,9 +116,30 @@ export default function Deals() {
     onSuccess: invalidate,
   });
 
+  // A delete that fails has to say so. It used to have no onError at all: the
+  // dialog closed, nothing was invalidated, and the card sat there — including
+  // the common case where the deal was already gone and the server answered 404,
+  // which left a card on the board that no amount of clicking Delete could
+  // remove. A 404 now resolves the same way a success does, because the board is
+  // simply out of date.
   const remove = useMutation({
     mutationFn: (id: string) => dealsApi.remove(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setActionError(null);
+      setDialog(null);
+      invalidate();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 404) {
+        setActionError(null);
+        setDialog(null);
+        invalidate();
+        return;
+      }
+      setActionError(
+        err instanceof ApiError ? err.message : "Could not delete that deal",
+      );
+    },
   });
 
   // Stable callbacks, so the memoised board and cards aren't invalidated on
@@ -168,6 +198,7 @@ export default function Deals() {
       />
 
       {moveError && <Alert>{moveError}</Alert>}
+      {actionError && <Alert>{actionError}</Alert>}
       {query.isError && (
         <Alert>
           {query.error instanceof ApiError ? query.error.message : "Could not load the board"}
@@ -230,7 +261,6 @@ export default function Deals() {
               ? () => {
                   if (window.confirm("Delete this deal?")) {
                     remove.mutate(dialog.deal!.id);
-                    setDialog(null);
                   }
                 }
               : undefined
