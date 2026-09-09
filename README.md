@@ -11,7 +11,6 @@ go_CRM/
 │   └── mobile/         # React Native + Expo (EAS build/update)
 ├── shared/
 │   ├── design-tokens/  # Tailwind preset + design tokens (web + mobile)
-│   ├── proto/          # gRPC protobuf contracts (internal service comm)
 │   └── schemas/        # Shared Zod schemas (web + mobile validation)
 ├── services/           # Go 1.22+ modular monolith
 │   ├── cmd/
@@ -31,7 +30,7 @@ go_CRM/
 
 **Frontend:** Turborepo + pnpm · Astro + React · TailwindCSS · React Router v6 · React Native + Expo · TanStack Query · Zustand · React Hook Form + Zod
 
-**Backend:** Go 1.25+ · PostgreSQL 16 / Supabase · pgx + sqlc · golang-migrate · Chi · gRPC · NATS JetStream · golang-jwt · Argon2id
+**Backend:** Go 1.25+ · PostgreSQL 16 / Supabase · pgx · golang-migrate · Chi · NATS JetStream · golang-jwt · Argon2id
 
 ## Getting started
 

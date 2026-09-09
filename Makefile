@@ -1,4 +1,4 @@
-.PHONY: dev build migrate-up migrate-down sqlc proto
+.PHONY: dev build migrate-up migrate-down
 
 # Frontend
 dev:
@@ -13,10 +13,3 @@ migrate-up:
 
 migrate-down:
 	migrate -path services/migrations -database "$(DATABASE_URL)" down 1
-
-# Codegen
-sqlc:
-	cd services && sqlc generate
-
-proto:
-	cd shared/proto && buf generate
