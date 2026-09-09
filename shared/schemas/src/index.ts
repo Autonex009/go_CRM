@@ -25,8 +25,8 @@ export const DEAL_STAGES = [
   "quote_sent",
   "negotiation",
   "delivery",
+  "post_delivery",
   "won",
-  "lost",
 ] as const;
 export type DealStage = (typeof DEAL_STAGES)[number];
 

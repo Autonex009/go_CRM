@@ -25,8 +25,8 @@ export const STAGE_META: Record<DealStage, StageMeta> = {
   quote_sent: { label: "Quote sent", tone: "info", bar: "bg-indigo-500" },
   negotiation: { label: "Negotiation", tone: "warning", bar: "bg-amber-500" },
   delivery: { label: "Delivery", tone: "info", bar: "bg-sky-500" },
+  post_delivery: { label: "Post delivery", tone: "info", bar: "bg-teal-500" },
   won: { label: "Won", tone: "success", bar: "bg-success-500" },
-  lost: { label: "Lost", tone: "danger", bar: "bg-danger-500" },
 };
 
 export function normalizeDealStage(raw?: string | null): DealStage {
@@ -74,9 +74,9 @@ export const DEAL_COLUMNS: readonly KanbanColumnDef[] = DEAL_STAGES.map(
   }),
 );
 
-/** True once the deal is closed either way — used to grey out the close date. */
+/** True once the deal has landed — used to grey out the close date. */
 export function isClosed(stage: string): boolean {
-  return stage === "won" || stage === "lost";
+  return stage === "won";
 }
 
 /**

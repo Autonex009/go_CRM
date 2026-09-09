@@ -266,16 +266,29 @@ export function TrackerTable() {
                 <span className="sr-only">Row</span>#
               </th>
               {TRACKER_COLUMNS.map((column, index) => (
-                <th
-                  key={column.key}
-                  scope="col"
-                  className={`sticky top-0 whitespace-nowrap border-b border-r border-white/25 bg-[#1e3a5f] px-sm py-sm text-left text-xs font-semibold uppercase tracking-wide ${column.width} ${
-                    // The client column pins alongside the gutter.
-                    index === 0 ? "left-[44px] z-30" : "z-20"
-                  }`}
-                >
-                  {column.label}
-                </th>
+                <Fragment key={column.key}>
+                  <th
+                    scope="col"
+                    className={`sticky top-0 whitespace-nowrap border-b border-r border-white/25 bg-[#1e3a5f] px-sm py-sm text-left text-xs font-semibold uppercase tracking-wide ${column.width} ${
+                      // The client column pins alongside the gutter.
+                      index === 0 ? "left-[44px] z-30" : "z-20"
+                    }`}
+                  >
+                    {column.label}
+                  </th>
+
+                  {/* The body injects a deal cell after Client; the header has to
+                      match it or every heading from here on sits one column left
+                      of its data. */}
+                  {index === 0 && (
+                    <th
+                      scope="col"
+                      className="sticky top-0 z-20 min-w-[160px] whitespace-nowrap border-b border-r border-white/25 bg-[#1e3a5f] px-sm py-sm text-left text-xs font-semibold uppercase tracking-wide"
+                    >
+                      Deal
+                    </th>
+                  )}
+                </Fragment>
               ))}
               {/* Pinned to the right edge: with ten columns the actions used to
                   sit past the horizontal scroll, where nobody found them. */}
