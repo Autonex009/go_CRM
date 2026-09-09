@@ -157,11 +157,13 @@ export function TrackerTable() {
         nextRow += 1;
       }
 
-      const target = gridRef.current?.querySelector<HTMLInputElement>(
+      const target = gridRef.current?.querySelector<HTMLElement>(
         `[data-cell="${nextRow}-${nextCol}"]`,
       );
-      target?.focus();
-      target?.select();
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        target.focus();
+        target.select();
+      }
     },
     [],
   );
@@ -335,7 +337,7 @@ export function TrackerTable() {
                 {TRACKER_COLUMNS.map((column, colIndex) => (
                   <Fragment key={column.key}>
                     <td
-                      className={`border-b border-r border-line p-0 align-middle ${
+                      className={`border-b border-r border-line p-0 align-top ${
                         // Opaque, because the row scrolls underneath it.
                         colIndex === 0
                           ? "sticky left-[44px] z-10 bg-surface"
@@ -352,7 +354,7 @@ export function TrackerTable() {
                     </td>
 
                     {colIndex === 0 && (
-                      <td className="border-b border-r border-line bg-surface px-sm py-xs align-middle">
+                      <td className="border-b border-r border-line bg-surface px-sm py-xs align-top">
                         <DealLink row={row} />
                       </td>
                     )}

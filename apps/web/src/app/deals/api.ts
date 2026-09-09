@@ -18,6 +18,7 @@ export interface Deal {
   accountId: string | null;
   /** The lead this deal was converted from, if any. */
   leadId: string | null;
+  leadName?: string | null;
   /** What is being deployed on this deal. */
   totalCameras: number | null;
   location: string | null;

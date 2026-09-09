@@ -6,7 +6,6 @@ import { useAuthStore } from "../auth/store";
 import { API_URL } from "../lib/config";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { Timeline } from "../activities/Timeline";
-import { contactName, contactsApi } from "../contacts/api";
 import { dealsApi } from "../deals/api";
 import { invoicesApi } from "../invoices/api";
 import { ApiError } from "../lib/api";
@@ -16,6 +15,7 @@ import { useCurrency } from "../org/workspace";
 import { LineItems } from "../documents/LineItems";
 import { emptyDocumentItem } from "../documents/types";
 import { PDFPreviewModal } from "../documents/PDFPreviewModal";
+import { buildQuoteStateFromDeal } from "../deals/quote-utils";
 import {
   isEditable,
   nextStatuses,
@@ -82,7 +82,13 @@ export default function QuoteEditor() {
 
   const location = useLocation();
   const [header, setHeader] = useState<Header>(() => emptyHeader(location.state as Partial<Header> | null));
-  const [items, setItems] = useState<QuoteItemInput[]>(() => [emptyItem()]);
+  const [items, setItems] = useState<QuoteItemInput[]>(() => {
+    const passedItems = (location.state as { items?: QuoteItemInput[] } | null)?.items;
+    if (passedItems && passedItems.length > 0) {
+      return passedItems;
+    }
+    return [emptyItem()];
+  });
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -127,11 +133,6 @@ export default function QuoteEditor() {
 
   // Pickers. All cached and shared with the other dialogs.
   const members = useQuery({ queryKey: ["members"], queryFn: orgApi.members, staleTime: 5 * 60_000 });
-  const contacts = useQuery({
-    queryKey: ["contacts", 0],
-    queryFn: () => contactsApi.list(0),
-    staleTime: 60_000,
-  });
   const deals = useQuery({ queryKey: ["deals"], queryFn: dealsApi.board, staleTime: 60_000 });
 
   const totals = useMemo(() => computeTotals(items), [items]);
@@ -156,6 +157,59 @@ export default function QuoteEditor() {
     setDirty(true);
     setItems((prev) => [...prev, emptyItem()]);
   }, []);
+
+  const onDealChange = useCallback(
+    (selectedDealId: string) => {
+      patchHeader({ dealId: selectedDealId });
+      if (!selectedDealId) return;
+
+      const selectedDeal = (deals.data?.deals ?? []).find((d) => d.id === selectedDealId);
+      if (selectedDeal) {
+        const prefill = buildQuoteStateFromDeal(selectedDeal);
+        setHeader((prev) => ({
+          ...prev,
+          dealId: selectedDealId,
+          title: prev.title && prev.title !== "New quote" ? prev.title : prefill.title,
+          accountId: prefill.accountId || prev.accountId,
+          contactId: prefill.contactId || prev.contactId,
+          ownerUserId: prefill.ownerUserId || prev.ownerUserId,
+          validUntil: prev.validUntil || prefill.validUntil,
+          notes: prev.notes || prefill.notes,
+        }));
+
+        setItems((prev) => {
+          const isDefaultBlank =
+            prev.length === 0 ||
+            (prev.length === 1 && !prev[0].description.trim() && !prev[0].unitPrice);
+          return isDefaultBlank ? prefill.items : prev;
+        });
+      }
+    },
+    [deals.data, patchHeader],
+  );
+
+  // If new quote has dealId, ensure any missing fields get hydrated from deal
+  useEffect(() => {
+    if (!isNew || !header.dealId || dirty || !deals.data?.deals?.length) return;
+    const selectedDeal = deals.data.deals.find((d) => d.id === header.dealId);
+    if (!selectedDeal) return;
+    const prefill = buildQuoteStateFromDeal(selectedDeal);
+    setHeader((prev) => ({
+      ...prev,
+      title: prev.title ? prev.title : prefill.title,
+      accountId: prev.accountId ? prev.accountId : prefill.accountId,
+      contactId: prev.contactId ? prev.contactId : prefill.contactId,
+      ownerUserId: prev.ownerUserId ? prev.ownerUserId : prefill.ownerUserId,
+      validUntil: prev.validUntil ? prev.validUntil : prefill.validUntil,
+      notes: prev.notes ? prev.notes : prefill.notes,
+    }));
+    setItems((prev) => {
+      const isDefaultBlank =
+        prev.length === 0 ||
+        (prev.length === 1 && !prev[0].description.trim() && !prev[0].unitPrice);
+      return isDefaultBlank ? prefill.items : prev;
+    });
+  }, [isNew, header.dealId, deals.data, dirty]);
 
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["quotes"] });
@@ -355,26 +409,11 @@ export default function QuoteEditor() {
           />
 
           <SelectField
-            label="Contact"
-            name="contactId"
-            value={header.contactId}
-            disabled={!editable}
-            onChange={(e) => patchHeader({ contactId: e.target.value })}
-          >
-            <option value="">—</option>
-            {(contacts.data?.items ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {contactName(c)}
-              </option>
-            ))}
-          </SelectField>
-
-          <SelectField
             label="Deal"
             name="dealId"
             value={header.dealId}
             disabled={!editable}
-            onChange={(e) => patchHeader({ dealId: e.target.value })}
+            onChange={(e) => onDealChange(e.target.value)}
           >
             <option value="">—</option>
             {(deals.data?.deals ?? []).map((d) => (

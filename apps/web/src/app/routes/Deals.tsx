@@ -7,6 +7,7 @@ import { TrackerTable } from "../delivery/TrackerTable";
 import { DealDialog } from "../deals/DealDialog";
 import { RemarkDialog } from "../deals/RemarkDialog";
 import { dealsApi, type Deal, type DealInput } from "../deals/api";
+import { buildQuoteStateFromDeal } from "../deals/quote-utils";
 import { DEAL_COLUMNS, type DealStage } from "../deals/stages";
 import { formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
@@ -122,11 +123,24 @@ export default function Deals() {
     [],
   );
   const onRemark = useCallback((deal: Deal) => setRemarkDeal(deal), []);
+  const onGenerateQuote = useCallback(
+    (deal: Deal) => {
+      navigate("/quotes/new", {
+        state: buildQuoteStateFromDeal(deal),
+      });
+    },
+    [navigate],
+  );
   const renderCard = useCallback(
     (deal: Deal, overlay: boolean) => (
-      <DealCard deal={deal} overlay={overlay} onRemark={onRemark} />
+      <DealCard
+        deal={deal}
+        overlay={overlay}
+        onRemark={onRemark}
+        onGenerateQuote={onGenerateQuote}
+      />
     ),
-    [onRemark],
+    [onRemark, onGenerateQuote],
   );
   const columnSummary = useCallback((items: Deal[]) => {
     const amount = items.reduce((sum, d) => sum + d.amount, 0);

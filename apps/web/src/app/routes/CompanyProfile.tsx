@@ -63,7 +63,7 @@ export default function CompanyProfilePage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "contacts" | "pipeline" | "financials"
+    "overview" | "leads" | "pipeline" | "financials"
   >("overview");
 
   const query = useQuery({
@@ -160,7 +160,7 @@ export default function CompanyProfilePage() {
     );
   }
 
-  const { deals, quotes, invoices, contacts, leads } = query.data;
+  const { deals, quotes, invoices, leads } = query.data;
   const brandColor = formData.primaryColor || "#6366f1";
 
   const totalDealAmount = deals.reduce((sum, d) => sum + (d.amount || 0), 0);
@@ -480,9 +480,9 @@ export default function CompanyProfilePage() {
               count: deals.length + leads.length,
             },
             {
-              id: "contacts",
-              label: "Contacts & Leads",
-              count: contacts.length + leads.length,
+              id: "leads",
+              label: "Leads",
+              count: leads.length,
             },
             {
               id: "financials",
@@ -577,27 +577,7 @@ export default function CompanyProfilePage() {
               </div>
             </div>
 
-            {/* Key Contacts Metric Card */}
-            <div
-              onClick={() => setActiveTab("contacts")}
-              className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
-            >
-              <div className="flex items-center justify-between text-xs text-fg-muted">
-                <span className="font-medium">Key Contacts</span>
-                <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
-                  →
-                </span>
-              </div>
-              <div className="text-xl font-bold text-fg mt-xs">
-                {contacts.length}{" "}
-                <span className="text-xs font-normal text-fg-muted">
-                  ({contacts.length === 1 ? "Contact" : "Contacts"})
-                </span>
-              </div>
-              <div className="text-xs text-fg-muted mt-xs truncate">
-                Decision makers & SPOCs
-              </div>
-            </div>
+
 
             {/* Commercial Documents Metric Card */}
             <div
@@ -1524,44 +1504,8 @@ export default function CompanyProfilePage() {
         </div>
       )}
 
-      {activeTab === "contacts" && (
+      {activeTab === "leads" && (
         <div className="flex flex-col gap-lg mt-md">
-          {/* Key Contacts */}
-          <Card>
-            <CardHeader
-              title={`Key Contacts (${contacts.length})`}
-              className="mb-md"
-            />
-            {contacts.length > 0 ? (
-              <div className="flex flex-col gap-sm">
-                {contacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    className="flex items-center gap-sm p-sm rounded-md border border-line bg-surface-muted text-xs"
-                  >
-                    <Avatar
-                      name={`${contact.firstName} ${contact.lastName || ""}`}
-                      size="xs"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <span className="font-medium text-fg block truncate">
-                        {contact.firstName} {contact.lastName || ""}
-                      </span>
-                      {contact.title && (
-                        <span className="text-fg-muted block truncate">
-                          {contact.title}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-fg-subtle">No contacts linked yet.</p>
-            )}
-          </Card>
-
-          {/* Leads */}
           <Card>
             <CardHeader
               title={`Leads (${leads?.length || 0})`}

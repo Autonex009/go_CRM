@@ -29,7 +29,7 @@ export function RemarkDialog({ deal, onClose, onSubmit }: RemarkDialogProps) {
         description: trimmed || undefined,
         remark: trimmed || undefined,
         ownerUserId: deal.ownerUserId ?? undefined,
-        contactId: deal.contactId ?? undefined,
+
         accountId: deal.accountId ?? undefined,
         expectedCloseDate: deal.expectedCloseDate ?? undefined,
       });
@@ -53,11 +53,7 @@ export function RemarkDialog({ deal, onClose, onSubmit }: RemarkDialogProps) {
               {stageLabel(deal.stage)}
             </Badge>
           </div>
-          {deal.contactName && (
-            <span className="text-xs text-fg-subtle">
-              Contact: {deal.contactName}
-            </span>
-          )}
+
         </div>
 
         <TextareaField

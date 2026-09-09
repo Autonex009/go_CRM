@@ -6,7 +6,6 @@ import { useAuthStore } from "../auth/store";
 import { API_URL } from "../lib/config";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { Timeline } from "../activities/Timeline";
-import { contactName, contactsApi } from "../contacts/api";
 import { dealsApi } from "../deals/api";
 import { LineItems } from "../documents/LineItems";
 import { computeTotals } from "../documents/totals";
@@ -124,11 +123,6 @@ export default function InvoiceEditor() {
   }, [invoice, dirty]);
 
   const members = useQuery({ queryKey: ["members"], queryFn: orgApi.members, staleTime: 5 * 60_000 });
-  const contacts = useQuery({
-    queryKey: ["contacts", 0],
-    queryFn: () => contactsApi.list(0),
-    staleTime: 60_000,
-  });
   const deals = useQuery({ queryKey: ["deals"], queryFn: dealsApi.board, staleTime: 60_000 });
 
   // Preview while editing; once issued the server's stored figures are the truth
@@ -381,20 +375,6 @@ export default function InvoiceEditor() {
             onChange={(e) => patchHeader({ dueDate: e.target.value })}
           />
 
-          <SelectField
-            label="Contact"
-            name="contactId"
-            value={header.contactId}
-            disabled={!editable}
-            onChange={(e) => patchHeader({ contactId: e.target.value })}
-          >
-            <option value="">—</option>
-            {(contacts.data?.items ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {contactName(c)}
-              </option>
-            ))}
-          </SelectField>
 
           <SelectField
             label="Deal"

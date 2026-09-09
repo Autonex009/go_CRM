@@ -9,7 +9,7 @@ import Accounts from "./routes/Accounts";
 import CompanyProfilePage from "./routes/CompanyProfile";
 import AppLayout from "./routes/AppLayout";
 
-import Contacts from "./routes/Contacts";
+
 import Dashboard from "./routes/Dashboard";
 import Deals from "./routes/Deals";
 import InvoiceEditor from "./routes/InvoiceEditor";
@@ -74,7 +74,7 @@ export default function AppRoot() {
               <Route path="/invoices/:id" element={<InvoiceEditor />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/accounts/:id" element={<CompanyProfilePage />} />
-              <Route path="/contacts" element={<Contacts />} />
+
 
               <Route path="/team" element={<Team />} />
             </Route>

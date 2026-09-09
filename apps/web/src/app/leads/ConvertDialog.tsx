@@ -1,9 +1,24 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 
-import { formatMoney } from "../lib/money";
+import { AccountSelect } from "../accounts/AccountSelect";
+import { DEAL_STAGES, stageLabel, normalizeDealStage } from "../deals/stages";
+import { dealFormSchema, type DealFormValues } from "../deals/schemas";
 import { ApiError } from "../lib/api";
-import { useCurrency } from "../org/workspace";
-import { Alert, Avatar, Badge, Button, Field, Icon, Modal, TextareaField } from "../ui";
+import { zodResolver } from "../lib/zodResolver";
+import { memberLabel, orgApi } from "../org/api";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  Field,
+  Icon,
+  Modal,
+  SelectField,
+  TextareaField,
+} from "../ui";
 import { leadCompany, leadName, type ConvertInput, type Lead } from "./api";
 
 interface ConvertDialogProps {
@@ -13,154 +28,205 @@ interface ConvertDialogProps {
 }
 
 /**
- * Lead → Deal conversion (brief §3.4).
- *
- * The split the mockup makes — "pre-filled from lead" above, "you fill in" below
- * — is the whole point: what carries over is shown as read-only context so the
- * person doesn't retype it, and the four things only they know get the focus.
+ * Lead → Deal conversion.
+ * Replicates the full Deal form so all fields can be reviewed and edited,
+ * while minimizing manual typing by pre-filling everything from the lead.
  */
 export function ConvertDialog({ lead, onClose, onSubmit }: ConvertDialogProps) {
-  const currency = useCurrency();
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // The deal name defaults to the company, which is what it is usually called.
-  const [dealTitle, setDealTitle] = useState(leadCompany(lead) ?? leadName(lead));
-  const [amount, setAmount] = useState(lead.value ? String(lead.value) : "");
-  const [expectedClose, setExpectedClose] = useState("");
-  const [callNotes, setCallNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const members = useQuery({
+    queryKey: ["members"],
+    queryFn: orgApi.members,
+    staleTime: 5 * 60_000,
+  });
 
-  const parsedAmount = amount.trim() === "" ? undefined : Number(amount);
-  const amountInvalid = parsedAmount !== undefined && (Number.isNaN(parsedAmount) || parsedAmount < 0);
+  const defaultTitle = leadCompany(lead) || leadName(lead);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!dealTitle.trim()) {
-      setError("Give the deal a name");
-      return;
-    }
-    if (amountInvalid) {
-      setError("Enter a valid amount");
-      return;
-    }
+  // Pre-fill expected close: followUpAt date if present, or +14 days from today
+  const defaultCloseDate = lead.followUpAt
+    ? lead.followUpAt.slice(0, 10)
+    : new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
 
-    setSaving(true);
-    setError(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<DealFormValues>({
+    resolver: zodResolver(dealFormSchema),
+    defaultValues: {
+      title: defaultTitle,
+      description: lead.notes ?? "",
+      amount: lead.value ?? 0,
+      stage: "discovery",
+      ownerUserId: lead.ownerUserId ?? "",
+      contactId: lead.contactId ?? "",
+      expectedCloseDate: defaultCloseDate,
+      accountId: lead.accountId ?? "",
+      leadId: lead.id,
+      totalCameras: null,
+      location: "",
+      products: lead.title ?? "",
+    },
+  });
+
+  const submit = handleSubmit(async (values) => {
+    setFormError(null);
     try {
       await onSubmit({
-        dealTitle: dealTitle.trim(),
-        amount: parsedAmount,
-        expectedCloseDate: expectedClose ? `${expectedClose}T00:00:00Z` : undefined,
-        callNotes: callNotes.trim() || undefined,
+        title: values.title.trim(),
+        dealTitle: values.title.trim(),
+        amount: values.amount,
+        stage: normalizeDealStage(values.stage),
+        dealStage: normalizeDealStage(values.stage),
+        ownerUserId: values.ownerUserId?.trim() || undefined,
+        accountId: values.accountId?.trim() || undefined,
+        expectedCloseDate: values.expectedCloseDate?.trim()
+          ? `${values.expectedCloseDate.trim()}T00:00:00Z`
+          : undefined,
+        totalCameras: values.totalCameras,
+        location: values.location?.trim() || undefined,
+        products: values.products?.trim() || undefined,
+        description: values.description?.trim() || undefined,
+        callNotes: values.description?.trim() || undefined,
       });
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not convert this lead");
-    } finally {
-      setSaving(false);
+      setFormError(
+        err instanceof ApiError ? err.message : "Could not convert this lead",
+      );
     }
-  };
+  });
 
   return (
     <Modal title="Convert to deal" onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-lg" noValidate>
-        {error && <Alert>{error}</Alert>}
+      <form onSubmit={submit} className="flex flex-col gap-md" noValidate>
+        {formError && <Alert>{formError}</Alert>}
 
         <p className="flex items-start gap-sm rounded-md bg-ok-soft px-md py-sm text-sm text-ok-fg">
           <Icon name="check" size={15} className="mt-[2px] shrink-0" />
           <span>
-            This lead will be marked <strong>Converted</strong> and a new Deal record created
-            automatically.
+            This lead will be marked <strong>Converted</strong> and a new Deal
+            record created automatically.
           </span>
         </p>
 
-        <section className="flex flex-col gap-sm">
+        {/* Pre-filled from lead indicator banner */}
+        <section className="flex flex-col gap-xs">
           <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
             Pre-filled from lead
           </h3>
-
-          <div className="flex items-center gap-sm rounded-md border border-line bg-surface-muted px-md py-sm">
-            <Avatar name={leadName(lead)} size="sm" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-fg">
-                {leadName(lead)}
-                {leadCompany(lead) ? ` — ${leadCompany(lead)}` : ""}
-              </p>
-              {lead.title && <p className="truncate text-xs text-fg-muted">{lead.title}</p>}
+          <div className="flex items-center justify-between rounded-md border border-line bg-surface-muted px-md py-sm">
+            <div className="flex items-center gap-sm min-w-0">
+              <Avatar name={leadName(lead)} size="sm" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-fg">
+                  {leadName(lead)}
+                  {leadCompany(lead) ? ` — ${leadCompany(lead)}` : ""}
+                </p>
+                {lead.title && (
+                  <p className="truncate text-xs text-fg-muted">{lead.title}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-xs shrink-0">
+              {lead.source && <Badge tone="neutral">{lead.source}</Badge>}
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-sm text-xs text-fg-muted">
-            <span>
-              Deal stage <Badge tone="neutral">Discovery</Badge>
-            </span>
-            {lead.source && (
-              <span>
-                Source <Badge tone="neutral">{lead.source}</Badge>
-              </span>
-            )}
-            {lead.ownerEmail && <span>Owner carried over</span>}
-          </div>
         </section>
 
-        <section className="flex flex-col gap-md">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
-            You fill in
-          </h3>
+        <Field
+          label="Title"
+          error={errors.title?.message}
+          {...register("title")}
+        />
 
+        <div className="grid gap-md sm:grid-cols-2">
           <Field
-            label="Deal name"
-            name="dealTitle"
-            value={dealTitle}
-            onChange={(e) => setDealTitle(e.target.value)}
-            placeholder="e.g. Jubilant EHS assessment"
+            label="Products"
+            placeholder="VIGIL Pro; ANPR add-on"
+            error={errors.products?.message}
+            {...register("products")}
+          />
+          <Field
+            label="No. of cameras"
+            type="number"
+            min={0}
+            step={1}
+            placeholder="24"
+            error={errors.totalCameras?.message}
+            {...register("totalCameras", { valueAsNumber: true })}
+          />
+        </div>
+
+        <Field
+          label="Location"
+          placeholder="Pune (Plant 1); Nashik"
+          error={errors.location?.message}
+          {...register("location")}
+        />
+
+        <div className="grid gap-md sm:grid-cols-2">
+          <Field
+            label="Amount"
+            type="number"
+            min={0}
+            step="any"
+            error={errors.amount?.message}
+            {...register("amount", { valueAsNumber: true })}
+          />
+          <Field
+            label="Next follow up date"
+            type="date"
+            error={errors.expectedCloseDate?.message}
+            {...register("expectedCloseDate")}
           />
 
-          <div className="grid gap-md sm:grid-cols-2">
-            <Field
-              label={`Estimated value (${currency})`}
-              name="amount"
-              type="number"
-              min={0}
-              step="any"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-            />
-            <Field
-              label="Expected close"
-              name="expectedClose"
-              type="date"
-              value={expectedClose}
-              onChange={(e) => setExpectedClose(e.target.value)}
-            />
-          </div>
+          <SelectField
+            label="Stage"
+            error={errors.stage?.message}
+            {...register("stage")}
+          >
+            {DEAL_STAGES.map((stage) => (
+              <option key={stage} value={stage}>
+                {stageLabel(stage)}
+              </option>
+            ))}
+          </SelectField>
 
-          <TextareaField
-            label="Call notes (from demo)"
-            name="callNotes"
-            rows={3}
-            value={callNotes}
-            onChange={(e) => setCallNotes(e.target.value)}
-            placeholder="Key points from the call, interest level, next steps…"
-          />
-          <p className="-mt-sm text-xs text-fg-subtle">
-            Saved to the timeline, so it stays with the deal.
-          </p>
-        </section>
+          <SelectField
+            label="Owner"
+            error={errors.ownerUserId?.message}
+            {...register("ownerUserId")}
+          >
+            <option value="">Unassigned</option>
+            {(members.data ?? []).map((m) => (
+              <option key={m.id} value={m.id}>
+                {memberLabel(m)}
+              </option>
+            ))}
+          </SelectField>
+        </div>
 
-        {parsedAmount !== undefined && !amountInvalid && parsedAmount > 0 && (
-          <p className="text-xs text-fg-muted">
-            Deal will open at {formatMoney(parsedAmount, currency)}.
-          </p>
-        )}
+        <AccountSelect
+          error={errors.accountId?.message}
+          {...register("accountId")}
+        />
 
-        <div className="flex justify-end gap-sm">
-          <Button variant="secondary" onClick={onClose}>
+        <TextareaField
+          label="Description / Notes"
+          rows={3}
+          placeholder="Key notes, scope, next steps…"
+          error={errors.description?.message}
+          {...register("description")}
+        />
+
+        <div className="flex justify-end gap-sm mt-xs">
+          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Creating…" : "Create deal"}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating…" : "Create deal"}
           </Button>
         </div>
       </form>

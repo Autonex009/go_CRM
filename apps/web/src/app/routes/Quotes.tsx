@@ -151,7 +151,7 @@ export default function Quotes() {
 
 function Row({ quote, onOpen }: { quote: Quote; onOpen: () => void }) {
   const meta = STATUS_META[quote.status];
-  const forWhom = quote.accountName ?? quote.contactName ?? "—";
+  const forWhom = quote.accountName ?? "—";
 
   return (
     <tr

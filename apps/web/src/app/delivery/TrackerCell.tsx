@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 import type { TrackerColumn, TrackerInput } from "./api";
 
@@ -23,6 +23,10 @@ interface TrackerCellProps {
  * put the server in the middle of the user's typing — including its validation
  * errors, which would fire on every half-finished value.
  *
+ * Text cells use a `<textarea>` that auto-expands vertically so long text is
+ * always fully visible. Date and number cells stay as `<input>` because they
+ * are single-line by nature.
+ *
  * Escape restores the last committed value, which is the only undo a table
  * like this needs.
  */
@@ -36,8 +40,21 @@ export const TrackerCell = memo(function TrackerCell({
   cellId,
 }: TrackerCellProps) {
   const [draft, setDraft] = useState(() => toText(value));
-  const ref = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const committed = useRef(toText(value));
+
+  const isTextColumn = column.type === "text";
+
+  // Auto-resize the textarea to fit its content.
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    // Reset height to auto so scrollHeight recalculates from content, not
+    // from the previous height.
+    el.style.height = "auto";
+    el.style.height = `${Math.max(34, el.scrollHeight)}px`;
+  }, []);
 
   // A background refetch or an import can change the row under an idle cell.
   // Only adopt it when the cell is not being typed in, so a save in flight
@@ -45,8 +62,14 @@ export const TrackerCell = memo(function TrackerCell({
   useEffect(() => {
     const next = toText(value);
     committed.current = next;
-    if (document.activeElement !== ref.current) setDraft(next);
-  }, [value]);
+    const activeEl = isTextColumn ? textareaRef.current : inputRef.current;
+    if (document.activeElement !== activeEl) setDraft(next);
+  }, [value, isTextColumn]);
+
+  // Re-measure the textarea whenever the draft changes.
+  useEffect(() => {
+    if (isTextColumn) autoResize();
+  }, [draft, isTextColumn, autoResize]);
 
   const commit = () => {
     if (draft === committed.current) return;
@@ -54,9 +77,60 @@ export const TrackerCell = memo(function TrackerCell({
     onCommit(fromText(draft, column.type));
   };
 
+  // The input fills its cell edge to edge so the table's gridlines are the
+  // only borders on screen — an input with its own border inside a bordered
+  // cell reads as a form, not a sheet. Focus is a ring drawn inside the
+  // cell, so selecting a cell never shifts the grid by a pixel.
+  const baseClassName = `w-full border-0 bg-transparent px-sm text-sm text-fg outline-none transition-shadow duration-75 placeholder:text-fg-subtle focus:relative focus:z-10 focus:bg-surface focus:shadow-[inset_0_0_0_2px_rgb(var(--accent))] ${
+    invalid
+      ? "bg-bad-soft/40 shadow-[inset_0_0_0_1px_rgb(var(--bad-fg))]"
+      : ""
+  } ${column.type === "number" ? "text-right tabular-nums" : ""}`;
+
+  if (isTextColumn) {
+    return (
+      <textarea
+        ref={textareaRef}
+        data-cell={cellId}
+        value={draft}
+        autoFocus={autoFocus}
+        aria-label={column.label}
+        aria-invalid={invalid || undefined}
+        rows={1}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          switch (e.key) {
+            case "Enter":
+              if (e.shiftKey) {
+                // Shift+Enter = commit and move down (like a spreadsheet)
+                e.preventDefault();
+                commit();
+                onNavigate("down");
+              }
+              // Plain Enter = newline (natural textarea behavior)
+              break;
+            case "Escape":
+              e.preventDefault();
+              setDraft(committed.current);
+              textareaRef.current?.blur();
+              break;
+            case "Tab":
+              e.preventDefault();
+              commit();
+              onNavigate(e.shiftKey ? "left" : "right");
+              break;
+          }
+        }}
+        className={`${baseClassName} resize-none overflow-hidden py-[7px] leading-snug`}
+        style={{ minHeight: "34px" }}
+      />
+    );
+  }
+
   return (
     <input
-      ref={ref}
+      ref={inputRef}
       data-cell={cellId}
       type={column.type === "date" ? "date" : "text"}
       // Numbers stay a text input on purpose: type="number" swallows scroll
@@ -79,7 +153,7 @@ export const TrackerCell = memo(function TrackerCell({
           case "Escape":
             e.preventDefault();
             setDraft(committed.current);
-            ref.current?.blur();
+            inputRef.current?.blur();
             break;
           case "Tab":
             e.preventDefault();
@@ -96,15 +170,7 @@ export const TrackerCell = memo(function TrackerCell({
             break;
         }
       }}
-      // The input fills its cell edge to edge so the table's gridlines are the
-      // only borders on screen — an input with its own border inside a bordered
-      // cell reads as a form, not a sheet. Focus is a ring drawn inside the
-      // cell, so selecting a cell never shifts the grid by a pixel.
-      className={`h-[34px] w-full border-0 bg-transparent px-sm text-sm text-fg outline-none transition-shadow duration-75 placeholder:text-fg-subtle focus:relative focus:z-10 focus:bg-surface focus:shadow-[inset_0_0_0_2px_rgb(var(--accent))] ${
-        invalid
-          ? "bg-bad-soft/40 shadow-[inset_0_0_0_1px_rgb(var(--bad-fg))]"
-          : ""
-      } ${column.type === "number" ? "text-right tabular-nums" : ""}`}
+      className={`h-[34px] ${baseClassName}`}
     />
   );
 });

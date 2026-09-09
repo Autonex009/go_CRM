@@ -79,7 +79,11 @@ export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: 
     }
   });
 
-  const converted = Boolean(lead?.convertedAt);
+  const converted =
+    lead?.stage === "converted" ||
+    lead?.stage === "closed" ||
+    Boolean(lead?.convertedDealId) ||
+    Boolean(lead?.convertedAt);
 
   return (
     <Modal
@@ -98,12 +102,12 @@ export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: 
 
         {lead && (
           <div className="flex flex-wrap items-center gap-sm">
-            <Badge tone={STAGE_META[lead.stage].tone} dot>
+            <Badge tone={STAGE_META[lead.stage]?.tone ?? "neutral"} dot>
               {stageLabel(lead.stage)}
             </Badge>
             {converted && (
               <span className="text-xs text-fg-subtle">
-                Converted {new Date(lead.convertedAt!).toLocaleDateString()}
+                Converted {lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : ""}
               </span>
             )}
           </div>
@@ -134,7 +138,7 @@ export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: 
           <SelectField label="Stage" error={errors.stage?.message} {...register("stage")}>
             {LEAD_STAGES.map((stage) => (
               <option key={stage} value={stage}>
-                {stageLabel(stage)}
+                {stage === "not interested" ? "Not interested (Drop lead)" : stageLabel(stage)}
               </option>
             ))}
           </SelectField>
@@ -191,8 +195,12 @@ export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: 
       </form>
 
       {lead && (
-        <div className="mt-lg">
-          <Timeline scope={{ leadId: lead.id }} />
+        <div className="mt-lg border-t border-line/60 pt-md">
+          <Timeline
+            scope={{ leadId: lead.id }}
+            collapsible
+            defaultCollapsed={false}
+          />
         </div>
       )}
     </Modal>

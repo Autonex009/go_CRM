@@ -7,7 +7,7 @@ import { accountsApi } from "../accounts/api";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { leadsApi } from "../leads/api";
 import { Timeline } from "../activities/Timeline";
-import { contactName, contactsApi } from "../contacts/api";
+
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
@@ -21,6 +21,7 @@ import {
   TextareaField,
 } from "../ui";
 import type { Deal, DealInput } from "./api";
+import { buildQuoteStateFromDeal } from "./quote-utils";
 import { dealFormSchema, toPayload, type DealFormValues } from "./schemas";
 import {
   DEAL_STAGES,
@@ -58,11 +59,7 @@ export function DealDialog({
     queryFn: orgApi.members,
     staleTime: 5 * 60_000,
   });
-  const contacts = useQuery({
-    queryKey: ["contacts", 0],
-    queryFn: () => contactsApi.list(0),
-    staleTime: 60_000,
-  });
+
 
   const {
     register,
@@ -146,7 +143,7 @@ export function DealDialog({
   const selectableLeads = useMemo(() => {
     const items = allLeads.data?.items ?? [];
     if (!accountId) return items;
-    return items.filter((l) => !l.accountId || l.accountId === accountId);
+    return items.filter((l) => l.accountId === accountId);
   }, [allLeads.data, accountId]);
 
   // Switching account used to leave a now-invalid lead selected, and the save
@@ -202,35 +199,33 @@ export function DealDialog({
           {...register("title")}
         />
 
-        {/* What is being deployed. Grouped above the commercials because it is
-            what the rest of the deal is priced against, and it is the same
-            information the company profile totals up. */}
-        <div className="grid gap-md sm:grid-cols-2">
+        <div className="grid gap-md sm:grid-cols-3">
+          <Field
+            label="Total cameras"
+            type="number"
+            min={0}
+            placeholder="e.g. 15"
+            error={errors.totalCameras?.message}
+            {...register("totalCameras", {
+              setValueAs: (v) =>
+                v === "" || v === null || Number.isNaN(Number(v))
+                  ? null
+                  : Number(v),
+            })}
+          />
+          <Field
+            label="Location"
+            placeholder="e.g. Mumbai, Plant 2"
+            error={errors.location?.message}
+            {...register("location")}
+          />
           <Field
             label="Products"
-            placeholder="VIGIL Pro; ANPR add-on"
+            placeholder="e.g. Safety AI, ANPR"
             error={errors.products?.message}
             {...register("products")}
           />
-          <Field
-            label="No. of cameras"
-            type="number"
-            min={0}
-            step={1}
-            placeholder="24"
-            error={errors.totalCameras?.message}
-            // valueAsNumber turns a cleared input into NaN, which the schema
-            // maps to null — "not scoped yet" rather than zero cameras.
-            {...register("totalCameras", { valueAsNumber: true })}
-          />
         </div>
-
-        <Field
-          label="Location"
-          placeholder="Pune (Plant 1); Nashik"
-          error={errors.location?.message}
-          {...register("location")}
-        />
 
         <div className="grid gap-md sm:grid-cols-2">
           <Field
@@ -242,7 +237,7 @@ export function DealDialog({
             {...register("amount", { valueAsNumber: true })}
           />
           <Field
-            label="Expected close"
+            label="Next follow up date"
             type="date"
             error={errors.expectedCloseDate?.message}
             {...register("expectedCloseDate")}
@@ -274,38 +269,52 @@ export function DealDialog({
           </SelectField>
         </div>
 
-        <div className="grid gap-md sm:grid-cols-2">
+        <AccountSelect
+          error={errors.accountId?.message}
+          {...register("accountId")}
+        />
+
+        <div>
           <SelectField
-            label="Contact"
-            error={errors.contactId?.message}
-            {...register("contactId")}
+            label="Lead"
+            error={errors.leadId?.message}
+            {...register("leadId")}
           >
-            <option value="">—</option>
-            {(contacts.data?.items ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {contactName(c)}
-              </option>
-            ))}
+            {accountId ? (
+              selectableLeads.length > 0 ? (
+                <>
+                  <option value="">
+                    — Select Lead ({selectableLeads.length} available) —
+                  </option>
+                  {selectableLeads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
+                    </option>
+                  ))}
+                </>
+              ) : (
+                <option value="">No leads found for this company</option>
+              )
+            ) : (
+              <>
+                <option value="">
+                  — Select Lead (or choose company above to filter) —
+                </option>
+                {selectableLeads.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}{" "}
+                    {l.company ? `— ${l.company}` : ""}
+                  </option>
+                ))}
+              </>
+            )}
           </SelectField>
-
-          <AccountSelect
-            error={errors.accountId?.message}
-            {...register("accountId")}
-          />
+          {accountId && selectableLeads.length === 0 && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+              No leads found connected to this company.
+            </p>
+          )}
         </div>
-
-        <SelectField
-          label="Lead"
-          error={errors.leadId?.message}
-          {...register("leadId")}
-        >
-          <option value="">—</option>
-          {selectableLeads.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
-            </option>
-          ))}
-        </SelectField>
 
         <TextareaField
           label="Description"
@@ -327,12 +336,7 @@ export function DealDialog({
               variant="secondary"
               onClick={() => {
                 navigate("/quotes/new", {
-                  state: {
-                    accountId: deal.accountId,
-                    dealId: deal.id,
-                    contactId: deal.contactId,
-                    title: `${deal.title} - Quote`,
-                  },
+                  state: buildQuoteStateFromDeal(deal),
                 });
                 onClose();
               }}

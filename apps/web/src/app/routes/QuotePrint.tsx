@@ -138,8 +138,8 @@ export default function QuotePrint() {
               <td className="border border-black py-1 px-2 font-mono font-bold w-2/6">{quote.number}</td>
             </tr>
             <tr>
-              <td className="border border-black bg-gray-100 py-1 px-2 font-semibold">Contact Person</td>
-              <td className="border border-black py-1 px-2">{quote.contactName || "—"}</td>
+              <td className="border border-black bg-gray-100 py-1 px-2 font-semibold">Prepared By</td>
+              <td className="border border-black py-1 px-2">{quote.ownerName || "Sales Team"}</td>
               <td className="border border-black bg-gray-100 py-1 px-2 font-semibold">PO Date</td>
               <td className="border border-black py-1 px-2">{poDate}</td>
             </tr>

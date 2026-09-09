@@ -4,7 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   LayoutDashboard,
   Building2,
-  Users,
+
   TrendingUp,
   Handshake,
   FileText,
@@ -55,7 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: "CRM & Pipeline",
     items: [
       { to: "/accounts", label: "Companies", icon: Building2 },
-      { to: "/contacts", label: "Contacts", icon: Users },
+
       { to: "/leads", label: "Leads", icon: TrendingUp },
       { to: "/deals", label: "Deals", icon: Handshake },
     ],
@@ -78,7 +78,7 @@ const NAV_GROUPS: NavGroup[] = [
 const TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/accounts": "Companies",
-  "/contacts": "Contacts",
+
   "/leads": "Leads",
   "/deals": "Deals",
   "/quotes": "Quotes Workbench",
@@ -159,7 +159,7 @@ export default function AppLayout() {
           title={getPageTitle()}
           onOpenSearch={() => setCommandSearchOpen(true)}
         />
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+        <main className="mx-auto w-full max-w-[1780px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>

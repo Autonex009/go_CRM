@@ -167,7 +167,7 @@ export default function Invoices() {
 
 function Row({ invoice, onOpen }: { invoice: Invoice; onOpen: () => void }) {
   const badge = statusBadge(invoice);
-  const forWhom = invoice.accountName ?? invoice.contactName ?? "—";
+  const forWhom = invoice.accountName ?? "—";
 
   return (
     <tr

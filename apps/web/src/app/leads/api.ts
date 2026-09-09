@@ -15,11 +15,12 @@ export const LEAD_STAGES = [
   "proposal sent",
   "closed",
   "not interested",
+  "converted",
 ] as const;
 export type LeadStage = (typeof LEAD_STAGES)[number];
 
 /** Stages where the work has finished, one way or the other. */
-export const TERMINAL_STAGES: LeadStage[] = ["closed", "not interested"];
+export const TERMINAL_STAGES: LeadStage[] = ["closed", "not interested", "converted"];
 
 /** The stages that form the funnel strip; the two terminal ones sit outside it. */
 export const FUNNEL_STAGES: LeadStage[] = [
@@ -131,13 +132,21 @@ export interface AdvanceResult {
   meeting?: Meeting;
 }
 
-/** The convert dialog's payload (brief §3.4). */
+/** The convert dialog's payload. Supports full Deal fields. */
 export interface ConvertInput {
+  title?: string;
   dealTitle?: string;
   amount?: number;
   expectedCloseDate?: string;
-  callNotes?: string;
+  stage?: string;
   dealStage?: string;
+  ownerUserId?: string;
+  accountId?: string;
+  totalCameras?: number | null;
+  location?: string;
+  products?: string;
+  description?: string;
+  callNotes?: string;
 }
 
 export interface Conversion {
@@ -217,6 +226,7 @@ export const STAGE_META: Record<LeadStage, StageMeta> = {
     tone: "danger",
     bar: "bg-danger-500",
   },
+  converted: { label: "Converted", tone: "success", bar: "bg-emerald-600" },
 };
 
 export function stageLabel(stage: string): string {
