@@ -7,17 +7,12 @@ import {
   Handshake,
   FileText,
   Building2,
-  Users,
-  CheckCircle2,
-  ArrowRight,
   Sparkles,
-  AlertCircle,
 } from "lucide-react";
 
 import { KIND_META, relativeTime, type ActivityKind } from "../activities/api";
 import { useAuthStore } from "../auth/store";
 import { STAGE_META as DEAL_META, stageLabel as dealStageLabel } from "../deals/stages";
-import { STAGE_META as LEAD_META, stageLabel as leadStageLabel } from "../leads/api";
 import { ApiError } from "../lib/api";
 import { dashboardApi, type Attention, type Pipeline, type Recent, type Summary } from "../lib/dashboard";
 import { formatMoney, formatMoneyCompact } from "../lib/money";
@@ -30,7 +25,6 @@ import {
   EmptyState,
   Icon,
   Skeleton,
-  buttonClass,
   type IconName,
   type Tone,
 } from "../ui";

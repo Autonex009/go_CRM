@@ -135,7 +135,6 @@ export default function Accounts() {
                   <Row
                     key={account.id}
                     account={account}
-                    onEdit={() => setDialog({ account })}
                     onDelete={() => {
                       if (window.confirm(`Delete ${account.name}?`)) {
                         remove.mutate(account.id);
@@ -199,12 +198,10 @@ export default function Accounts() {
 
 function Row({
   account,
-  onEdit,
   onDelete,
   disabled,
 }: {
   account: Account;
-  onEdit: () => void;
   onDelete: () => void;
   disabled: boolean;
 }) {

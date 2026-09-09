@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, ShieldCheck, Zap, Sun } from "lucide-react";
+import { Sun } from "lucide-react";
 
 interface SiteAssessmentProps {
   roofAreaSqft?: number;

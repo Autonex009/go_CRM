@@ -3,22 +3,13 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   MessageSquare,
-  Plus,
-  ArrowRight,
-  TrendingUp,
-  DollarSign,
-  Users,
-  Briefcase,
 } from "lucide-react";
 
 import {
   accountsApi,
   websiteLabel,
-  type PlantLocation,
-  type CustomSection,
   type ProfileInput,
   type LinkedDeal,
-  type LinkedLead,
 } from "../accounts/api";
 import { Timeline } from "../activities/Timeline";
 import { DealDialog } from "../deals/DealDialog";
@@ -28,12 +19,10 @@ import {
   getStageMeta,
   normalizeDealStage,
   stageLabel,
-  type DealStage,
 } from "../deals/stages";
 import { ApiError } from "../lib/api";
 import {
   Alert,
-  Avatar,
   Badge,
   Button,
   Card,

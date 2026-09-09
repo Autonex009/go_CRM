@@ -3,7 +3,6 @@ import { useMemo, useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
-import { accountsApi } from "../accounts/api";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { leadsApi } from "../leads/api";
 import { Timeline } from "../activities/Timeline";
@@ -25,7 +24,6 @@ import { buildQuoteStateFromDeal } from "./quote-utils";
 import { dealFormSchema, toPayload, type DealFormValues } from "./schemas";
 import {
   DEAL_STAGES,
-  STAGE_META,
   stageLabel,
   getStageMeta,
   normalizeDealStage,
@@ -89,13 +87,6 @@ export function DealDialog({
   const accountId = useWatch({
     control,
     name: "accountId",
-  });
-
-  const accountProfile = useQuery({
-    queryKey: ["accountProfile", accountId],
-    queryFn: () => accountsApi.getProfile(accountId as string),
-    enabled: Boolean(accountId),
-    staleTime: 60_000,
   });
 
   // The picker needs the workspace's leads, not the first page of them — at the
