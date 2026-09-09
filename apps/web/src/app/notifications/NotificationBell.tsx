@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuthStore } from "../auth/store";
 import { API_URL } from "../lib/config";
-import { Badge, Button, Icon } from "../ui";
+import { Badge, Icon } from "../ui";
 import { notificationsApi, type NotificationItem } from "./api";
 
 export function NotificationBell() {

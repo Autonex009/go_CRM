@@ -1,9 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { AccountSelect } from "../accounts/AccountSelect";
-import { accountsApi } from "../accounts/api";
 import { Timeline } from "../activities/Timeline";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
@@ -37,7 +36,6 @@ interface LeadDialogProps {
 /** Create/edit form. One dialog for both, since the field set is identical. */
 export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: LeadDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
   const members = useQuery({
     queryKey: ["members"],

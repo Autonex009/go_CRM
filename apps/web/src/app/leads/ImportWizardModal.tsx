@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UploadCloud, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
+import { UploadCloud, CheckCircle2 } from 'lucide-react';
 
 interface ImportWizardModalProps {
   isOpen: boolean;

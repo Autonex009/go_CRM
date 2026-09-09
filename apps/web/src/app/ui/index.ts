@@ -7,7 +7,6 @@ export { Button, IconButton, LinkButton, buttonClass } from "./Button";
 export { Field, SelectField, TextareaField } from "./Field";
 export { Icon, type IconName } from "./Icon";
 export { Modal } from "./Modal";
-export { StatTile } from "./StatTile";
 export {
   KanbanBoard,
   type KanbanColumnDef,

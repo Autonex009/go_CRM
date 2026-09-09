@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
-import { useAuthStore } from "../auth/store";
 import { API_URL } from "../lib/config";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { Timeline } from "../activities/Timeline";
@@ -74,10 +73,6 @@ export default function InvoiceEditor() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const workspaceCurrency = useCurrency();
-  const token = useAuthStore((s) => s.token);
-
-  const pdfUrl = `/api/v1/invoices/${id}/pdf${token ? `?token=${token}` : ""}`;
-
   const location = useLocation();
   const [header, setHeader] = useState<Header>(() => emptyHeader(location.state as Partial<Header> | null));
   const [items, setItems] = useState<DocumentItemInput[]>(() => [emptyDocumentItem()]);
