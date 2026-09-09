@@ -75,8 +75,9 @@ export default function Deals() {
     let open = 0;
     let won = 0;
     for (const deal of deals) {
+      // Every stage before won is still in play, now that nothing is lost.
       if (deal.stage === "won") won += deal.amount;
-      else if (deal.stage !== "lost") open += deal.amount;
+      else open += deal.amount;
     }
     return { count: deals.length, open, won };
   }, [deals]);
