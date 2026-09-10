@@ -1,20 +1,28 @@
-import type { ProfileInput } from "../api";
+import type { LinkedContact, ProfileInput } from "../api";
 import { Card, CardHeader } from "../../ui";
 import { Timeline } from "../../activities/Timeline";
+import { RecordTable } from "./RecordTable";
+import { contactColumns } from "./columns";
 
 /**
- * The Overview tab's side column: hardware inventory and the activity feed.
+ * The Overview tab's side column: hardware inventory, who to call, and the
+ * activity feed.
+ *
+ * The contacts list is read-only — contacts belong to the contacts page, and the
+ * profile only needs to say who they are.
  */
 export function ProfileSidebar({
   accountId,
   mode,
   formData,
   setFormData,
+  contacts,
 }: {
   accountId: string;
   mode: "preview" | "edit";
   formData: ProfileInput;
   setFormData: (next: ProfileInput) => void;
+  contacts: LinkedContact[];
 }) {
   return (
     <div className="flex flex-col gap-lg">
@@ -117,6 +125,22 @@ export function ProfileSidebar({
             )}
           </div>
         </div>
+      </Card>
+
+      {/* Contacts */}
+      <Card>
+        <CardHeader title={`Contacts (${contacts.length})`} className="mb-md" />
+        <RecordTable
+          columns={contactColumns()}
+          rows={contacts}
+          rowKey={(c) => c.id}
+          minWidth={320}
+          empty={{
+            icon: "contacts",
+            title: "No contacts recorded",
+            description: "Contacts added against this company appear here.",
+          }}
+        />
       </Card>
 
       <Timeline scope={{ accountId }} />

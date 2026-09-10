@@ -1,120 +1,83 @@
-import type {
-  LinkedDeal,
-  LinkedInvoice,
-  LinkedLead,
-  LinkedQuote,
-} from "../api";
+import { formatMoney } from "../../lib/money";
+import { StatTile } from "./StatTile";
+import type { ProfileMetrics } from "./metrics";
 import type { ProfileTab } from "./tabs";
 
 /**
- * The four-up metric strip at the top of the Overview tab.
+ * The four figures that answer "where does this account stand" without
+ * scrolling: what is still open, what has landed, what is feeding it, and what
+ * is owed.
  *
- * Each card is a button into the tab that details it, so the numbers are a way
- * in rather than a dead end. The totals arrive as props because they are summed
- * once on the page and shown in more than one tab.
+ * Every number arrives on the `metrics` object, computed once for the page, so
+ * these tiles and the tabs beneath them cannot disagree.
  */
 export function MetricsBanner({
-  deals,
-  leads,
-  quotes,
-  invoices,
-  totalDealAmount,
-  totalCameras,
-  scopedDeals,
-  totalLeadEstimate,
+  metrics: m,
+  currency,
   setActiveTab,
 }: {
-  deals: LinkedDeal[];
-  leads: LinkedLead[];
-  quotes: LinkedQuote[];
-  invoices: LinkedInvoice[];
-  totalDealAmount: number;
-  totalCameras: number;
-  /** How many deals carry a camera count, so a partial total can admit it. */
-  scopedDeals: number;
-  totalLeadEstimate: number;
+  metrics: ProfileMetrics;
+  currency: string;
   setActiveTab: (tab: ProfileTab) => void;
 }) {
+  const unscoped = m.dealCount - m.scopedDeals;
+
   return (
-  <div className="grid grid-cols-2 md:grid-cols-4 gap-md">
-    {/* Active Deals Metric Card */}
-    <div
-      onClick={() => setActiveTab("pipeline")}
-      className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
-    >
-      <div className="flex items-center justify-between text-xs text-fg-muted">
-        <span className="font-medium">Active Deals</span>
-        <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
-          →
-        </span>
-      </div>
-      <div className="text-xl font-bold text-fg mt-xs">
-        {deals.length}{" "}
-        <span className="text-xs font-normal text-fg-muted">
-          ({deals.length === 1 ? "Deal" : "Deals"})
-        </span>
-      </div>
-      <div className="text-xs text-brand font-medium mt-xs truncate">
-        ${totalDealAmount.toLocaleString()} total pipeline
-      </div>
-      {totalCameras > 0 && (
-        <div
-          className="text-[11px] text-fg-subtle mt-0.5 truncate"
-          title={`${totalCameras.toLocaleString()} cameras across ${scopedDeals} scoped deal${scopedDeals === 1 ? "" : "s"}`}
-        >
-          {totalCameras.toLocaleString()} camera
-          {totalCameras === 1 ? "" : "s"}
-          {scopedDeals < deals.length &&
-            ` · ${deals.length - scopedDeals} unscoped`}
-        </div>
-      )}
+    <div className="grid grid-cols-1 gap-md sm:grid-cols-2 xl:grid-cols-4">
+      <StatTile
+        icon="deals"
+        label="Open pipeline"
+        value={formatMoney(m.openValue, currency)}
+        hint={`${m.openCount} ${m.openCount === 1 ? "deal" : "deals"} in play`}
+        note={
+          m.dealCount === 0
+            ? undefined
+            : `${m.dealCount} ${m.dealCount === 1 ? "deal" : "deals"} on record · ${formatMoney(m.dealValue, currency)} lifetime`
+        }
+        tone="brand"
+        onClick={() => setActiveTab("pipeline")}
+      />
+
+      <StatTile
+        icon="check"
+        label="Closed won"
+        value={formatMoney(m.wonValue, currency)}
+        hint={
+          m.dealCount > 0
+            ? `${m.wonCount} of ${m.dealCount} won · ${Math.round((m.wonCount / m.dealCount) * 100)}% win rate`
+            : "No deals yet"
+        }
+        tone="success"
+        onClick={() => setActiveTab("pipeline")}
+      />
+
+      <StatTile
+        icon="leads"
+        label="Leads"
+        value={m.leadCount}
+        hint={
+          m.leadEstimate > 0
+            ? `${formatMoney(m.leadEstimate, currency)} estimated`
+            : "Top of funnel"
+        }
+        note={
+          m.totalCameras > 0
+            ? `${m.totalCameras.toLocaleString()} cameras scoped${unscoped > 0 ? ` · ${unscoped} deal${unscoped === 1 ? "" : "s"} unscoped` : ""}`
+            : undefined
+        }
+        tone="warning"
+        onClick={() => setActiveTab("leads")}
+      />
+
+      <StatTile
+        icon="trend"
+        label="Billing"
+        value={formatMoney(m.outstanding, currency)}
+        hint={`${formatMoney(m.paid, currency)} collected of ${formatMoney(m.invoiced, currency)}`}
+        note={`${m.quoteCount} ${m.quoteCount === 1 ? "quote" : "quotes"} · ${m.invoiceCount} ${m.invoiceCount === 1 ? "invoice" : "invoices"}`}
+        tone={m.outstanding > 0 ? "warning" : "success"}
+        onClick={() => setActiveTab("financials")}
+      />
     </div>
-
-    {/* Active Leads Metric Card */}
-    <div
-      onClick={() => setActiveTab("pipeline")}
-      className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
-    >
-      <div className="flex items-center justify-between text-xs text-fg-muted">
-        <span className="font-medium">Active Leads</span>
-        <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
-          →
-        </span>
-      </div>
-      <div className="text-xl font-bold text-fg mt-xs">
-        {leads.length}{" "}
-        <span className="text-xs font-normal text-fg-muted">
-          ({leads.length === 1 ? "Lead" : "Leads"})
-        </span>
-      </div>
-      <div className="text-xs text-amber-500 font-medium mt-xs truncate">
-        {totalLeadEstimate > 0
-          ? `$${totalLeadEstimate.toLocaleString()} est.`
-          : "Top of funnel"}
-      </div>
-    </div>
-
-
-
-    {/* Commercial Documents Metric Card */}
-    <div
-      onClick={() => setActiveTab("financials")}
-      className="p-md rounded-xl border border-line bg-surface hover:border-brand/40 transition-all cursor-pointer shadow-xs group"
-    >
-      <div className="flex items-center justify-between text-xs text-fg-muted">
-        <span className="font-medium">Financials</span>
-        <span className="text-brand font-semibold group-hover:translate-x-0.5 transition-transform">
-          →
-        </span>
-      </div>
-      <div className="text-xl font-bold text-fg mt-xs">
-        {quotes.length + invoices.length}{" "}
-        <span className="text-xs font-normal text-fg-muted">Docs</span>
-      </div>
-      <div className="text-xs text-emerald-500 font-medium mt-xs truncate">
-        {quotes.length} Quotes · {invoices.length} Invoices
-      </div>
-    </div>
-  </div>
   );
 }

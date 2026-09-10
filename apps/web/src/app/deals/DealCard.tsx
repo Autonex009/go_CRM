@@ -194,26 +194,6 @@ export const DealCard = memo(function DealCard({
             </span>
           )}
 
-          {onRemark && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemark(deal);
-              }}
-              className={`p-1 rounded-md transition-colors ${
-                remarkText
-                  ? "text-indigo-500 hover:bg-indigo-500/10"
-                  : "text-fg-subtle hover:text-indigo-500 hover:bg-surface-muted"
-              }`}
-              title={remarkText ? "Edit remark" : "Add remark"}
-            >
-              <MessageSquare
-                className={`h-3.5 w-3.5 ${remarkText ? "fill-indigo-500/20" : ""}`}
-              />
-            </button>
-          )}
-
           {onGenerateQuote && (
             <button
               type="button"

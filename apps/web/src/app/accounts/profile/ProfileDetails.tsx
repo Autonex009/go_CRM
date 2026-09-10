@@ -1,5 +1,7 @@
 import type { ProfileInput } from "../api";
 import { Badge, Button, Card, CardHeader } from "../../ui";
+import { SpecList } from "./SpecList";
+import type { ProfileMetrics } from "./metrics";
 
 /**
  * Detections offered as one-click suggestions when editing the AI module.
@@ -31,11 +33,16 @@ export function ProfileDetails({
   mode,
   formData,
   setFormData,
+  metrics,
 }: {
   mode: "preview" | "edit";
   formData: ProfileInput;
   setFormData: (next: ProfileInput) => void;
+  /** Read only for the deployment strip — the form itself never touches it. */
+  metrics: ProfileMetrics;
 }) {
+  const sites = formData.plantLocations?.length ?? 0;
+  const modules = formData.aiDetections?.length ?? 0;
   return (
     <div className="md:col-span-2 flex flex-col gap-lg">
       {/* Company Description Card */}
@@ -52,10 +59,50 @@ export function ProfileDetails({
             }
           />
         ) : (
-          <p className="text-sm text-fg-muted leading-relaxed">
-            {formData.description ||
-              "No company description provided yet."}
-          </p>
+          <>
+            <p className="text-sm leading-relaxed text-fg-muted">
+              {formData.description ||
+                "No company description provided yet."}
+            </p>
+
+            {/* What is actually deployed, read off the deals and the profile.
+                The counts come from two different places on purpose: cameras and
+                sites are what the deals committed to, plant sites and modules
+                are what the profile records. Seeing them side by side is how a
+                gap between the two becomes visible. */}
+            <SpecList
+              className="mt-md border-t border-line pt-md"
+              columns={4}
+              items={[
+                {
+                  label: "Cameras scoped",
+                  value:
+                    metrics.totalCameras > 0
+                      ? metrics.totalCameras.toLocaleString()
+                      : "—",
+                  note:
+                    metrics.totalCameras > 0
+                      ? `across ${metrics.scopedDeals} deal${metrics.scopedDeals === 1 ? "" : "s"}`
+                      : "no deal carries a count",
+                },
+                {
+                  label: "Sites in deals",
+                  value: metrics.siteCount > 0 ? String(metrics.siteCount) : "—",
+                  note: "named by deal locations",
+                },
+                {
+                  label: "Plant sites",
+                  value: sites > 0 ? String(sites) : "—",
+                  note: "on the profile",
+                },
+                {
+                  label: "AI modules",
+                  value: modules > 0 ? String(modules) : "—",
+                  note: "active detections",
+                },
+              ]}
+            />
+          </>
         )}
       </Card>
 
