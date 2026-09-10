@@ -13,10 +13,10 @@ import {
   type AccountFormValues,
 } from "../accounts/api";
 import { ApiError } from "../lib/api";
+import { useDebounced } from "../lib/useDebounced";
 import {
   Alert,
   Avatar,
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -42,6 +42,7 @@ function confirmDeleteCompany(name: string): boolean {
 export default function Accounts() {
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
   const [dialog, setDialog] = useState<{ account: Account | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,9 +57,13 @@ export default function Accounts() {
     }
   }, [location.state, location.pathname, navigate]);
 
+  // Debounced so typing does not fire a request per keystroke; the input still
+  // renders the raw value, so it never feels laggy.
+  const search = useDebounced(searchQuery, 300);
+
   const query = useQuery({
-    queryKey: ["accounts", offset],
-    queryFn: () => accountsApi.list(offset),
+    queryKey: ["accounts", offset, search],
+    queryFn: () => accountsApi.list(offset, PAGE_SIZE, search),
     // Keep the current page on screen while the next one loads.
     placeholderData: keepPreviousData,
   });
@@ -94,14 +99,41 @@ export default function Accounts() {
   return (
     <section className="flex flex-col gap-lg">
       <PageHeader
-        title="Accounts"
+        title="Companies"
         subtitle={
-          total === 0 ? "No companies yet" : `${total} compan${total === 1 ? "y" : "ies"}`
+          total === 0
+            ? search
+              ? `No companies match "${search}"`
+              : "No companies yet"
+            : `${total} compan${total === 1 ? "y" : "ies"}${
+                search ? ` matching "${search}"` : ""
+              }`
         }
         action={
-          <Button icon="plus" onClick={() => setDialog({ account: null })}>
-            New account
-          </Button>
+          <div className="flex items-center gap-sm">
+            <label className="relative">
+              <span className="sr-only">Search companies</span>
+              <Icon
+                name="search"
+                size={14}
+                className="pointer-events-none absolute left-sm top-1/2 -translate-y-1/2 text-fg-subtle"
+              />
+              <input
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  // A new term restarts paging, or page 3 of the old result set
+                  // is requested against the new one.
+                  setOffset(0);
+                }}
+                placeholder="Search name, website, industry…"
+                className="h-[34px] w-[240px] rounded-lg border border-line bg-surface pl-[30px] pr-sm text-sm text-fg outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+              />
+            </label>
+            <Button icon="plus" onClick={() => setDialog({ account: null })}>
+              New company
+            </Button>
+          </div>
         }
       />
 
@@ -133,34 +165,24 @@ export default function Accounts() {
           }
         />
       ) : (
-        <Card padded={false} className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-line bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
-                <tr>
-                  <th className="px-lg py-sm font-medium">Company</th>
-                  <th className="px-lg py-sm font-medium">Owner</th>
-                  <th className="px-lg py-sm font-medium">Linked</th>
-                  <th className="px-lg py-sm" />
-                </tr>
-              </thead>
-              <tbody>
-                {page!.items.map((account) => (
-                  <Row
-                    key={account.id}
-                    account={account}
-                    onDelete={() => {
-                      if (confirmDeleteCompany(account.name)) {
-                        remove.mutate(account.id);
-                      }
-                    }}
-                    disabled={remove.isPending}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        /* A grid of cards rather than a table: a company is identified by its
+           name and sized by what hangs off it, and those counts read as figures
+           on a card far faster than as badges in a "Linked" column. */
+        <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-3">
+          {page!.items.map((account) => (
+            <AccountCard
+              key={account.id}
+              account={account}
+              onEdit={() => setDialog({ account })}
+              onDelete={() => {
+                if (confirmDeleteCompany(account.name)) {
+                  remove.mutate(account.id);
+                }
+              }}
+              disabled={remove.isPending}
+            />
+          ))}
+        </div>
       )}
 
       {total > PAGE_SIZE && (
@@ -210,12 +232,21 @@ export default function Accounts() {
   );
 }
 
-function Row({
+/**
+ * One company.
+ *
+ * The three counts are the point of this page — they are what tells you whether
+ * a company is real work or an empty record — so they get their own row of
+ * figures rather than being tucked into a badge list.
+ */
+function AccountCard({
   account,
+  onEdit,
   onDelete,
   disabled,
 }: {
   account: Account;
+  onEdit: () => void;
   onDelete: () => void;
   disabled: boolean;
 }) {
@@ -223,46 +254,73 @@ function Row({
   const owner = account.ownerName?.trim() || account.ownerEmail;
 
   return (
-    <tr className="border-b border-line transition-colors duration-100 last:border-0 hover:bg-surface-hover">
-      <td className="px-lg py-sm">
-        <Link to={`/accounts/${account.id}`} className="flex items-center gap-sm text-left group">
-          <span className="flex h-[32px] w-[32px] items-center justify-center rounded-md bg-surface-muted text-fg-muted group-hover:bg-brand/10 group-hover:text-brand transition-colors">
-            <Icon name="building" size={16} />
+    <Card
+      padded={false}
+      className="group flex flex-col overflow-hidden transition-all duration-150 hover:border-brand/40 hover:shadow-md"
+    >
+      <div className="flex items-start gap-sm p-md">
+        <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+          <Icon name="building" size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <Link
+            to={`/accounts/${account.id}`}
+            className="block truncate font-semibold text-fg transition-colors hover:text-brand"
+            title={account.name}
+          >
+            {account.name}
+          </Link>
+          <span className="mt-[2px] block truncate text-xs text-fg-muted">
+            {site ?? account.industry ?? "—"}
           </span>
-          <span className="min-w-0">
-            <span className="block font-medium text-fg group-hover:text-brand transition-colors">{account.name}</span>
-            <span className="block text-xs text-fg-muted">
-              {site ?? account.industry ?? "—"}
-            </span>
-          </span>
-        </Link>
-      </td>
+        </div>
+      </div>
 
-      <td className="px-lg py-sm">
+      <div className="grid grid-cols-3 gap-px border-y border-line bg-line">
+        <Stat label="Leads" value={account.leadCount} />
+        <Stat label="Deals" value={account.dealCount} />
+        <Stat label="Contacts" value={account.contactCount} />
+      </div>
+
+      <div className="flex items-center justify-between gap-sm p-md">
         {owner ? (
-          <span className="flex items-center gap-sm">
+          <span className="flex min-w-0 items-center gap-xs">
             <Avatar name={owner} title={account.ownerEmail ?? owner} size="xs" />
-            <span className="text-fg-muted">{owner}</span>
+            <span className="truncate text-xs text-fg-muted">{owner}</span>
           </span>
         ) : (
-          <span className="text-fg-subtle">Unassigned</span>
+          <span className="text-xs text-fg-subtle">Unassigned</span>
         )}
-      </td>
-      <td className="px-lg py-sm">
-        <span className="flex flex-wrap gap-xs">
-          {account.leadCount > 0 && <Badge tone="warning">{account.leadCount} leads</Badge>}
-          {account.dealCount > 0 && <Badge tone="success">{account.dealCount} deals</Badge>}
-          {account.contactCount > 0 && <Badge tone="brand">{account.contactCount} contacts</Badge>}
-          {account.leadCount === 0 && account.contactCount === 0 && account.dealCount === 0 && (
-            <span className="text-fg-subtle">—</span>
-          )}
+
+        {/* Revealed on hover, but always reachable by keyboard — a control that
+            only exists once the pointer is over it is a control nobody can tab
+            to. */}
+        <span className="flex shrink-0 items-center gap-xs opacity-0 transition-opacity duration-100 focus-within:opacity-100 group-hover:opacity-100">
+          <Button variant="ghost" size="sm" onClick={onEdit}>
+            Edit
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onDelete} disabled={disabled}>
+            <span className="text-bad-fg">Delete</span>
+          </Button>
         </span>
-      </td>
-      <td className="px-lg py-sm text-right">
-        <Button variant="ghost" size="sm" onClick={onDelete} disabled={disabled}>
-          <span className="text-bad-fg">Delete</span>
-        </Button>
-      </td>
-    </tr>
+      </div>
+    </Card>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="bg-surface px-sm py-sm text-center">
+      <span
+        className={`block text-base font-bold tabular-nums ${
+          value > 0 ? "text-fg" : "text-fg-subtle"
+        }`}
+      >
+        {value}
+      </span>
+      <span className="block text-[11px] uppercase tracking-wide text-fg-muted">
+        {label}
+      </span>
+    </div>
   );
 }

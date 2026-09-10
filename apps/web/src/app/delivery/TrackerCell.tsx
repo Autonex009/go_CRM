@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 
+import { DELIVERY_STAGE_COLORS } from "./api";
 import type { TrackerColumn, TrackerInput } from "./api";
 
 interface TrackerCellProps {
@@ -110,11 +111,20 @@ export const TrackerCell = memo(function TrackerCell({
             onNavigate(e.shiftKey ? "left" : "right");
           }
         }}
-        className={`h-[34px] cursor-pointer appearance-none ${baseClassName}`}
+        // The chosen stage tints its own cell, the way the sheet's conditional
+        // formatting did. Options carry the same tint where the browser honours
+        // it (Firefox does, Chrome does not) — the cell itself is what matters.
+        className={`h-[34px] cursor-pointer appearance-none font-medium ${
+          DELIVERY_STAGE_COLORS[current] ?? ""
+        } ${baseClassName}`}
       >
         <option value="">—</option>
         {options.map((option) => (
-          <option key={option} value={option}>
+          <option
+            key={option}
+            value={option}
+            className={DELIVERY_STAGE_COLORS[option] ?? ""}
+          >
             {option}
           </option>
         ))}

@@ -18,7 +18,7 @@ export interface Pipeline {
 
 /** Mirrors dashboard.Attention — one thing going wrong, or about to. */
 export interface Attention {
-  kind: "lead" | "quote" | "invoice";
+  kind: "lead" | "quote" | "invoice" | "deal";
   id: string;
   label: string;
   detail: string;

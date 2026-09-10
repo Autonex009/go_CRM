@@ -93,6 +93,22 @@ export const DELIVERY_STAGE_OPTIONS = [
 ] as const;
 
 /**
+ * Cell colours for the stage dropdown, matching the conditional formatting the
+ * sheet used: warm while the deal is still being talked about, green once it is
+ * being installed. Colour is what makes a stage column readable at a glance
+ * down a long table, which is the whole reason the sheet had it.
+ */
+export const DELIVERY_STAGE_COLORS: Record<string, string> = {
+  "Lead / Intro Call": "bg-slate-100 text-slate-800",
+  "Use Case Discussion": "bg-sky-100 text-sky-900",
+  "NDA / Demo": "bg-indigo-100 text-indigo-900",
+  "Quotation Sent": "bg-amber-100 text-amber-900",
+  PoC: "bg-orange-100 text-orange-900",
+  Deployment: "bg-emerald-100 text-emerald-900",
+  "Deployed / Live": "bg-green-200 text-green-900",
+};
+
+/**
  * The tracker's editable columns, in table order. One list drives the header,
  * the cells and the CSV export, so a new column cannot appear in one and not
  * the others.

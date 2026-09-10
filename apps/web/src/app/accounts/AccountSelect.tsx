@@ -13,9 +13,9 @@ import { accountsApi } from "./api";
  * change far less often than the records that point at them, and both dialogs
  * open repeatedly during normal use.
  *
- * Caveat: this lists the first 100 accounts. Past that it needs to become a
- * typeahead against a search endpoint — noted in EXPLAINER §22.5 rather than
- * pretending a dropdown scales.
+ * Caveat: this lists the first 500 accounts. Past that it needs to become a
+ * typeahead against the search endpoint the companies page now uses, rather
+ * than pretending a dropdown scales.
  */
 export const AccountSelect = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement> & {
   label?: string;
@@ -23,7 +23,7 @@ export const AccountSelect = forwardRef<HTMLSelectElement, SelectHTMLAttributes<
 }>(function AccountSelect({ label = "Company", error, ...props }, ref) {
   const accounts = useQuery({
     queryKey: ["accountOptions"],
-    queryFn: () => accountsApi.list(0, 100),
+    queryFn: () => accountsApi.list(0, 500),
     staleTime: 5 * 60_000,
   });
 

@@ -19,14 +19,17 @@ export const LEAD_STATUSES = [
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
+// Board order, left to right. "won" sits before delivery on purpose: the deal is
+// closed at that point and what follows is fulfilment, so a card moves into Won
+// and then on through delivery rather than reaching Won only at the very end.
 export const DEAL_STAGES = [
   "discovery",
   "site_assessment",
   "quote_sent",
   "negotiation",
+  "won",
   "delivery",
   "post_delivery",
-  "won",
 ] as const;
 export type DealStage = (typeof DEAL_STAGES)[number];
 

@@ -385,6 +385,8 @@ const ATTENTION_META: Record<Attention["kind"], { icon: IconName; href: (id: str
   lead: { icon: "leads", href: () => "/leads" },
   quote: { icon: "trend", href: (id) => `/quotes/${id}` },
   invoice: { icon: "building", href: (id) => `/invoices/${id}` },
+  // The board has no per-deal route, so an overdue deal links to the pipeline.
+  deal: { icon: "deals", href: () => "/deals" },
 };
 
 /** "3 days overdue" / "Due today" / "in 2 days", plus how loudly to say it. */
@@ -411,7 +413,7 @@ function AttentionCard({
     <Card className={className} padded={false}>
       <CardHeader
         className="p-lg pb-md"
-        title="Now Need Attenction Today"
+        title="Needs Attention Today"
         subtitle="Overdue and due soon, across everything"
       />
 

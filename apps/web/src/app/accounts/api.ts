@@ -169,8 +169,16 @@ export interface ProfileInput {
 }
 
 export const accountsApi = {
-  list: (offset = 0, limit = PAGE_SIZE) =>
-    apiFetch<AccountPage>(`${BASE}?limit=${limit}&offset=${offset}`),
+  /** One page of companies. `search` is applied by the server, across the whole
+   *  table rather than the fetched page. */
+  list: (offset = 0, limit = PAGE_SIZE, search = "") => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    if (search.trim()) params.set("search", search.trim());
+    return apiFetch<AccountPage>(`${BASE}?${params}`);
+  },
 
   create: (input: AccountFormValues) =>
     apiFetch<Account>(BASE, {

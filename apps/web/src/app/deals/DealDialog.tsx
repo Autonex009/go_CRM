@@ -97,7 +97,7 @@ export function DealDialog({
   // across the workspace to browse.
   const allLeads = useQuery({
     queryKey: ["leads", "picker", accountId ?? ""],
-    queryFn: () => leadsApi.list(0, "", 500, accountId ? { accountId } : {}),
+    queryFn: () => leadsApi.list(0, "", 1000, accountId ? { accountId } : {}),
     staleTime: 60_000,
   });
 
