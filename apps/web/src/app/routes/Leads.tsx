@@ -62,6 +62,28 @@ import {
 } from "../ui";
 
 
+/**
+ * The confirmation shown before a lead is deleted.
+ *
+ * One function for both affordances — the row's delete button and the dialog's —
+ * because they used to ask different questions, and the dialog's did not even
+ * name the lead it was about to remove.
+ *
+ * A converted lead is called out separately: the deal it became is a real record
+ * that survives, and someone deleting the lead should know the deal does not go
+ * with it rather than assume the conversion has been undone.
+ */
+function confirmDeleteLead(name: string, convertedDealId: string | null): boolean {
+  const what = name.trim() || "this lead";
+  return window.confirm(
+    convertedDealId
+      ? `Delete ${what}?\n\nThis lead has been converted. The deal it became ` +
+          `is kept, but the lead disappears from every list and count.`
+      : `Delete ${what}?\n\nIt disappears from every list and count, along ` +
+          `with its follow-up.`,
+  );
+}
+
 export default function Leads() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -436,7 +458,9 @@ export default function Leads() {
                     onReopen={() => onReopenLead(lead)}
                     onStageSelect={(stage) => onStageSelect(lead, stage)}
                     onDelete={() => {
-                      if (window.confirm(`Delete lead "${leadName(lead)}"?`)) {
+                      if (
+                        confirmDeleteLead(leadName(lead), lead.convertedDealId)
+                      ) {
                         remove.mutate(lead.id);
                       }
                     }}
@@ -492,7 +516,12 @@ export default function Leads() {
           onDelete={
             dialog.lead
               ? () => {
-                  if (window.confirm("Delete this lead?")) {
+                  if (
+                    confirmDeleteLead(
+                      leadName(dialog.lead!),
+                      dialog.lead!.convertedDealId,
+                    )
+                  ) {
                     remove.mutate(dialog.lead!.id);
                   }
                 }
