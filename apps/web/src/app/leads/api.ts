@@ -167,10 +167,28 @@ export const leadsApi = {
    * `limit` defaults to one page. Pickers that need the whole list rather than
    * the first screenful pass their own; the gateway caps it at 100.
    */
-  list: (offset = 0, filter = "", limit = PAGE_SIZE) =>
-    apiFetch<LeadPage>(
-      `${BASE}?limit=${limit}&offset=${offset}${filter ? `&filter=${filter}` : ""}`,
-    ),
+  /**
+   * One page of leads.
+   *
+   * `search` and `accountId` are applied by the server, not here: the page is 25
+   * rows out of hundreds, so anything filtered client-side only ever sees the
+   * rows that happened to be on screen.
+   */
+  list: (
+    offset = 0,
+    filter = "",
+    limit = PAGE_SIZE,
+    opts: { search?: string; accountId?: string } = {},
+  ) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    if (filter) params.set("filter", filter);
+    if (opts.search?.trim()) params.set("search", opts.search.trim());
+    if (opts.accountId) params.set("accountId", opts.accountId);
+    return apiFetch<LeadPage>(`${BASE}?${params}`);
+  },
 
   get: (id: string) => apiFetch<Lead>(`${BASE}/${id}`),
 

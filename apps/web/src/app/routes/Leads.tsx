@@ -49,6 +49,7 @@ import {
   type LeadStage,
 } from "../leads/api";
 import { ApiError } from "../lib/api";
+import { useDebounced } from "../lib/useDebounced";
 import {
   Alert,
   Avatar,
@@ -94,27 +95,23 @@ export default function Leads() {
     }
   }, [location.state, location.pathname, navigate]);
 
+  // Debounced so typing does not fire a request per keystroke; the input itself
+  // still renders searchQuery, so it never feels laggy.
+  const search = useDebounced(searchQuery, 300);
+
+  // The search is a server parameter. Filtering the fetched page here searched
+  // 25 rows out of hundreds, so a lead on any other page came back "not found"
+  // — the reason the search box looked broken.
   const query = useQuery({
-    queryKey: ["leads", filter, offset],
-    queryFn: () => leadsApi.list(offset, filter),
+    queryKey: ["leads", filter, offset, search],
+    queryFn: () => leadsApi.list(offset, filter, PAGE_SIZE, { search }),
     placeholderData: keepPreviousData,
   });
 
   const page = query.data;
   const counts = page?.counts ?? {};
   const total = page?.total ?? 0;
-  const rawItems = page?.items ?? [];
-
-  const filteredItems = rawItems.filter((l) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      leadName(l).toLowerCase().includes(q) ||
-      (leadCompany(l) ?? "").toLowerCase().includes(q) ||
-      (l.title ?? "").toLowerCase().includes(q) ||
-      (l.email ?? "").toLowerCase().includes(q)
-    );
-  });
+  const filteredItems = page?.items ?? [];
   const showing = filteredItems.length;
 
   const invalidate = useCallback(() => {
@@ -181,11 +178,16 @@ export default function Leads() {
       id: string;
       input: Parameters<typeof leadsApi.convert>[1];
     }) => leadsApi.convert(id, input),
+    // Converting used to navigate straight to the deals board, which is what made
+    // a converted lead feel deleted — you never saw where it went. It stays here
+    // and switches to the Converted tab instead, so the lead is visible in its new
+    // state; the deal it became is one click away from the row.
     onSuccess: () => {
       invalidate();
       void queryClient.invalidateQueries({ queryKey: ["deals"] });
       void queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      navigate("/deals");
+      setFilter("converted");
+      setOffset(0);
     },
   });
 
@@ -597,6 +599,24 @@ function FunnelStrip({
             }`}
           >
             All Leads
+          </button>
+
+          {/* Converted is a tab, not just a funnel tile. A converted lead sorts
+              to the very end of the urgency order, so in a workspace of several
+              hundred it sat on the last page and looked as though converting had
+              deleted it. This is the one click that always finds them. */}
+          <button
+            type="button"
+            onClick={() => onPick(activeStage === "converted" ? "" : "converted")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeStage === "converted"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20"
+            }`}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>Converted</span>
+            <span className="tabular-nums opacity-80">{counts.converted ?? 0}</span>
           </button>
 
           {(counts.overdue ?? 0) > 0 && (

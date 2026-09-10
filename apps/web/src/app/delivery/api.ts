@@ -74,6 +74,25 @@ export interface CommitResult {
 }
 
 /**
+ * The stages a delivery can be at, taken verbatim from the data validation on
+ * the "Current Stage(s)" column of the Master Tracker sheet this table replaced.
+ *
+ * In the sheet's order rather than alphabetised: it is a pipeline, and reading
+ * it in sequence is the point. Rows imported while the column was still free
+ * text can hold a value that is not on this list; TrackerCell keeps such a value
+ * selectable so that editing the row cannot quietly rewrite it.
+ */
+export const DELIVERY_STAGE_OPTIONS = [
+  "Lead / Intro Call",
+  "Use Case Discussion",
+  "NDA / Demo",
+  "Quotation Sent",
+  "PoC",
+  "Deployment",
+  "Deployed / Live",
+] as const;
+
+/**
  * The tracker's editable columns, in table order. One list drives the header,
  * the cells and the CSV export, so a new column cannot appear in one and not
  * the others.
@@ -111,8 +130,9 @@ export const TRACKER_COLUMNS = [
   {
     key: "currentStages",
     label: "Current Stage(s)",
-    type: "text",
+    type: "select",
     width: "min-w-[160px]",
+    options: DELIVERY_STAGE_OPTIONS,
   },
   {
     key: "keyContacts",
@@ -130,8 +150,10 @@ export const TRACKER_COLUMNS = [
 ] as const satisfies readonly {
   key: keyof TrackerInput;
   label: string;
-  type: "text" | "number" | "date";
+  type: "text" | "number" | "date" | "select";
   width: string;
+  /** The choices offered by a `select` column. */
+  options?: readonly string[];
   /**
    * Also stored on the linked deal. Editing either side writes both, so
    * these are flagged in the header rather than locked — the point of the

@@ -45,6 +45,7 @@ export const TrackerCell = memo(function TrackerCell({
   const committed = useRef(toText(value));
 
   const isTextColumn = column.type === "text";
+  const isSelectColumn = column.type === "select";
 
   // Auto-resize the textarea to fit its content.
   const autoResize = useCallback(() => {
@@ -86,6 +87,46 @@ export const TrackerCell = memo(function TrackerCell({
       ? "bg-bad-soft/40 shadow-[inset_0_0_0_1px_rgb(var(--bad-fg))]"
       : ""
   } ${column.type === "number" ? "text-right tabular-nums" : ""}`;
+
+  if (isSelectColumn) {
+    // Widened to string[]: the const assertion on the options list narrows them
+    // to a literal union, which cannot be compared against a stored value.
+    const options: readonly string[] = column.options ?? [];
+    const current = toText(value);
+    return (
+      <select
+        data-cell={cellId}
+        value={current}
+        autoFocus={autoFocus}
+        aria-label={column.label}
+        aria-invalid={invalid || undefined}
+        // Committed on change rather than on blur: there is no half-typed state
+        // to protect, and picking from a list is already the deliberate act that
+        // blur stands in for on a text cell.
+        onChange={(e) => onCommit(e.target.value === "" ? null : e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Tab") {
+            e.preventDefault();
+            onNavigate(e.shiftKey ? "left" : "right");
+          }
+        }}
+        className={`h-[34px] cursor-pointer appearance-none ${baseClassName}`}
+      >
+        <option value="">—</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        {/* A value the sheet's list does not contain — imported before the
+            column had one. Offered so the cell shows what it actually holds and
+            selecting another row's stage cannot silently drop it. */}
+        {current !== "" && !options.includes(current) && (
+          <option value={current}>{current}</option>
+        )}
+      </select>
+    );
+  }
 
   if (isTextColumn) {
     return (

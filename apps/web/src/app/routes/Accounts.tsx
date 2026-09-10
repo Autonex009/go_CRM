@@ -25,6 +25,20 @@ import {
   Skeleton,
 } from "../ui";
 
+/**
+ * The confirmation shown before a company is deleted.
+ *
+ * Deleting one now takes its contacts, leads, deals, quotes and invoices with
+ * it, so the prompt has to say so — the old "Delete X?" described a far smaller
+ * action than the one it triggers.
+ */
+function confirmDeleteCompany(name: string): boolean {
+  return window.confirm(
+    `Delete ${name}?\n\nIts contacts, leads, deals, quotes and invoices are ` +
+      `deleted with it, and its delivery tracker rows are removed permanently.`,
+  );
+}
+
 export default function Accounts() {
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
@@ -136,7 +150,7 @@ export default function Accounts() {
                     key={account.id}
                     account={account}
                     onDelete={() => {
-                      if (window.confirm(`Delete ${account.name}?`)) {
+                      if (confirmDeleteCompany(account.name)) {
                         remove.mutate(account.id);
                       }
                     }}
@@ -183,7 +197,7 @@ export default function Accounts() {
           onDelete={
             dialog.account
               ? () => {
-                  if (window.confirm(`Delete ${dialog.account!.name}?`)) {
+                  if (confirmDeleteCompany(dialog.account!.name)) {
                     remove.mutate(dialog.account!.id);
                     setDialog(null);
                   }

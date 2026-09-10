@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
@@ -89,12 +89,15 @@ export function DealDialog({
     name: "accountId",
   });
 
-  // The picker needs the workspace's leads, not the first page of them — at the
-  // default 25 a deal's own lead could be missing from its own edit form. 100 is
-  // the gateway's cap.
+  // The picker asks the server for the leads it needs rather than paging through
+  // them here. Once a company is chosen it fetches that company's leads — all of
+  // them, since the largest companies carry more than the old fixed first-100
+  // this used to filter client-side, which is why a big company's leads went
+  // missing from the dropdown. With no company chosen yet it takes the same page
+  // across the workspace to browse.
   const allLeads = useQuery({
-    queryKey: ["leads", "picker"],
-    queryFn: () => leadsApi.list(0, "", 100),
+    queryKey: ["leads", "picker", accountId ?? ""],
+    queryFn: () => leadsApi.list(0, "", 500, accountId ? { accountId } : {}),
     staleTime: 60_000,
   });
 
@@ -127,24 +130,21 @@ export function DealDialog({
    * Leads the selected account can actually be linked to.
    *
    * The server rejects a lead filed under a different account, so offering the
-   * whole workspace here would just be a way to fail on save. Leads with no
-   * account stay visible: those are captured before the company record exists,
-   * and converting one is the normal path into a deal.
+   * whole workspace here would just be a way to fail on save. The query above
+   * already scopes this to the chosen company, so there is nothing left to
+   * filter — the guard below only keeps a lead the fetch has not returned yet
+   * from being silently cleared.
    */
-  const selectableLeads = useMemo(() => {
-    const items = allLeads.data?.items ?? [];
-    if (!accountId) return items;
-    return items.filter((l) => l.accountId === accountId);
-  }, [allLeads.data, accountId]);
+  const selectableLeads = allLeads.data?.items ?? [];
 
   // Switching account used to leave a now-invalid lead selected, and the save
   // failed with a message about an account the user had already moved on from.
   useEffect(() => {
-    if (!leadId || !allLeads.data) return;
+    if (!leadId || allLeads.isFetching || !allLeads.data) return;
     if (!selectableLeads.some((l) => l.id === leadId)) {
       setValue("leadId", "");
     }
-  }, [selectableLeads, leadId, allLeads.data, setValue]);
+  }, [selectableLeads, leadId, allLeads.data, allLeads.isFetching, setValue]);
 
   const submit = handleSubmit(async (values) => {
     setFormError(null);

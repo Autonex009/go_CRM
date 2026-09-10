@@ -165,7 +165,14 @@ export function TrackerTable() {
       const target = gridRef.current?.querySelector<HTMLElement>(
         `[data-cell="${nextRow}-${nextCol}"]`,
       );
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      // A select has no text to select, so focus is all it gets — without this
+      // branch, tabbing simply stopped at the stage column.
+      if (target instanceof HTMLSelectElement) {
+        target.focus();
+      } else if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement
+      ) {
         target.focus();
         target.select();
       }
