@@ -189,9 +189,28 @@ export default function Leads() {
     },
   });
 
+  // A delete that fails has to say so. With no onError the dialog closed, nothing
+  // was refetched, and the row stayed put — which is how deleting a converted
+  // lead looked like nothing at all rather than the error it was. A 404 resolves
+  // the same way a success does: the list is simply out of date.
   const remove = useMutation({
     mutationFn: (id: string) => leadsApi.remove(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setError(null);
+      setDialog(null);
+      invalidate();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 404) {
+        setError(null);
+        setDialog(null);
+        invalidate();
+        return;
+      }
+      setError(
+        err instanceof ApiError ? err.message : "Could not delete that lead",
+      );
+    },
   });
 
   const onAction = (lead: Lead) => {
@@ -473,7 +492,6 @@ export default function Leads() {
               ? () => {
                   if (window.confirm("Delete this lead?")) {
                     remove.mutate(dialog.lead!.id);
-                    setDialog(null);
                   }
                 }
               : undefined
