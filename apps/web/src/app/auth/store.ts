@@ -24,7 +24,7 @@ interface AuthState {
 function deriveUser(token: string): User | null {
   const claims = decodeJwt(token);
   if (!claims) return null;
-  return { id: claims.sub, email: claims.email, orgId: claims.org, authProvider: "sso" };
+  return { id: claims.sub, email: claims.email, orgId: claims.org, authProvider: "sso", role: claims.role };
 }
 
 /**
