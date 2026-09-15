@@ -54,6 +54,34 @@ export interface DealInput {
   products?: string;
 }
 
+/**
+ * A complete DealInput for an existing deal, with `changes` applied on top.
+ *
+ * The update endpoint is a full replace: every column it writes comes from the
+ * payload, so a field left out is not "unchanged", it is set to NULL. Editing
+ * one thing about a deal therefore means resending all of it. Saving a remark
+ * used to drop the deal's cameras, location, products, lead and contact for
+ * exactly this reason — build partial updates through here instead.
+ */
+export function toDealInput(deal: Deal, changes: Partial<DealInput> = {}): DealInput {
+  return {
+    title: deal.title,
+    description: deal.description ?? undefined,
+    remark: deal.remark ?? undefined,
+    amount: deal.amount,
+    stage: deal.stage,
+    ownerUserId: deal.ownerUserId ?? undefined,
+    contactId: deal.contactId ?? undefined,
+    accountId: deal.accountId ?? undefined,
+    leadId: deal.leadId ?? undefined,
+    expectedCloseDate: deal.expectedCloseDate ?? undefined,
+    totalCameras: deal.totalCameras,
+    location: deal.location ?? undefined,
+    products: deal.products ?? undefined,
+    ...changes,
+  };
+}
+
 const BASE = "/api/v1/deals";
 
 export const dealsApi = {

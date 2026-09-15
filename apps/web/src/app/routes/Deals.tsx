@@ -6,7 +6,7 @@ import { DealCard } from "../deals/DealCard";
 import { TrackerTable } from "../delivery/TrackerTable";
 import { DealDialog } from "../deals/DealDialog";
 import { ChecklistDialog } from "../deals/ChecklistDialog";
-import { dealsApi, type Deal, type DealInput } from "../deals/api";
+import { dealsApi, toDealInput, type Deal, type DealInput } from "../deals/api";
 import { parseChecklist, serializeChecklist } from "../deals/checklist";
 import { ActionDialog } from "../actions/ActionDialog";
 import { actionsApi, type Action, type ActionInput } from "../actions/api";
@@ -218,16 +218,10 @@ export default function Deals() {
       const serialized = serializeChecklist(items);
       save.mutate({
         id: deal.id,
-        input: {
-          title: deal.title,
-          amount: deal.amount,
-          stage: deal.stage,
+        input: toDealInput(deal, {
           description: serialized || undefined,
           remark: serialized || undefined,
-          ownerUserId: deal.ownerUserId ?? undefined,
-          accountId: deal.accountId ?? undefined,
-          expectedCloseDate: deal.expectedCloseDate ?? undefined,
-        },
+        }),
       });
     },
     [save],

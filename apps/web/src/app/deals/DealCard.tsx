@@ -17,6 +17,8 @@ import { useCurrency } from "../org/workspace";
 import { Avatar } from "../ui";
 import type { Deal } from "./api";
 import {
+  PRIORITY_META,
+  byPriority,
   completedItems,
   parseChecklist,
   pendingItems,
@@ -128,7 +130,7 @@ export const DealCard = memo(function DealCard({
     deal.contactName ?? "",
     deal.ownerName ?? "",
   ]);
-  const pending = pendingItems(items);
+  const pending = byPriority(pendingItems(items));
   const doneCount = completedItems(items).length;
   const openActions = (actions ?? []).filter((a) => a.status !== "done");
 
@@ -361,14 +363,17 @@ function TaskPanel({
         {showing === "tasks" &&
           pending.slice(0, 3).map((item) => (
             <li key={item.id} className="group flex items-start gap-2" onClick={stop}>
-              <input
-                type="checkbox"
-                checked={false}
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={false}
                 disabled={!onToggleTask}
-                onChange={() => onToggleTask?.(deal, item.id)}
-                aria-label={`Mark "${item.text}" done`}
-                title="Mark done"
-                className="mt-[3px] h-3.5 w-3.5 shrink-0 cursor-pointer rounded accent-indigo-600"
+                onClick={() => onToggleTask?.(deal, item.id)}
+                aria-label={`${PRIORITY_META[item.priority].label} priority — mark "${item.text}" done`}
+                title={`${PRIORITY_META[item.priority].label} priority — mark done`}
+                className={`mt-[2px] h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-transform enabled:hover:scale-125 disabled:cursor-default ${
+                  PRIORITY_META[item.priority].ring
+                }`}
               />
               <button
                 type="button"
