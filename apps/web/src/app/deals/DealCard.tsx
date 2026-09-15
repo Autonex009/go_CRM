@@ -398,9 +398,14 @@ function TaskPanel({
                   <span className="line-clamp-2 text-xs leading-snug text-fg-muted">
                     {action.title}
                   </span>
-                  {/* Who owns it is the reason this view exists. */}
-                  {action.assignedTo && memberName && (
-                    <span className="block truncate text-[10px] text-fg-subtle">
+                  {/* Who owns it is the reason this view exists — including
+                      when nobody does yet, which is a prompt to go and pick. */}
+                  {memberName && (
+                    <span
+                      className={`block truncate text-[10px] ${
+                        action.assignedTo ? "text-fg-subtle" : "italic text-amber-600"
+                      }`}
+                    >
                       {memberName(action.assignedTo)}
                     </span>
                   )}
