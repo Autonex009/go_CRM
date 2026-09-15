@@ -9,6 +9,7 @@ import {
   Handshake,
   FileText,
   Receipt,
+  ListChecks,
   Settings,
   Search,
   Plus,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { endSession } from "../auth/session";
+import { MANAGER_ROLES } from "../auth/roles";
 import { useAuthStore } from "../auth/store";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useWorkspaceSync } from "../org/workspace";
@@ -36,6 +38,8 @@ interface NavGroup {
     label: string;
     icon: React.ElementType;
     end?: boolean;
+    /** Omitted for everyone; set to restrict to specific profiles.role values. */
+    roles?: string[];
   }[];
 }
 
@@ -53,6 +57,7 @@ const NAV_GROUPS: NavGroup[] = [
 
       { to: "/leads", label: "Leads", icon: TrendingUp },
       { to: "/deals", label: "Deals", icon: Handshake },
+      { to: "/actions", label: "Actions", icon: ListChecks, roles: MANAGER_ROLES },
     ],
   },
   {
@@ -76,6 +81,7 @@ const TITLES: Record<string, string> = {
 
   "/leads": "Leads",
   "/deals": "Deals",
+  "/actions": "Actions",
   "/quotes": "Quotes Workbench",
   "/invoices": "Tax Invoices",
   "/team": "Team & Settings",
@@ -179,6 +185,7 @@ const Sidebar = memo(function Sidebar({
   onNavigate?: () => void;
 }) {
   const location = useLocation();
+  const role = useAuthStore((s) => s.user?.role);
 
   return (
     <>
@@ -203,7 +210,11 @@ const Sidebar = memo(function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-        {NAV_GROUPS.map((group, idx) => (
+        {NAV_GROUPS.map((group, idx) => {
+          const items = group.items.filter((item) => !item.roles || (!!role && item.roles.includes(role)));
+          if (items.length === 0) return null;
+
+          return (
           <div key={idx} className="space-y-1">
             {!collapsed ? (
               <h3 className="px-3 text-[11px] font-bold uppercase tracking-wider text-fg-subtle/80 mb-1.5">
@@ -212,7 +223,7 @@ const Sidebar = memo(function Sidebar({
             ) : (
               <div className="h-px bg-line/60 my-2 mx-1" />
             )}
-            {group.items.map((item) => {
+            {items.map((item) => {
               const IconComp = item.icon;
               const isActive =
                 item.to === "/"
@@ -256,7 +267,8 @@ const Sidebar = memo(function Sidebar({
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer Workspace Badge */}

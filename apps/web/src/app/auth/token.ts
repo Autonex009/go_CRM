@@ -4,6 +4,8 @@ export interface JwtClaims {
   email: string;
   /** Organization id — the gateway scopes every query by it. */
   org: string;
+  /** profiles.role — may be absent on a token minted before roles existed. */
+  role?: string;
   iss: string;
   iat: number;
   exp: number;

@@ -4,8 +4,11 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { bootstrapAuth } from "./auth/bootstrap";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
+import { RequireRole } from "./auth/RequireRole";
+import { MANAGER_ROLES } from "./auth/roles";
 import AcceptInvite from "./routes/AcceptInvite";
 import Accounts from "./routes/Accounts";
+import Actions from "./routes/Actions";
 import CompanyProfilePage from "./routes/CompanyProfile";
 import AppLayout from "./routes/AppLayout";
 import { DocumentPreview } from "./documents/DocumentPreview";
@@ -74,6 +77,12 @@ export default function AppRoot() {
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/accounts/:id" element={<CompanyProfilePage />} />
 
+
+              {/* Admin/manager-only: hidden from the nav and bounced here for
+                  anyone else, though the real gate is the gateway's RequireRole. */}
+              <Route element={<RequireRole roles={MANAGER_ROLES} />}>
+                <Route path="/actions" element={<Actions />} />
+              </Route>
 
               <Route path="/team" element={<Team />} />
             </Route>

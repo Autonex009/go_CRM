@@ -7,6 +7,7 @@ export interface Member {
   email: string;
   name: string | null;
   authProvider: string;
+  role?: string;
   createdAt: string;
 }
 
@@ -52,6 +53,12 @@ export const orgApi = {
 
   revoke: (id: string) =>
     apiFetch<void>(`${BASE}/invitations/${id}`, { method: "DELETE" }),
+
+  updateMemberRole: (id: string, role: string) =>
+    apiFetch<Member>(`${BASE}/members/${id}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
 
   /** Public: the invite token in the link is the credential. */
   accept: (token: string, name: string, password: string) =>

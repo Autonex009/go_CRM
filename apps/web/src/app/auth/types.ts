@@ -7,6 +7,8 @@ export interface User {
   /** The tenant this user belongs to (see EXPLAINER §13). */
   orgId?: string;
   authProvider: string;
+  /** profiles.role — "owner" | "admin" | "sales" | "account_manager" | "client". */
+  role?: string;
 }
 
 /** Response body of a successful /login, /register or invitation accept. */
