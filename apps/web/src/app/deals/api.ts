@@ -16,6 +16,8 @@ export interface Deal {
   contactId: string | null;
   contactName: string | null;
   accountId: string | null;
+  /** The client's name, so a card can fall back to it when there is no title. */
+  accountName?: string | null;
   /** The lead this deal was converted from, if any. */
   leadId: string | null;
   leadName?: string | null;

@@ -5,8 +5,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { DealCard } from "../deals/DealCard";
 import { TrackerTable } from "../delivery/TrackerTable";
 import { DealDialog } from "../deals/DealDialog";
-import { RemarkDialog } from "../deals/RemarkDialog";
+import { ChecklistDialog } from "../deals/ChecklistDialog";
 import { dealsApi, type Deal, type DealInput } from "../deals/api";
+import { parseChecklist, serializeChecklist } from "../deals/checklist";
+import { ActionDialog } from "../actions/ActionDialog";
+import { actionsApi, type Action, type ActionInput } from "../actions/api";
+import { MANAGER_ROLES } from "../auth/roles";
+import { useAuthStore } from "../auth/store";
+import { memberLabel, orgApi } from "../org/api";
 import { buildQuoteStateFromDeal } from "../deals/quote-utils";
 import { DEAL_COLUMNS, type DealStage } from "../deals/stages";
 import { formatMoneyCompact } from "../lib/money";
@@ -42,6 +48,47 @@ export default function Deals() {
   const currency = useCurrency();
   const query = useQuery({ queryKey: ["deals"], queryFn: dealsApi.board });
 
+  // Actions are manager-only server-side, so reps never see the card's Actions
+  // view and never fire this request.
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canSeeActions = !!userRole && MANAGER_ROLES.includes(userRole);
+
+  // One org-wide fetch for the whole board, sharing the Actions dashboard's
+  // cache key — the cards are views onto the same data, not separate copies.
+  const actionsQuery = useQuery({
+    queryKey: ["actions", {}],
+    queryFn: () => actionsApi.list({}),
+    staleTime: 60_000,
+    enabled: canSeeActions,
+  });
+
+  const members = useQuery({
+    queryKey: ["members"],
+    queryFn: orgApi.members,
+    staleTime: 5 * 60_000,
+  });
+
+  const actionsByDeal = useMemo(() => {
+    const map = new Map<string, Action[]>();
+    const actions = actionsQuery.data ?? [];
+    for (const action of actions) {
+      if (!action.dealId) continue;
+      const list = map.get(action.dealId);
+      if (list) list.push(action);
+      else map.set(action.dealId, [action]);
+    }
+    return map;
+  }, [actionsQuery.data]);
+
+  const memberName = useCallback(
+    (id: string | null) => {
+      if (!id) return "Unassigned";
+      const m = (members.data ?? []).find((x) => x.id === id);
+      return m ? memberLabel(m) : "—";
+    },
+    [members.data],
+  );
+
   const [moveError, setMoveError] = useState<string | null>(null);
   // Failures from the dialog's own actions (delete today), shown on the page
   // rather than inside the dialog: the dialog closes on success, so an error
@@ -49,6 +96,8 @@ export default function Deals() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ deal: Deal | null; stage: DealStage } | null>(null);
   const [remarkDeal, setRemarkDeal] = useState<Deal | null>(null);
+  // The deal an action is being created for, straight from its card.
+  const [actionDeal, setActionDeal] = useState<Deal | null>(null);
   const [boardCollapsed, setBoardCollapsed] = useState(readCollapsed);
 
   const toggleBoard = useCallback(() => {
@@ -154,6 +203,75 @@ export default function Deals() {
     [],
   );
   const onRemark = useCallback((deal: Deal) => setRemarkDeal(deal), []);
+
+  // Ticking a task rewrites the deal's checklist in place — the card stays put
+  // and the board refreshes from the mutation's invalidation.
+  const onToggleTask = useCallback(
+    (deal: Deal, itemId: string) => {
+      const items = parseChecklist(deal.remark ?? deal.description, [
+        deal.leadName ?? "",
+        deal.contactName ?? "",
+        deal.ownerName ?? "",
+      ]).map((item) =>
+        item.id === itemId ? { ...item, done: !item.done } : item,
+      );
+      const serialized = serializeChecklist(items);
+      save.mutate({
+        id: deal.id,
+        input: {
+          title: deal.title,
+          amount: deal.amount,
+          stage: deal.stage,
+          description: serialized || undefined,
+          remark: serialized || undefined,
+          ownerUserId: deal.ownerUserId ?? undefined,
+          accountId: deal.accountId ?? undefined,
+          expectedCloseDate: deal.expectedCloseDate ?? undefined,
+        },
+      });
+    },
+    [save],
+  );
+
+  // Completing here and completing on the Actions dashboard are the same call,
+  // so the two surfaces can never disagree about an action's status.
+  const completeAction = useMutation({
+    mutationFn: (id: string) => actionsApi.complete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["actions"] });
+    },
+    onError: (err) =>
+      setActionError(err instanceof ApiError ? err.message : "Could not complete that action"),
+  });
+  const onCompleteAction = useCallback((id: string) => completeAction.mutate(id), [completeAction]);
+
+  const onAddAction = useCallback((deal: Deal) => setActionDeal(deal), []);
+
+  // Creating from a card and creating from the Actions dashboard are the same
+  // endpoint and the same cache key, so a new action appears in both at once.
+  const createAction = useMutation({
+    mutationFn: (input: ActionInput) => actionsApi.create(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["actions"] });
+    },
+  });
+
+  // Promoting a task hands it to the Actions board. The deal's owner is the
+  // obvious first assignee and today the obvious first due date — both editable
+  // there, which is the whole point of moving it.
+  const promoteTask = useCallback(
+    (deal: Deal, text: string) =>
+      createAction.mutateAsync({
+        title: text,
+        dueAt: `${new Date().toISOString().slice(0, 10)}T00:00:00Z`,
+        assignedTo: deal.ownerUserId ?? undefined,
+        accountId: deal.accountId ?? undefined,
+        leadId: deal.leadId ?? undefined,
+        dealId: deal.id,
+      }),
+    [createAction],
+  );
+
   const onGenerateQuote = useCallback(
     (deal: Deal) => {
       navigate("/quotes/new", {
@@ -169,9 +287,24 @@ export default function Deals() {
         overlay={overlay}
         onRemark={onRemark}
         onGenerateQuote={onGenerateQuote}
+        actions={actionsByDeal.get(deal.id)}
+        canSeeActions={canSeeActions}
+        onToggleTask={onToggleTask}
+        onCompleteAction={onCompleteAction}
+        onAddAction={onAddAction}
+        memberName={memberName}
       />
     ),
-    [onRemark, onGenerateQuote],
+    [
+      onRemark,
+      onGenerateQuote,
+      actionsByDeal,
+      canSeeActions,
+      onToggleTask,
+      onCompleteAction,
+      onAddAction,
+      memberName,
+    ],
   );
   const columnSummary = useCallback((items: Deal[]) => {
     const amount = items.reduce((sum, d) => sum + d.amount, 0);
@@ -268,11 +401,25 @@ export default function Deals() {
         />
       )}
 
+      {actionDeal && (
+        <ActionDialog
+          action={null}
+          defaultDealId={actionDeal.id}
+          defaultAccountId={actionDeal.accountId ?? undefined}
+          defaultLeadId={actionDeal.leadId ?? undefined}
+          onClose={() => setActionDeal(null)}
+          onSubmit={({ status: _status, ...input }) => createAction.mutateAsync(input)}
+        />
+      )}
+
       {remarkDeal && (
-        <RemarkDialog
+        <ChecklistDialog
           deal={remarkDeal}
           onClose={() => setRemarkDeal(null)}
           onSubmit={(input) => save.mutateAsync({ id: remarkDeal.id, input })}
+          onPromote={
+            canSeeActions ? (text) => promoteTask(remarkDeal, text) : undefined
+          }
         />
       )}
     </section>
