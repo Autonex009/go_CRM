@@ -387,6 +387,9 @@ const ATTENTION_META: Record<Attention["kind"], { icon: IconName; href: (id: str
   invoice: { icon: "building", href: (id) => `/invoices/${id}` },
   // The board has no per-deal route, so an overdue deal links to the pipeline.
   deal: { icon: "deals", href: () => "/deals" },
+  // Actions and tasks live on boards rather than pages of their own.
+  action: { icon: "check", href: () => "/actions" },
+  task: { icon: "check", href: () => "/deals" },
 };
 
 /** "3 days overdue" / "Due today" / "in 2 days", plus how loudly to say it. */
@@ -429,7 +432,9 @@ function AttentionCard({
       ) : (
         <ul>
           {items.map((item) => {
-            const meta = ATTENTION_META[item.kind];
+            // A kind the client does not know would otherwise read `undefined`
+            // off this map and crash the whole dashboard.
+            const meta = ATTENTION_META[item.kind] ?? { icon: "check" as IconName, href: () => "/" };
             const due = dueLabel(item.days);
             return (
               <li key={`${item.kind}-${item.id}`}>
@@ -510,25 +515,57 @@ function RecentCard({ items, className = "" }: { items: Recent[]; className?: st
         <ul>
           {items.map((item, i) => {
             const meta = KIND_META[item.kind as ActivityKind] ?? KIND_META.system;
-            return (
-              <li
-                key={`${item.at}-${i}`}
-                className="flex items-start gap-md border-t border-line px-lg py-sm"
-              >
-                <span className="mt-[2px] flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-md bg-surface-muted text-fg-muted">
+
+            // The whole row is the link when the record has a page; a plain
+            // list item when it does not, rather than a link that goes nowhere.
+            const row = (
+              <>
+                <span className="mt-[2px] flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md bg-surface-muted text-fg-muted">
                   <Icon name={meta.icon} size={13} />
                 </span>
 
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-fg">{item.subject}</span>
+                  <span className="flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="truncate text-sm font-medium text-fg">{item.subject}</span>
+                    {item.entity && (
+                      <span className="rounded bg-surface-muted px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
+                        {item.entity}
+                      </span>
+                    )}
+                  </span>
+
                   {item.body && (
-                    <span className="block truncate text-xs text-fg-muted">{item.body}</span>
+                    <span className="mt-px block truncate text-xs text-fg-muted">{item.body}</span>
+                  )}
+
+                  {item.actor && (
+                    <span className="mt-px block truncate text-[11px] text-fg-subtle">
+                      by {item.actor}
+                    </span>
                   )}
                 </span>
 
-                <span className="shrink-0 whitespace-nowrap text-xs text-fg-subtle">
+                <span
+                  className="shrink-0 whitespace-nowrap text-xs text-fg-subtle"
+                  title={new Date(item.at).toLocaleString()}
+                >
                   {relativeTime(item.at)}
                 </span>
+              </>
+            );
+
+            const className =
+              "flex items-start gap-md border-t border-line px-lg py-sm transition-colors";
+
+            return (
+              <li key={`${item.at}-${i}`}>
+                {item.actionUrl ? (
+                  <Link to={item.actionUrl} className={`${className} hover:bg-surface-hover`}>
+                    {row}
+                  </Link>
+                ) : (
+                  <div className={className}>{row}</div>
+                )}
               </li>
             );
           })}

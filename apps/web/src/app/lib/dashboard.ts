@@ -18,7 +18,7 @@ export interface Pipeline {
 
 /** Mirrors dashboard.Attention — one thing going wrong, or about to. */
 export interface Attention {
-  kind: "lead" | "quote" | "invoice" | "deal";
+  kind: "lead" | "quote" | "invoice" | "deal" | "action" | "task";
   id: string;
   label: string;
   detail: string;
@@ -30,9 +30,14 @@ export interface Attention {
 /** Mirrors dashboard.Recent — a flattened timeline entry. */
 export interface Recent {
   kind: string;
+  /** What the entry happened to: "deal", "lead", "account". */
+  entity: string;
+  /** The record's own name, resolved by the server. */
   subject: string;
   body: string;
   actor: string;
+  /** Where the row leads; empty when the record has no page. */
+  actionUrl: string;
   at: string;
 }
 
