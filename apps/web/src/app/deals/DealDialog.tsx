@@ -64,6 +64,7 @@ export function DealDialog({
     handleSubmit,
     control,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<DealFormValues>({
     resolver: zodResolver(dealFormSchema),
@@ -115,16 +116,20 @@ export function DealDialog({
           setValue("ownerUserId", selectedLead.ownerUserId);
         if (selectedLead.value) setValue("amount", selectedLead.value);
         // The deal title is the deal's own name, not the lead's. Pre-fill from the
-        // lead's company (what the deal is actually about) and only when the user
-        // has not typed one; falling back to the person's name produced titles
-        // like "Chandan  - Deal".
-        if (!deal?.title) {
+        // lead's company (what the deal is actually about) and only when the
+        // field is still empty; falling back to the person's name produced
+        // titles like "Chandan  - Deal".
+        //
+        // The emptiness test has to read the live form value, not deal?.title:
+        // on a new deal that is always undefined, so picking a lead used to
+        // overwrite whatever title had just been typed.
+        if (!getValues("title").trim()) {
           const company = selectedLead.company?.trim();
           if (company) setValue("title", company, { shouldValidate: true });
         }
       }
     }
-  }, [leadId, allLeads.data, setValue, deal]);
+  }, [leadId, allLeads.data, setValue, getValues]);
 
   /**
    * Leads the selected account can actually be linked to.

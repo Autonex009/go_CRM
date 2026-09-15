@@ -14,6 +14,7 @@ export const actionFormSchema = z.object({
   assignedTo: z.string().optional(),
   accountId: z.string().optional(),
   leadId: z.string().optional(),
+  dealId: z.string().optional(),
   status: z.enum(ACTION_STATUSES),
 });
 
@@ -35,5 +36,6 @@ export function toPayload(values: ActionFormValues): ActionUpdateInput {
     assignedTo: text(values.assignedTo),
     accountId: text(values.accountId),
     leadId: text(values.leadId),
+    dealId: text(values.dealId),
   };
 }

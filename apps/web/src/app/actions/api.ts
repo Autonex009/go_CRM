@@ -32,6 +32,7 @@ export interface ActionInput {
   assignedTo?: string;
   accountId?: string;
   leadId?: string;
+  dealId?: string;
 }
 
 export interface ActionUpdateInput {
@@ -41,11 +42,13 @@ export interface ActionUpdateInput {
   assignedTo?: string;
   accountId?: string;
   leadId?: string;
+  dealId?: string;
 }
 
 export interface ActionFilter {
   accountId?: string;
   leadId?: string;
+  dealId?: string;
   assignedTo?: string;
   status?: ActionStatus;
   /** Drops completed actions. Independent of `status`, so "everything still
@@ -62,6 +65,7 @@ function query(filter: ActionFilter): string {
   const params = new URLSearchParams();
   if (filter.accountId) params.set("accountId", filter.accountId);
   if (filter.leadId) params.set("leadId", filter.leadId);
+  if (filter.dealId) params.set("dealId", filter.dealId);
   if (filter.assignedTo) params.set("assignedTo", filter.assignedTo);
   if (filter.status) params.set("status", filter.status);
   if (filter.excludeDone) params.set("excludeDone", "true");

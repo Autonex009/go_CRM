@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 import { AccountSelect } from "../accounts/AccountSelect";
+import { dealsApi } from "../deals/api";
 import { leadsApi } from "../leads/api";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
@@ -16,13 +17,25 @@ interface ActionDialogProps {
   action: Action | null;
   /** Pre-fills the client when opened from a Company Profile page. */
   defaultAccountId?: string;
+  /** Pre-fills the deal when opened from the pipeline. */
+  defaultDealId?: string;
+  /** Pre-fills the lead, so opening from a deal card carries its lead across. */
+  defaultLeadId?: string;
   onClose: () => void;
   onSubmit: (input: ActionUpdateInput) => Promise<unknown>;
   onDelete?: () => void;
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-export function ActionDialog({ action, defaultAccountId, onClose, onSubmit, onDelete }: ActionDialogProps) {
+export function ActionDialog({
+  action,
+  defaultAccountId,
+  defaultDealId,
+  defaultLeadId,
+  onClose,
+  onSubmit,
+  onDelete,
+}: ActionDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const members = useQuery({
@@ -44,7 +57,8 @@ export function ActionDialog({ action, defaultAccountId, onClose, onSubmit, onDe
       dueDate: action?.dueAt?.slice(0, 10) ?? "",
       assignedTo: action?.assignedTo ?? "",
       accountId: action?.accountId ?? defaultAccountId ?? "",
-      leadId: action?.leadId ?? "",
+      leadId: action?.leadId ?? defaultLeadId ?? "",
+      dealId: action?.dealId ?? defaultDealId ?? "",
       status: action?.status ?? "open",
     },
   });
@@ -53,6 +67,19 @@ export function ActionDialog({ action, defaultAccountId, onClose, onSubmit, onDe
     control,
     name: "accountId",
   });
+
+  // Linking an action to a deal is what puts it on that deal's card. The board
+  // is one request and already cached by the pipeline page.
+  const board = useQuery({
+    queryKey: ["deals"],
+    queryFn: dealsApi.board,
+    staleTime: 60_000,
+  });
+
+  // Narrowed to the chosen client, the same way the lead picker narrows.
+  const selectableDeals = (board.data?.deals ?? []).filter(
+    (d) => !accountId || d.accountId === accountId,
+  );
 
   // The picker asks the server for the leads it needs, matching DealDialog exactly.
   // Once a company is chosen it fetches that company's leads (limit 1000).
@@ -171,6 +198,21 @@ export function ActionDialog({ action, defaultAccountId, onClose, onSubmit, onDe
             )}
           </SelectField>
         </div>
+
+        <SelectField label="Deal (optional)" error={errors.dealId?.message} {...register("dealId")}>
+          <option value="">
+            {selectableDeals.length > 0
+              ? "— Select deal —"
+              : accountId
+                ? "No deals for this company"
+                : "No deals yet"}
+          </option>
+          {selectableDeals.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.title}
+            </option>
+          ))}
+        </SelectField>
 
         {action && (
           <SelectField label="Status" error={errors.status?.message} {...register("status")}>
