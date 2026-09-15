@@ -5,7 +5,7 @@ import { useAuthStore } from "../auth/store";
 import { integrationsApi } from "../integrations/api";
 import { ApiError } from "../lib/api";
 import { COMMON_CURRENCIES } from "../lib/money";
-import { memberLabel, orgApi, type NewInvitation } from "../org/api";
+import { memberLabel, orgApi, type Member, type NewInvitation } from "../org/api";
 import { useWorkspaceStore } from "../org/workspace";
 import {
   Alert,
@@ -23,6 +23,9 @@ import {
 export default function Team() {
   const queryClient = useQueryClient();
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const currentUserRole = useAuthStore((s) => s.user?.role);
+  const isOwner = currentUserRole === "owner";
+  const canManageRoles = isOwner || currentUserRole === "admin";
 
   const members = useQuery({ queryKey: ["members"], queryFn: orgApi.members, staleTime: 5 * 60_000 });
   const invitations = useQuery({ queryKey: ["invitations"], queryFn: orgApi.invitations });
@@ -32,6 +35,34 @@ export default function Team() {
   // Shown once, after a successful invite: there is no mail sender, so the
   // inviter copies this link and sends it themselves.
   const [created, setCreated] = useState<NewInvitation | null>(null);
+
+  const changeRole = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: string }) => orgApi.updateMemberRole(id, role),
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ["members"] });
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : "Could not change role");
+    },
+  });
+
+  // Mirrors the server's guards so the UI never offers a change that will be
+  // refused: nobody edits their own role, and only an owner touches an owner.
+  const canEditRole = (m: Member) =>
+    canManageRoles && m.id !== currentUserId && (isOwner || m.role !== "owner");
+
+  // A role change takes effect the moment the member's session refreshes, so it
+  // gets the same confirmation as a delete.
+  const requestRoleChange = (m: Member, role: string) => {
+    if (role === (m.role || "sales")) return;
+    const confirmed = window.confirm(
+      `Change ${memberLabel(m)}'s role to ${ROLE_LABEL[role] ?? role}?` +
+        (role === "client" ? "\n\nThey will lose access to the internal workspace." : ""),
+    );
+    if (!confirmed) return;
+    changeRole.mutate({ id: m.id, role });
+  };
 
   const invite = useMutation({
     mutationFn: (address: string) => orgApi.invite(address),
@@ -82,18 +113,42 @@ export default function Team() {
             {(members.data ?? []).map((m) => (
               <li
                 key={m.id}
-                className="flex items-center gap-md border-b border-line px-lg py-md last:border-0"
+                className="flex items-center justify-between gap-md border-b border-line px-lg py-md last:border-0"
               >
-                <Avatar name={memberLabel(m)} title={m.email} />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-fg">{memberLabel(m)}</p>
-                  {m.name && <p className="truncate text-xs text-fg-muted">{m.email}</p>}
+                <div className="flex items-center gap-md min-w-0">
+                  <Avatar name={memberLabel(m)} title={m.email} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-xs">
+                      <p className="truncate text-sm font-medium text-fg">{memberLabel(m)}</p>
+                      {m.id === currentUserId && <Badge tone="brand">You</Badge>}
+                    </div>
+                    {m.name && <p className="truncate text-xs text-fg-muted">{m.email}</p>}
+                  </div>
                 </div>
-                {m.id === currentUserId && (
-                  <span className="ml-auto">
-                    <Badge tone="brand">You</Badge>
-                  </span>
-                )}
+
+                <div className="flex items-center gap-sm">
+                  {canEditRole(m) ? (
+                    <select
+                      value={m.role || "sales"}
+                      disabled={changeRole.isPending}
+                      onChange={(e) => requestRoleChange(m, e.target.value)}
+                      aria-label={`Role for ${memberLabel(m)}`}
+                      className="h-8 rounded-md border border-line bg-surface px-2 text-xs font-medium text-fg focus:border-accent focus:outline-none disabled:opacity-60"
+                    >
+                      {/* Only an owner can create another owner, and the server
+                          enforces the same rule. */}
+                      {isOwner && <option value="owner">Owner</option>}
+                      <option value="admin">Admin</option>
+                      <option value="account_manager">Account Manager</option>
+                      <option value="sales">Sales</option>
+                      <option value="client">Client</option>
+                    </select>
+                  ) : (
+                    <Badge tone={ROLE_TONE[m.role ?? "sales"] ?? "neutral"}>
+                      {ROLE_LABEL[m.role ?? "sales"] ?? "Sales"}
+                    </Badge>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -380,3 +435,20 @@ function GoogleCalendarCard() {
     </Card>
   );
 }
+
+/** The roles profiles_role_check allows, in the words the team page uses. */
+const ROLE_LABEL: Record<string, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  account_manager: "Account Manager",
+  sales: "Sales",
+  client: "Client",
+};
+
+const ROLE_TONE: Record<string, "brand" | "info" | "neutral"> = {
+  owner: "brand",
+  admin: "brand",
+  account_manager: "info",
+  sales: "neutral",
+  client: "neutral",
+};

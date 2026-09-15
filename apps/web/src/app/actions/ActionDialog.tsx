@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import { AccountSelect } from "../accounts/AccountSelect";
+import { leadsApi } from "../leads/api";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
@@ -33,6 +34,8 @@ export function ActionDialog({ action, defaultAccountId, onClose, onSubmit, onDe
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ActionFormValues>({
     resolver: zodResolver(actionFormSchema),
@@ -41,9 +44,45 @@ export function ActionDialog({ action, defaultAccountId, onClose, onSubmit, onDe
       dueDate: action?.dueAt?.slice(0, 10) ?? "",
       assignedTo: action?.assignedTo ?? "",
       accountId: action?.accountId ?? defaultAccountId ?? "",
+      leadId: action?.leadId ?? "",
       status: action?.status ?? "open",
     },
   });
+
+  const accountId = useWatch({
+    control,
+    name: "accountId",
+  });
+
+  // The picker asks the server for the leads it needs, matching DealDialog exactly.
+  // Once a company is chosen it fetches that company's leads (limit 1000).
+  // With no company chosen yet it takes the same page across the workspace to browse.
+  const allLeads = useQuery({
+    queryKey: ["leads", "picker", accountId ?? ""],
+    queryFn: () => leadsApi.list(0, "", 1000, accountId ? { accountId } : {}),
+    staleTime: 60_000,
+  });
+
+  const leadId = useWatch({ control, name: "leadId" });
+  const selectableLeads = allLeads.data?.items ?? [];
+
+  // When a lead is selected and it belongs to a company, auto-fill the client if not selected
+  useEffect(() => {
+    if (leadId && allLeads.data) {
+      const selectedLead = allLeads.data.items.find((l) => l.id === leadId);
+      if (selectedLead && selectedLead.accountId && !accountId) {
+        setValue("accountId", selectedLead.accountId);
+      }
+    }
+  }, [leadId, allLeads.data, setValue, accountId]);
+
+  // Switching account clears leadId if it doesn't belong to the newly chosen account
+  useEffect(() => {
+    if (!leadId || allLeads.isFetching || !allLeads.data) return;
+    if (!selectableLeads.some((l) => l.id === leadId)) {
+      setValue("leadId", "");
+    }
+  }, [selectableLeads, leadId, allLeads.data, allLeads.isFetching, setValue]);
 
   const submit = handleSubmit(async (values) => {
     setFormError(null);
@@ -90,19 +129,58 @@ export function ActionDialog({ action, defaultAccountId, onClose, onSubmit, onDe
           </SelectField>
         </div>
 
-        <div className="grid gap-md sm:grid-cols-2">
-          <AccountSelect label="Client" error={errors.accountId?.message} {...register("accountId")} />
+        <AccountSelect
+          label="Client"
+          error={errors.accountId?.message}
+          {...register("accountId")}
+        />
 
-          {action && (
-            <SelectField label="Status" error={errors.status?.message} {...register("status")}>
-              {ACTION_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {ACTION_STATUS_LABEL[s]}
+        <div>
+          <SelectField
+            label="Lead (optional)"
+            error={errors.leadId?.message}
+            {...register("leadId")}
+          >
+            {accountId ? (
+              selectableLeads.length > 0 ? (
+                <>
+                  <option value="">
+                    — Select Lead ({selectableLeads.length} available) —
+                  </option>
+                  {selectableLeads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
+                    </option>
+                  ))}
+                </>
+              ) : (
+                <option value="">No leads found for this company</option>
+              )
+            ) : (
+              <>
+                <option value="">
+                  — Select Lead (or choose company above to filter) —
                 </option>
-              ))}
-            </SelectField>
-          )}
+                {selectableLeads.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}{" "}
+                    {l.company ? `— ${l.company}` : ""}
+                  </option>
+                ))}
+              </>
+            )}
+          </SelectField>
         </div>
+
+        {action && (
+          <SelectField label="Status" error={errors.status?.message} {...register("status")}>
+            {ACTION_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {ACTION_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </SelectField>
+        )}
 
         <div className="flex justify-end gap-sm">
           <Button variant="secondary" onClick={onClose}>

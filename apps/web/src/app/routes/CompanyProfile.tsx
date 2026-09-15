@@ -7,6 +7,7 @@ import {
   websiteLabel,
   type ProfileInput,
 } from "../accounts/api";
+import { ActionsTab } from "../accounts/profile/ActionsTab";
 import { FinancialsTab } from "../accounts/profile/FinancialsTab";
 import { LeadsTab } from "../accounts/profile/LeadsTab";
 import { OverviewTab } from "../accounts/profile/OverviewTab";
@@ -16,6 +17,9 @@ import { humanise } from "../accounts/profile/columns";
 import { formatDay } from "../accounts/profile/format";
 import { computeMetrics } from "../accounts/profile/metrics";
 import type { ProfileTab } from "../accounts/profile/tabs";
+import { actionsApi } from "../actions/api";
+import { MANAGER_ROLES } from "../auth/roles";
+import { useAuthStore } from "../auth/store";
 import { ApiError } from "../lib/api";
 import { formatMoney } from "../lib/money";
 import { useCurrency } from "../org/workspace";
@@ -122,6 +126,24 @@ export default function CompanyProfilePage() {
   const { account, deals, quotes, invoices, leads, contacts } = query.data;
   const brandColor = formData.primaryColor || "#6366f1";
   const amcStatus = (formData.amcStatus || "none") as keyof typeof AMC_TONE;
+
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canSeeActions = !!userRole && MANAGER_ROLES.includes(userRole);
+
+  // Shares its key with ActionsTab, so the tab's list and this count are one
+  // request. Reps never see the tab, and the API would refuse them anyway.
+  const actionsQuery = useQuery({
+    queryKey: ["actions", { accountId: id }],
+    queryFn: () => actionsApi.list({ accountId: id }),
+    enabled: !!id && canSeeActions,
+  });
+  const actionsCount = actionsQuery.data?.length ?? 0;
+
+  // A demotion mid-session would otherwise leave the page on a tab that renders
+  // nothing at all.
+  useEffect(() => {
+    if (activeTab === "actions" && !canSeeActions) setActiveTab("overview");
+  }, [activeTab, canSeeActions]);
 
   const handleSave = () => {
     if (!formData) return;
@@ -417,18 +439,17 @@ export default function CompanyProfilePage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-md overflow-x-auto border-b border-line px-sm">
-        {(
-          [
-            { id: "overview", label: "Overview", count: null },
-            { id: "pipeline", label: "Pipeline & deals", count: deals.length },
-            { id: "leads", label: "Leads", count: leads.length },
-            {
-              id: "financials",
-              label: "Financials",
-              count: quotes.length + invoices.length,
-            },
-          ] as const
-        ).map((tab) => (
+        {[
+          { id: "overview" as ProfileTab, label: "Overview", count: null },
+          { id: "pipeline" as ProfileTab, label: "Pipeline & deals", count: deals.length },
+          { id: "leads" as ProfileTab, label: "Leads", count: leads.length },
+          {
+            id: "financials" as ProfileTab,
+            label: "Financials",
+            count: quotes.length + invoices.length,
+          },
+          ...(canSeeActions ? [{ id: "actions" as ProfileTab, label: "Actions", count: actionsCount }] : []),
+        ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -459,7 +480,7 @@ export default function CompanyProfilePage() {
           accountId={id!}
           mode={mode}
           formData={formData}
-          setFormData={setFormData}
+          setFormData={(next: ProfileInput) => setFormData(next)}
           deals={deals}
           leads={leads}
           contacts={contacts}
@@ -488,6 +509,8 @@ export default function CompanyProfilePage() {
           currency={currency}
         />
       )}
+
+      {activeTab === "actions" && canSeeActions && <ActionsTab accountId={id!} />}
     </div>
   );
 }

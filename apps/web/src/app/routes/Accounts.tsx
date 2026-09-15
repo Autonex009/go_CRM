@@ -276,10 +276,9 @@ function AccountCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-px border-y border-line bg-line">
+      <div className="grid grid-cols-2 gap-px border-y border-line bg-line">
         <Stat label="Leads" value={account.leadCount} />
         <Stat label="Deals" value={account.dealCount} />
-        <Stat label="Contacts" value={account.contactCount} />
       </div>
 
       <div className="flex items-center justify-between gap-sm p-md">

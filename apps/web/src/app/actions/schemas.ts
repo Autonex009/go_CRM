@@ -13,6 +13,7 @@ export const actionFormSchema = z.object({
   dueDate: z.string().min(1, "Due date is required"),
   assignedTo: z.string().optional(),
   accountId: z.string().optional(),
+  leadId: z.string().optional(),
   status: z.enum(ACTION_STATUSES),
 });
 
@@ -33,5 +34,6 @@ export function toPayload(values: ActionFormValues): ActionUpdateInput {
     status: values.status,
     assignedTo: text(values.assignedTo),
     accountId: text(values.accountId),
+    leadId: text(values.leadId),
   };
 }
