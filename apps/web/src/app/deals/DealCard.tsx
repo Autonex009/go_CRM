@@ -126,65 +126,63 @@ export const DealCard = memo(function DealCard({
 
   return (
     <article
-      className={`relative rounded-2xl border p-4 transition-all duration-200 ${
+      className={`group/card relative rounded-xl border bg-surface p-3.5 transition-all duration-150 ${
         overlay
-          ? "rotate-2 border-indigo-500/60 bg-surface/90 backdrop-blur-md shadow-2xl scale-105"
-          : "border-line bg-surface/80 hover:border-indigo-500/40 hover:shadow-lg hover:-translate-y-0.5"
+          ? "rotate-1 scale-[1.02] border-indigo-500/50 shadow-xl"
+          : "border-line hover:border-indigo-500/40 hover:shadow-md"
       }`}
     >
-      {/* Title & Amount */}
-      <div className="flex items-start justify-between gap-3">
-        <h4 className="line-clamp-2 text-sm font-bold leading-snug text-fg">
+      {/* Title and amount. The amount is the one number worth reading from a
+          metre away, so it gets the weight and the title gets the room. */}
+      <div className="flex items-baseline justify-between gap-3">
+        <h4 className="line-clamp-2 text-[13px] font-semibold leading-snug text-fg">
           {cardTitle}
         </h4>
-        <span className="shrink-0 rounded-xl bg-indigo-500/10 px-2.5 py-1 text-xs font-extrabold tabular-nums text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+        <span className="shrink-0 text-[13px] font-bold tabular-nums text-fg">
           {formatMoneyCompact(deal.amount, currency)}
         </span>
       </div>
 
       {/* Lead Name */}
       {leadName && (
-        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-fg-muted font-medium">
-          <User className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-fg-muted">
+          <User className="h-3 w-3 shrink-0 text-fg-subtle" />
           <span className="truncate" title={`Lead: ${leadName}`}>
             {leadName}
           </span>
         </div>
       )}
 
-      {/* Structured Info Badges: Cameras, Location, Products */}
+      {/* Cameras, location, products. One quiet chip family with the colour on
+          the icon: three different coloured pills competed with the tasks below
+          them, which is where the eye actually needs to land. */}
       {(cameras !== null || location || products) && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-1">
           {cameras !== null && (
-            <span
-              className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-2 py-0.5 text-[11px] font-semibold text-sky-600 dark:text-sky-400 border border-sky-500/20"
+            <InfoChip
+              icon={<Camera className="h-3 w-3 shrink-0 text-sky-500" />}
               title={`${cameras} ${cameras === 1 ? "camera" : "cameras"}`}
             >
-              <Camera className="h-3 w-3 shrink-0" />
-              <span>
-                {cameras} {cameras === 1 ? "cam" : "cams"}
-              </span>
-            </span>
+              {cameras} {cameras === 1 ? "cam" : "cams"}
+            </InfoChip>
           )}
 
           {location && (
-            <span
-              className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400 border border-amber-500/20 max-w-[150px] truncate"
+            <InfoChip
+              icon={<MapPin className="h-3 w-3 shrink-0 text-amber-500" />}
               title={`Location: ${location}`}
             >
-              <MapPin className="h-3 w-3 shrink-0" />
-              <span className="truncate">{location}</span>
-            </span>
+              {location}
+            </InfoChip>
           )}
 
           {products && (
-            <span
-              className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 border border-purple-500/20 max-w-[140px] truncate"
+            <InfoChip
+              icon={<Layers className="h-3 w-3 shrink-0 text-violet-500" />}
               title={`Products: ${products}`}
             >
-              <Layers className="h-3 w-3 shrink-0" />
-              <span className="truncate">{products}</span>
-            </span>
+              {products}
+            </InfoChip>
           )}
         </div>
       )}
@@ -203,20 +201,18 @@ export const DealCard = memo(function DealCard({
         onEdit={onRemark}
       />
 
-      {/* Footer: Owner and Due Date / Overdue */}
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-line/60 pt-2.5">
-        <div className="flex items-center gap-2">
+      {/* Footer: owner on the left, the date that matters on the right. The
+          quote button only appears on hover — it is an occasional action, not
+          something to read past on every card. */}
+      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line/60 pt-2">
+        <div className="flex min-w-0 items-center gap-1.5">
           {owner ? (
-            <div className="flex items-center gap-1.5">
+            <>
               <Avatar name={owner} title={deal.ownerEmail ?? owner} size="xs" />
-              <span className="text-[11px] font-medium text-fg-muted truncate max-w-24">
-                {owner}
-              </span>
-            </div>
+              <span className="max-w-24 truncate text-[11px] text-fg-muted">{owner}</span>
+            </>
           ) : (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
-              Unassigned
-            </span>
+            <span className="text-[11px] italic text-fg-subtle">Unassigned</span>
           )}
 
           {onGenerateQuote && (
@@ -226,8 +222,8 @@ export const DealCard = memo(function DealCard({
                 e.stopPropagation();
                 onGenerateQuote(deal);
               }}
-              className="p-1 rounded-md text-fg-subtle hover:text-indigo-600 hover:bg-indigo-500/10 transition-colors cursor-pointer"
-              title="Generate Quote from this deal"
+              className="rounded p-1 text-fg-subtle opacity-0 transition-all hover:bg-indigo-500/10 hover:text-indigo-600 focus-visible:opacity-100 group-hover/card:opacity-100"
+              title="Generate quote from this deal"
             >
               <FileText className="h-3.5 w-3.5" />
             </button>
@@ -236,13 +232,13 @@ export const DealCard = memo(function DealCard({
 
         {deal.expectedCloseDate &&
           (days !== null && days < 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-500 border border-rose-500/20">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-rose-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
               <AlertTriangle className="h-3 w-3" />
-              {Math.abs(days)}d overdue
+              {Math.abs(days)}d late
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-muted">
-              <Calendar className="h-3 w-3 text-fg-subtle" />
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-fg-subtle">
+              <Calendar className="h-3 w-3" />
               {formatDate(deal.expectedCloseDate)}
             </span>
           ))}
@@ -294,8 +290,11 @@ function TaskPanel({
 
   return (
     <div className="mt-2.5 border-t border-line/60 pt-2">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5" onClick={stop}>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div
+          className="flex items-center gap-0.5 rounded-lg bg-surface-muted/70 p-0.5"
+          onClick={stop}
+        >
           <PanelTab
             active={showing === "tasks"}
             onClick={() => setTab("tasks")}
@@ -456,14 +455,35 @@ function PanelTab({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${
+      className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
         active
-          ? "text-indigo-600 dark:text-indigo-400"
+          ? "bg-surface text-indigo-600 shadow-xs dark:text-indigo-400"
           : "text-fg-subtle hover:text-fg-muted"
       }`}
     >
       {children}
-      {count > 0 && <span className="ml-1 font-semibold tabular-nums opacity-70">{count}</span>}
+      {count > 0 && <span className="ml-1 tabular-nums opacity-70">{count}</span>}
     </button>
+  );
+}
+
+/** One muted metadata chip; only its icon carries colour. */
+function InfoChip({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      title={title}
+      className="inline-flex max-w-[150px] items-center gap-1 rounded-md border border-line bg-surface-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-fg-muted"
+    >
+      {icon}
+      <span className="truncate">{children}</span>
+    </span>
   );
 }

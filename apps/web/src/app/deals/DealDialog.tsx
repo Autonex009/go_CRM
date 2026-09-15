@@ -20,6 +20,7 @@ import {
 } from "../ui";
 import type { Deal, DealInput } from "./api";
 import { buildQuoteStateFromDeal } from "./quote-utils";
+import { TaskHistory } from "./TaskHistory";
 import { dealFormSchema, toPayload, type DealFormValues } from "./schemas";
 import {
   DEAL_STAGES,
@@ -317,6 +318,10 @@ export function DealDialog({
             so dropping it from the payload would NULL whatever notes a deal
             still carries. */}
         <input type="hidden" {...register("description")} />
+
+        {/* What is outstanding on this deal and what has already been closed
+            off, with who did it — editing stays on the card. */}
+        {deal && <TaskHistory dealId={deal.id} />}
 
         {/* Existing deals carry a history; a new one has nothing to show yet.
             Collapsible here because the timeline sits between the fields and the
