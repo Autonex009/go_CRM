@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpRight, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import { ApiError } from "../lib/api";
 import { Alert, Badge, Button, Field, Modal } from "../ui";
@@ -15,11 +15,6 @@ interface ChecklistDialogProps {
   deal: Deal;
   onClose: () => void;
   onSubmit: (input: DealInput) => Promise<unknown>;
-  /**
-   * Hands one task over to the Actions dashboard. Present only for roles that
-   * may create actions; without it the promote control is simply absent.
-   */
-  onPromote?: (text: string) => Promise<unknown>;
 }
 
 /**
@@ -27,11 +22,10 @@ interface ChecklistDialogProps {
  * Items are stored back into the deal's remark column, so this dialog owns the
  * whole list and writes it in one update.
  *
- * Tasks are deliberately unassigned. Giving a task an owner without a due date
- * or a place to be reported helps nobody, so the way to put work on a person is
- * to promote the task into an Action, which has both.
+ * Tasks are deliberately unassigned and untracked. Work that needs an owner and
+ * a due date is an Action, created from the card's Actions toggle.
  */
-export function ChecklistDialog({ deal, onClose, onSubmit, onPromote }: ChecklistDialogProps) {
+export function ChecklistDialog({ deal, onClose, onSubmit }: ChecklistDialogProps) {
   const [items, setItems] = useState<ChecklistItem[]>(() =>
     parseChecklist(deal.remark ?? deal.description, [
       deal.leadName ?? "",
@@ -42,8 +36,6 @@ export function ChecklistDialog({ deal, onClose, onSubmit, onPromote }: Checklis
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [promoting, setPromoting] = useState<string | null>(null);
 
   const addItem = () => {
     const text = draft.trim();
@@ -59,22 +51,6 @@ export function ChecklistDialog({ deal, onClose, onSubmit, onPromote }: Checklis
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...change } : i)));
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
-
-  // Promoting moves the work rather than copying it: the action becomes the
-  // record, so leaving the task behind would mean two places to tick off.
-  const promote = async (item: ChecklistItem) => {
-    if (!onPromote) return;
-    setError(null);
-    setPromoting(item.id);
-    try {
-      await onPromote(item.text.trim());
-      removeItem(item.id);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create the action");
-    } finally {
-      setPromoting(null);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,11 +102,6 @@ export function ChecklistDialog({ deal, onClose, onSubmit, onPromote }: Checklis
           <span className="text-xs font-medium text-fg-muted">
             Tasks{items.length > 0 && ` — ${pendingCount} pending, ${items.length - pendingCount} completed`}
           </span>
-          {onPromote && items.length > 0 && (
-            <span className="text-[11px] text-fg-subtle">
-              Assign a task to give it an owner and due date on the Actions board.
-            </span>
-          )}
 
           {items.length === 0 && (
             <p className="py-sm text-sm italic text-fg-subtle">
@@ -159,19 +130,6 @@ export function ChecklistDialog({ deal, onClose, onSubmit, onPromote }: Checklis
                     item.done ? "text-fg-subtle line-through" : ""
                   }`}
                 />
-
-                {onPromote && !item.done && (
-                  <button
-                    type="button"
-                    onClick={() => promote(item)}
-                    disabled={promoting !== null || !item.text.trim()}
-                    title="Assign this to someone — moves it to Actions"
-                    className="flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium text-fg-subtle transition-colors hover:bg-indigo-500/10 hover:text-indigo-600 disabled:opacity-50"
-                  >
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                    {promoting === item.id ? "Moving…" : "Assign"}
-                  </button>
-                )}
 
                 <button
                   type="button"

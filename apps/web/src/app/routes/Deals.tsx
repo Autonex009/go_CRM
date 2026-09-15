@@ -256,31 +256,6 @@ export default function Deals() {
     },
   });
 
-  // Promoting a task hands it to the Actions board, due today, with the deal's
-  // own client, lead and deal already attached.
-  //
-  // The deal's owner is only offered as the first assignee when they are also a
-  // member of this workspace. deals.owner_id points at profiles, and a profile
-  // is not necessarily a user — an imported or deactivated owner has no users
-  // row — while an action's assignee must be one, so that the org check has
-  // something to scope by. Defaulting blindly made the server answer "unknown
-  // assignee" and the promotion fail outright; unassigned is the honest start,
-  // and the Actions board is where the owner gets picked anyway.
-  const promoteTask = useCallback(
-    (deal: Deal, text: string) => {
-      const ownerIsMember = (members.data ?? []).some((m) => m.id === deal.ownerUserId);
-      return createAction.mutateAsync({
-        title: text,
-        dueAt: `${new Date().toISOString().slice(0, 10)}T00:00:00Z`,
-        assignedTo: ownerIsMember ? (deal.ownerUserId ?? undefined) : undefined,
-        accountId: deal.accountId ?? undefined,
-        leadId: deal.leadId ?? undefined,
-        dealId: deal.id,
-      });
-    },
-    [createAction, members.data],
-  );
-
   const onGenerateQuote = useCallback(
     (deal: Deal) => {
       navigate("/quotes/new", {
@@ -426,9 +401,6 @@ export default function Deals() {
           deal={remarkDeal}
           onClose={() => setRemarkDeal(null)}
           onSubmit={(input) => save.mutateAsync({ id: remarkDeal.id, input })}
-          onPromote={
-            canSeeActions ? (text) => promoteTask(remarkDeal, text) : undefined
-          }
         />
       )}
     </section>

@@ -8,10 +8,10 @@
  * human can read rather than a blob of JSON.
  *
  * Tasks carry no assignee. Handing work to a person means giving it an owner, a
- * due date and somewhere to be reported — which is what an Action is — so the
- * checklist promotes an item into one rather than half-tracking it here. The
- * `@<uuid>` suffix an earlier revision wrote is still parsed off so those rows
- * read as clean text, but it is never written again.
+ * due date and somewhere to be reported — which is what an Action is — so that
+ * work is created from the card's Actions toggle instead. The `@<uuid>` suffix
+ * an earlier revision wrote is still parsed off so those rows read as clean
+ * text, but it is never written again.
  */
 
 export interface ChecklistItem {
