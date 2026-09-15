@@ -96,6 +96,24 @@ export default function CompanyProfilePage() {
     },
   });
 
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canSeeActions = !!userRole && MANAGER_ROLES.includes(userRole);
+
+  // Shares its key with ActionsTab, so the tab's list and this count are one
+  // request. Reps never see the tab, and the API would refuse them anyway.
+  const actionsQuery = useQuery({
+    queryKey: ["actions", { accountId: id }],
+    queryFn: () => actionsApi.list({ accountId: id }),
+    enabled: !!id && canSeeActions,
+  });
+  const actionsCount = actionsQuery.data?.length ?? 0;
+
+  // A demotion mid-session would otherwise leave the page on a tab that renders
+  // nothing at all.
+  useEffect(() => {
+    if (activeTab === "actions" && !canSeeActions) setActiveTab("overview");
+  }, [activeTab, canSeeActions]);
+
   if (query.isPending || !formData) {
     return (
       <div className="flex flex-col gap-lg p-lg">
@@ -126,24 +144,6 @@ export default function CompanyProfilePage() {
   const { account, deals, quotes, invoices, leads, contacts } = query.data;
   const brandColor = formData.primaryColor || "#6366f1";
   const amcStatus = (formData.amcStatus || "none") as keyof typeof AMC_TONE;
-
-  const userRole = useAuthStore((s) => s.user?.role);
-  const canSeeActions = !!userRole && MANAGER_ROLES.includes(userRole);
-
-  // Shares its key with ActionsTab, so the tab's list and this count are one
-  // request. Reps never see the tab, and the API would refuse them anyway.
-  const actionsQuery = useQuery({
-    queryKey: ["actions", { accountId: id }],
-    queryFn: () => actionsApi.list({ accountId: id }),
-    enabled: !!id && canSeeActions,
-  });
-  const actionsCount = actionsQuery.data?.length ?? 0;
-
-  // A demotion mid-session would otherwise leave the page on a tab that renders
-  // nothing at all.
-  useEffect(() => {
-    if (activeTab === "actions" && !canSeeActions) setActiveTab("overview");
-  }, [activeTab, canSeeActions]);
 
   const handleSave = () => {
     if (!formData) return;
