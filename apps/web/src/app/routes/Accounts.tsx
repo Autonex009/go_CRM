@@ -23,6 +23,8 @@ import {
   Icon,
   PageHeader,
   Skeleton,
+  SortSelect,
+  type SortKey,
 } from "../ui";
 
 /**
@@ -42,6 +44,7 @@ function confirmDeleteCompany(name: string): boolean {
 export default function Accounts() {
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
+  const [sort, setSort] = useState<SortKey>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [dialog, setDialog] = useState<{ account: Account | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,8 +65,8 @@ export default function Accounts() {
   const search = useDebounced(searchQuery, 300);
 
   const query = useQuery({
-    queryKey: ["accounts", offset, search],
-    queryFn: () => accountsApi.list(offset, PAGE_SIZE, search),
+    queryKey: ["accounts", offset, search, sort],
+    queryFn: () => accountsApi.list(offset, PAGE_SIZE, search, sort),
     // Keep the current page on screen while the next one loads.
     placeholderData: keepPreviousData,
   });
@@ -130,6 +133,16 @@ export default function Accounts() {
                 className="h-[34px] w-[240px] rounded-lg border border-line bg-surface pl-[30px] pr-sm text-sm text-fg outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
             </label>
+            <SortSelect
+              value={sort}
+              onChange={(next) => {
+                setSort(next);
+                // A new order restarts paging: page 3 of the old order is a
+                // different set of rows under the new one.
+                setOffset(0);
+              }}
+              nameLabel="Company"
+            />
             <Button icon="plus" onClick={() => setDialog({ account: null })}>
               New company
             </Button>

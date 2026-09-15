@@ -171,12 +171,13 @@ export interface ProfileInput {
 export const accountsApi = {
   /** One page of companies. `search` is applied by the server, across the whole
    *  table rather than the fetched page. */
-  list: (offset = 0, limit = PAGE_SIZE, search = "") => {
+  list: (offset = 0, limit = PAGE_SIZE, search = "", sort = "") => {
     const params = new URLSearchParams({
       limit: String(limit),
       offset: String(offset),
     });
     if (search.trim()) params.set("search", search.trim());
+    if (sort) params.set("sort", sort);
     return apiFetch<AccountPage>(`${BASE}?${params}`);
   },
 

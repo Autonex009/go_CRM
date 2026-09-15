@@ -30,8 +30,10 @@ export const ImportWizardModal: React.FC<ImportWizardModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-900/60 p-4 backdrop-blur-sm">
+      {/* Scrolls its own content rather than overflowing the viewport — a long
+          import error list used to have nowhere to go. */}
+      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">CSV Bulk Lead Import</h2>
         <p className="text-sm text-slate-500 mb-6">Upload a CSV file containing leads (first_name, last_name, company, email, phone).</p>
 

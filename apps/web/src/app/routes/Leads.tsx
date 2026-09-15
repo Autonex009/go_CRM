@@ -59,6 +59,8 @@ import {
   Icon,
   PageHeader,
   Skeleton,
+  SortSelect,
+  type SortKey,
 } from "../ui";
 
 
@@ -92,6 +94,7 @@ export default function Leads() {
   const [filter, setFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [offset, setOffset] = useState(0);
+  const [sort, setSort] = useState<SortKey>("");
   const [dialog, setDialog] = useState<{
     lead: Lead | null;
     initialState?: Partial<LeadInput>;
@@ -125,8 +128,8 @@ export default function Leads() {
   // 25 rows out of hundreds, so a lead on any other page came back "not found"
   // — the reason the search box looked broken.
   const query = useQuery({
-    queryKey: ["leads", filter, offset, search],
-    queryFn: () => leadsApi.list(offset, filter, PAGE_SIZE, { search }),
+    queryKey: ["leads", filter, offset, search, sort],
+    queryFn: () => leadsApi.list(offset, filter, PAGE_SIZE, { search, sort }),
     placeholderData: keepPreviousData,
   });
 
@@ -355,6 +358,13 @@ export default function Leads() {
           setOffset(0);
         }}
         searchQuery={searchQuery}
+        sort={sort}
+        onSortChange={(next) => {
+          setSort(next);
+          // A new order restarts paging: page 3 of the old order is a different
+          // set of rows under the new one.
+          setOffset(0);
+        }}
         onSearchChange={(q) => {
           setSearchQuery(q);
           setOffset(0);
@@ -571,12 +581,16 @@ function FunnelStrip({
   onPick,
   searchQuery,
   onSearchChange,
+  sort,
+  onSortChange,
 }: {
   counts: Record<string, number>;
   activeStage: string;
   onPick: (stage: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  sort: SortKey;
+  onSortChange: (next: SortKey) => void;
 }) {
   const totalProspects = Object.entries(counts)
     .filter(([k]) => k !== "overdue" && k !== "due_today")
@@ -615,6 +629,8 @@ function FunnelStrip({
             </button>
           )}
         </div>
+
+        <SortSelect value={sort} onChange={onSortChange} nameLabel="Lead" />
 
         {/* Quick Filter Buttons */}
         <div className="flex items-center gap-1.5">

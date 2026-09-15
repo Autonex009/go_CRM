@@ -30,3 +30,4 @@ export {
   initials,
   type Tone,
 } from "./primitives";
+export { SortSelect, SORT_OPTIONS, type SortKey } from "./SortSelect";

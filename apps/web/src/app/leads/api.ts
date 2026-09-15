@@ -178,7 +178,7 @@ export const leadsApi = {
     offset = 0,
     filter = "",
     limit = PAGE_SIZE,
-    opts: { search?: string; accountId?: string } = {},
+    opts: { search?: string; accountId?: string; sort?: string } = {},
   ) => {
     const params = new URLSearchParams({
       limit: String(limit),
@@ -187,6 +187,7 @@ export const leadsApi = {
     if (filter) params.set("filter", filter);
     if (opts.search?.trim()) params.set("search", opts.search.trim());
     if (opts.accountId) params.set("accountId", opts.accountId);
+    if (opts.sort) params.set("sort", opts.sort);
     return apiFetch<LeadPage>(`${BASE}?${params}`);
   },
 

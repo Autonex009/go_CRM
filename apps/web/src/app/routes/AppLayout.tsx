@@ -25,7 +25,7 @@ import { endSession } from "../auth/session";
 import { MANAGER_ROLES } from "../auth/roles";
 import { useAuthStore } from "../auth/store";
 import { NotificationBell } from "../notifications/NotificationBell";
-import { useWorkspaceSync } from "../org/workspace";
+import { useWorkspaceStore, useWorkspaceSync } from "../org/workspace";
 
 import { useAppStore } from "../store";
 import { Avatar, Spinner, ThemeToggle } from "../ui";
@@ -186,6 +186,7 @@ const Sidebar = memo(function Sidebar({
 }) {
   const location = useLocation();
   const role = useAuthStore((s) => s.user?.role);
+  const workspaceName = useWorkspaceStore((s) => s.name);
 
   return (
     <>
@@ -209,7 +210,7 @@ const Sidebar = memo(function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {NAV_GROUPS.map((group, idx) => {
           const items = group.items.filter((item) => !item.roles || (!!role && item.roles.includes(role)));
           if (items.length === 0) return null;
@@ -217,7 +218,7 @@ const Sidebar = memo(function Sidebar({
           return (
           <div key={idx} className="space-y-1">
             {!collapsed ? (
-              <h3 className="px-3 text-[11px] font-bold uppercase tracking-wider text-fg-subtle/80 mb-1.5">
+              <h3 className="mb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                 {group.group}
               </h3>
             ) : (
@@ -237,25 +238,31 @@ const Sidebar = memo(function Sidebar({
                   end={item.end}
                   onClick={onNavigate}
                   title={collapsed ? `${item.label} (${group.group})` : undefined}
-                  className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+                  className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-100 ${
                     collapsed ? "justify-center px-0" : ""
                   } ${
                     isActive
-                      ? "bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-500/30"
-                      : "text-fg-muted hover:bg-surface-hover hover:text-fg"
+                      ? "bg-indigo-500/10 font-semibold text-indigo-600 dark:text-indigo-400"
+                      : "font-medium text-fg-muted hover:bg-surface-hover hover:text-fg"
                   }`}
                 >
+                  {/* A rail rather than a filled block: the active row stays
+                      legible against the page it leads to, and the eye tracks a
+                      single vertical marker down the list. */}
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-indigo-500 ${
+                        collapsed ? "-left-px" : ""
+                      }`}
+                    />
+                  )}
                   <IconComp
-                    className={`h-4 w-4 shrink-0 transition-transform duration-150 group-hover:scale-110 ${
-                      isActive ? "text-white" : "text-fg-muted group-hover:text-fg"
+                    className={`h-4 w-4 shrink-0 ${
+                      isActive ? "text-indigo-600 dark:text-indigo-400" : "text-fg-subtle group-hover:text-fg"
                     }`}
                   />
-                  {!collapsed && (
-                    <span className="truncate flex-1">{item.label}</span>
-                  )}
-                  {isActive && !collapsed && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                  )}
+                  {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
 
                   {/* Collapsed Tooltip on Hover */}
                   {collapsed && (
@@ -271,21 +278,36 @@ const Sidebar = memo(function Sidebar({
         })}
       </nav>
 
-      {/* Footer Workspace Badge */}
+      {/* Footer: the workspace you are actually in, and your role in it. The
+          old badge announced a hardcoded "Pro Plan · Active", which told nobody
+          anything and was wrong for every workspace but one. */}
       {!collapsed ? (
-        <div className="border-t border-line p-3 bg-surface-muted/40">
-          <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-2.5">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <div className="flex flex-col text-xs">
-              <span className="font-semibold text-fg">Autonex Workspace</span>
-              <span className="text-[11px] text-fg-muted">Pro Plan · Active</span>
-            </div>
+        <Link
+          to="/team"
+          onClick={onNavigate}
+          className="flex items-center gap-2.5 border-t border-line p-3 transition-colors hover:bg-surface-hover"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+            {(workspaceName || "W").slice(0, 2).toUpperCase()}
           </div>
-        </div>
+          <div className="flex min-w-0 flex-col text-xs">
+            <span className="truncate font-semibold text-fg">{workspaceName || "Workspace"}</span>
+            <span className="truncate text-[11px] capitalize text-fg-muted">
+              {role ? role.replace(/_/g, " ") : "Member"}
+            </span>
+          </div>
+        </Link>
       ) : (
-        <div className="border-t border-line p-3.5 flex justify-center">
-          <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" title="Autonex Workspace Active" />
-        </div>
+        <Link
+          to="/team"
+          onClick={onNavigate}
+          title={workspaceName || "Workspace"}
+          className="flex justify-center border-t border-line p-3 transition-colors hover:bg-surface-hover"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+            {(workspaceName || "W").slice(0, 2).toUpperCase()}
+          </div>
+        </Link>
       )}
     </>
   );

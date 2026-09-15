@@ -29,6 +29,17 @@ import { Alert, BoardSkeleton, Button, Icon, KanbanBoard, PageHeader } from "../
  */
 const BOARD_COLLAPSED_KEY = "gocrm.deals.boardCollapsed";
 
+/** Board sort orders. "default" keeps each column's own stored order. */
+type SortKey = "default" | "amountDesc" | "amountAsc" | "closeSoon" | "recent";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "default", label: "Default order" },
+  { key: "amountDesc", label: "Value: high to low" },
+  { key: "amountAsc", label: "Value: low to high" },
+  { key: "closeSoon", label: "Closing soonest" },
+  { key: "recent", label: "Recently updated" },
+];
+
 function readCollapsed(): boolean {
   // Wrapped because storage throws outright in some privacy modes, and during
   // SSR there is no localStorage at all.
@@ -140,7 +151,45 @@ export default function Deals() {
     }
   }, [location.state, location.pathname, navigate]);
 
-  const deals = query.data?.deals ?? [];
+  const allDeals = query.data?.deals ?? [];
+
+  // Board view controls. Sorting is applied per column by KanbanBoard's own
+  // ordering of the items it is handed, so sorting here sorts every column.
+  const [search, setSearch] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("default");
+
+  const deals = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    const filtered = allDeals.filter((d) => {
+      if (ownerFilter && d.ownerUserId !== ownerFilter) return false;
+      if (!term) return true;
+      // The fields someone actually types when hunting for a deal.
+      return [d.title, d.accountName, d.leadName, d.contactName, d.location, d.products]
+        .some((v) => v?.toLowerCase().includes(term));
+    });
+
+    if (sortBy === "default") return filtered;
+
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "amountDesc":
+          return b.amount - a.amount;
+        case "amountAsc":
+          return a.amount - b.amount;
+        case "closeSoon":
+          // Deals with no close date sink rather than claiming the top slot.
+          return (a.expectedCloseDate ?? "9999").localeCompare(b.expectedCloseDate ?? "9999");
+        case "recent":
+          return b.updatedAt.localeCompare(a.updatedAt);
+        default:
+          return 0;
+      }
+    });
+  }, [allDeals, search, ownerFilter, sortBy]);
+
+  const filtersActive = !!search.trim() || !!ownerFilter || sortBy !== "default";
 
   const totals = useMemo(() => {
     let open = 0;
@@ -351,6 +400,72 @@ export default function Deals() {
             </span>
           )}
         </button>
+
+        {!boardCollapsed && (
+          <div className="mb-sm flex flex-wrap items-center gap-sm">
+            <div className="relative min-w-52 flex-1">
+              <Icon
+                name="search"
+                size={14}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle"
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search deals, clients, products…"
+                aria-label="Search deals"
+                className="h-9 w-full rounded-lg border border-line bg-surface pl-8 pr-3 text-sm text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+            </div>
+
+            <select
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+              aria-label="Filter by owner"
+              className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-fg-muted focus:border-accent focus:outline-none"
+            >
+              <option value="">All owners</option>
+              {(members.data ?? []).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {memberLabel(m)}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              aria-label="Sort deals"
+              className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-fg-muted focus:border-accent focus:outline-none"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+
+            {filtersActive && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearch("");
+                  setOwnerFilter("");
+                  setSortBy("default");
+                }}
+              >
+                Clear
+              </Button>
+            )}
+
+            <span className="ml-auto text-xs text-fg-subtle">
+              {deals.length === allDeals.length
+                ? `${allDeals.length} deals`
+                : `${deals.length} of ${allDeals.length}`}
+            </span>
+          </div>
+        )}
 
         {/* Unmounted rather than hidden while collapsed: the board holds drag
             sensors and a card per deal, and none of that should keep running
