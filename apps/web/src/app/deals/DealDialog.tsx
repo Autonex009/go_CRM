@@ -17,7 +17,6 @@ import {
   Field,
   Modal,
   SelectField,
-  TextareaField,
 } from "../ui";
 import type { Deal, DealInput } from "./api";
 import { buildQuoteStateFromDeal } from "./quote-utils";
@@ -312,12 +311,12 @@ export function DealDialog({
           )}
         </div>
 
-        <TextareaField
-          label="Description"
-          rows={3}
-          error={errors.description?.message}
-          {...register("description")}
-        />
+        {/* Description is not shown any more: a deal's notes are its Tasks now,
+            edited from the card. The field stays registered but hidden so the
+            column round-trips untouched — the update endpoint is a full replace,
+            so dropping it from the payload would NULL whatever notes a deal
+            still carries. */}
+        <input type="hidden" {...register("description")} />
 
         {/* Existing deals carry a history; a new one has nothing to show yet.
             Collapsible here because the timeline sits between the fields and the

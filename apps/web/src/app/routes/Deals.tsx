@@ -5,9 +5,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { DealCard } from "../deals/DealCard";
 import { TrackerTable } from "../delivery/TrackerTable";
 import { DealDialog } from "../deals/DealDialog";
-import { ChecklistDialog } from "../deals/ChecklistDialog";
-import { dealsApi, toDealInput, type Deal, type DealInput } from "../deals/api";
-import { parseChecklist, serializeChecklist } from "../deals/checklist";
+import { TasksDialog } from "../deals/TasksDialog";
+import { dealsApi, type Deal, type DealInput } from "../deals/api";
+import { dealTasksApi, type DealTask } from "../deals/tasks";
 import { ActionDialog } from "../actions/ActionDialog";
 import { actionsApi, type Action, type ActionInput } from "../actions/api";
 import { MANAGER_ROLES } from "../auth/roles";
@@ -61,6 +61,24 @@ export default function Deals() {
     staleTime: 60_000,
     enabled: canSeeActions,
   });
+
+  // Tasks are rep-facing, so unlike actions this loads for everyone. One
+  // request for the whole board, grouped per card below.
+  const tasksQuery = useQuery({
+    queryKey: ["dealTasks"],
+    queryFn: () => dealTasksApi.list(),
+    staleTime: 60_000,
+  });
+
+  const tasksByDeal = useMemo(() => {
+    const map = new Map<string, DealTask[]>();
+    for (const task of tasksQuery.data ?? []) {
+      const list = map.get(task.dealId);
+      if (list) list.push(task);
+      else map.set(task.dealId, [task]);
+    }
+    return map;
+  }, [tasksQuery.data]);
 
   const members = useQuery({
     queryKey: ["members"],
@@ -204,28 +222,23 @@ export default function Deals() {
   );
   const onRemark = useCallback((deal: Deal) => setRemarkDeal(deal), []);
 
-  // Ticking a task rewrites the deal's checklist in place — the card stays put
-  // and the board refreshes from the mutation's invalidation.
-  const onToggleTask = useCallback(
-    (deal: Deal, itemId: string) => {
-      const items = parseChecklist(deal.remark ?? deal.description, [
-        deal.leadName ?? "",
-        deal.contactName ?? "",
-        deal.ownerName ?? "",
-      ]).map((item) =>
-        item.id === itemId ? { ...item, done: !item.done } : item,
-      );
-      const serialized = serializeChecklist(items);
-      save.mutate({
-        id: deal.id,
-        input: toDealInput(deal, {
-          description: serialized || undefined,
-          remark: serialized || undefined,
-        }),
-      });
+  // Ticking a task from the card. The server stamps who completed it, which is
+  // the reason this is a request rather than a local edit.
+  const toggleTask = useMutation({
+    mutationFn: (task: DealTask) =>
+      dealTasksApi.update(task.id, {
+        text: task.text,
+        priority: task.priority,
+        assignedTo: task.assignedTo,
+        done: !task.done,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["dealTasks"] });
     },
-    [save],
-  );
+    onError: (err) =>
+      setActionError(err instanceof ApiError ? err.message : "Could not update that task"),
+  });
+  const onToggleTask = useCallback((task: DealTask) => toggleTask.mutate(task), [toggleTask]);
 
   // Completing here and completing on the Actions dashboard are the same call,
   // so the two surfaces can never disagree about an action's status.
@@ -266,6 +279,7 @@ export default function Deals() {
         onRemark={onRemark}
         onGenerateQuote={onGenerateQuote}
         actions={actionsByDeal.get(deal.id)}
+        tasks={tasksByDeal.get(deal.id)}
         canSeeActions={canSeeActions}
         onToggleTask={onToggleTask}
         onCompleteAction={onCompleteAction}
@@ -277,6 +291,7 @@ export default function Deals() {
       onRemark,
       onGenerateQuote,
       actionsByDeal,
+      tasksByDeal,
       canSeeActions,
       onToggleTask,
       onCompleteAction,
@@ -391,11 +406,7 @@ export default function Deals() {
       )}
 
       {remarkDeal && (
-        <ChecklistDialog
-          deal={remarkDeal}
-          onClose={() => setRemarkDeal(null)}
-          onSubmit={(input) => save.mutateAsync({ id: remarkDeal.id, input })}
-        />
+        <TasksDialog deal={remarkDeal} onClose={() => setRemarkDeal(null)} />
       )}
     </section>
   );

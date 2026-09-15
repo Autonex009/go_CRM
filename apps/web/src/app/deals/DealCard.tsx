@@ -16,28 +16,23 @@ import { formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
 import { Avatar } from "../ui";
 import type { Deal } from "./api";
-import {
-  PRIORITY_META,
-  byPriority,
-  completedItems,
-  parseChecklist,
-  pendingItems,
-  type ChecklistItem,
-} from "./checklist";
+import { PRIORITY_META, byPriority, type DealTask } from "./tasks";
 import { daysUntil, formatDate, isClosed } from "./stages";
 
 interface DealCardProps {
   deal: Deal;
   overlay?: boolean;
-  /** Opens the checklist editor. */
+  /** Opens the task editor. */
   onRemark?: (deal: Deal) => void;
   onGenerateQuote?: (deal: Deal) => void;
   /** This deal's actions, already filtered by the board so the card fetches nothing. */
   actions?: Action[];
+  /** This deal's tasks, likewise grouped by the board. */
+  tasks?: DealTask[];
   /** Actions are manager-only server-side; reps never see the tab. */
   canSeeActions?: boolean;
-  /** Ticks one checklist item and persists the deal's remark. */
-  onToggleTask?: (deal: Deal, itemId: string) => void;
+  /** Ticks one task; the server records who did it. */
+  onToggleTask?: (task: DealTask) => void;
   onCompleteAction?: (actionId: string) => void;
   /** Opens the Actions dialog pre-filled with this deal. */
   onAddAction?: (deal: Deal) => void;
@@ -106,6 +101,7 @@ export const DealCard = memo(function DealCard({
   onRemark,
   onGenerateQuote,
   actions,
+  tasks,
   canSeeActions = false,
   onToggleTask,
   onCompleteAction,
@@ -123,15 +119,9 @@ export const DealCard = memo(function DealCard({
   // one rather than showing an empty header.
   const cardTitle = deal.title?.trim() || deal.accountName?.trim() || "Untitled deal";
 
-  // The lead and contact already have their own row on this card, so their
-  // names are stripped rather than repeated as a task.
-  const items = parseChecklist(deal.remark ?? deal.description, [
-    leadName ?? "",
-    deal.contactName ?? "",
-    deal.ownerName ?? "",
-  ]);
-  const pending = byPriority(pendingItems(items));
-  const doneCount = completedItems(items).length;
+  const allTasks = tasks ?? [];
+  const pending = byPriority(allTasks.filter((t) => !t.done));
+  const doneCount = allTasks.length - pending.length;
   const openActions = (actions ?? []).filter((a) => a.status !== "done");
 
   return (
@@ -199,7 +189,7 @@ export const DealCard = memo(function DealCard({
         </div>
       )}
 
-      {/* Execution panel: quick checklist, or this deal's actions */}
+      {/* Execution panel: quick tasks, or this deal's actions */}
       <TaskPanel
         deal={deal}
         pending={pending}
@@ -283,12 +273,12 @@ function TaskPanel({
   onEdit,
 }: {
   deal: Deal;
-  pending: ChecklistItem[];
+  pending: DealTask[];
   doneCount: number;
   openActions: Action[];
   canSeeActions: boolean;
   memberName?: (id: string | null) => string;
-  onToggleTask?: (deal: Deal, itemId: string) => void;
+  onToggleTask?: (task: DealTask) => void;
   onCompleteAction?: (actionId: string) => void;
   onAddAction?: (deal: Deal) => void;
   onEdit?: (deal: Deal) => void;
@@ -361,18 +351,18 @@ function TaskPanel({
         )}
 
         {showing === "tasks" &&
-          pending.slice(0, 3).map((item) => (
-            <li key={item.id} className="group flex items-start gap-2" onClick={stop}>
+          pending.slice(0, 3).map((task) => (
+            <li key={task.id} className="group flex items-start gap-2" onClick={stop}>
               <button
                 type="button"
                 role="checkbox"
                 aria-checked={false}
                 disabled={!onToggleTask}
-                onClick={() => onToggleTask?.(deal, item.id)}
-                aria-label={`${PRIORITY_META[item.priority].label} priority — mark "${item.text}" done`}
-                title={`${PRIORITY_META[item.priority].label} priority — mark done`}
+                onClick={() => onToggleTask?.(task)}
+                aria-label={`${PRIORITY_META[task.priority].label} priority — mark "${task.text}" done`}
+                title={`${PRIORITY_META[task.priority].label} priority — mark done`}
                 className={`mt-[2px] h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-transform enabled:hover:scale-125 disabled:cursor-default ${
-                  PRIORITY_META[item.priority].ring
+                  PRIORITY_META[task.priority].ring
                 }`}
               />
               <button
@@ -380,8 +370,13 @@ function TaskPanel({
                 onClick={() => onEdit?.(deal)}
                 className="min-w-0 flex-1 text-left text-xs leading-snug text-fg-muted transition-colors group-hover:text-fg"
               >
-                <span className="line-clamp-2">{item.text}</span>
+                <span className="line-clamp-2">{task.text}</span>
               </button>
+              {task.assignedToName && (
+                <span className="mt-[1px] shrink-0 truncate text-[10px] text-fg-subtle">
+                  {task.assignedToName}
+                </span>
+              )}
             </li>
           ))}
 
