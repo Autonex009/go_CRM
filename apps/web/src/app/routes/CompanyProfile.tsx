@@ -480,7 +480,7 @@ export default function CompanyProfilePage() {
           accountId={id!}
           mode={mode}
           formData={formData}
-          setFormData={(next: ProfileInput) => setFormData(next)}
+          setFormData={setFormData}
           deals={deals}
           leads={leads}
           contacts={contacts}
