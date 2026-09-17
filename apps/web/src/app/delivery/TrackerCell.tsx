@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 import { DELIVERY_STAGE_COLORS } from "./api";
 import type { TrackerColumn, TrackerInput } from "./api";
@@ -48,16 +48,6 @@ export const TrackerCell = memo(function TrackerCell({
   const isTextColumn = column.type === "text";
   const isSelectColumn = column.type === "select";
 
-  // Auto-resize the textarea to fit its content.
-  const autoResize = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    // Reset height to auto so scrollHeight recalculates from content, not
-    // from the previous height.
-    el.style.height = "auto";
-    el.style.height = `${Math.max(34, el.scrollHeight)}px`;
-  }, []);
-
   // A background refetch or an import can change the row under an idle cell.
   // Only adopt it when the cell is not being typed in, so a save in flight
   // cannot yank the caret.
@@ -67,11 +57,6 @@ export const TrackerCell = memo(function TrackerCell({
     const activeEl = isTextColumn ? textareaRef.current : inputRef.current;
     if (document.activeElement !== activeEl) setDraft(next);
   }, [value, isTextColumn]);
-
-  // Re-measure the textarea whenever the draft changes.
-  useEffect(() => {
-    if (isTextColumn) autoResize();
-  }, [draft, isTextColumn, autoResize]);
 
   const commit = () => {
     if (draft === committed.current) return;
@@ -84,9 +69,7 @@ export const TrackerCell = memo(function TrackerCell({
   // cell reads as a form, not a sheet. Focus is a ring drawn inside the
   // cell, so selecting a cell never shifts the grid by a pixel.
   const baseClassName = `w-full border-0 bg-transparent px-sm text-sm text-fg outline-none transition-shadow duration-75 placeholder:text-fg-subtle focus:relative focus:z-10 focus:bg-surface focus:shadow-[inset_0_0_0_2px_rgb(var(--accent))] ${
-    invalid
-      ? "bg-bad-soft/40 shadow-[inset_0_0_0_1px_rgb(var(--bad-fg))]"
-      : ""
+    invalid ? "bg-bad-soft/40 shadow-[inset_0_0_0_1px_rgb(var(--bad-fg))]" : ""
   } ${column.type === "number" ? "text-right tabular-nums" : ""}`;
 
   if (isSelectColumn) {
@@ -114,68 +97,88 @@ export const TrackerCell = memo(function TrackerCell({
         // The chosen stage tints its own cell, the way the sheet's conditional
         // formatting did. Options carry the same tint where the browser honours
         // it (Firefox does, Chrome does not) — the cell itself is what matters.
-        className={`h-[34px] cursor-pointer appearance-none font-medium ${
+        className={`h-full min-h-[34px] cursor-pointer appearance-none font-medium ${
           DELIVERY_STAGE_COLORS[current] ?? ""
         } ${baseClassName}`}
       >
         <option value="">—</option>
         {options.map((option) => (
-          <option
-            key={option}
-            value={option}
-            className={DELIVERY_STAGE_COLORS[option] ?? ""}
-          >
+          <option key={option} value={option} className={DELIVERY_STAGE_COLORS[option] ?? ""}>
             {option}
           </option>
         ))}
         {/* A value the sheet's list does not contain — imported before the
             column had one. Offered so the cell shows what it actually holds and
             selecting another row's stage cannot silently drop it. */}
-        {current !== "" && !options.includes(current) && (
-          <option value={current}>{current}</option>
-        )}
+        {current !== "" && !options.includes(current) && <option value={current}>{current}</option>}
       </select>
     );
   }
 
   if (isTextColumn) {
     return (
-      <textarea
-        ref={textareaRef}
-        data-cell={cellId}
-        value={draft}
-        autoFocus={autoFocus}
-        aria-label={column.label}
-        aria-invalid={invalid || undefined}
-        rows={1}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          switch (e.key) {
-            case "Enter":
-              if (e.shiftKey) {
-                // Shift+Enter = commit and move down (like a spreadsheet)
+      // The cell sizes itself to its text, in CSS, with nothing measured in JS.
+      //
+      // A hidden copy of the value shares one grid cell with the textarea. The
+      // copy gives the grid its height and the textarea stretches to fill it,
+      // so the browser does the wrapping and the measuring in the same layout
+      // pass. That is what fixes long text showing only its first line: height
+      // depends on width, and the old scrollHeight read happened once, at a
+      // width the table column had not settled on yet, and never ran again when
+      // the column later changed. This cannot fall out of step — resize the
+      // window, widen a column, load a font late, paste a paragraph, and the
+      // height simply follows.
+      //
+      // `w-0 min-w-full` is what keeps the copy from widening the column: a
+      // definite zero width contributes nothing when the table works out its
+      // intrinsic column sizes, while min-width still fills the real cell so
+      // the text wraps exactly as it does in the textarea.
+      //
+      // The trailing space holds the last line open when the value ends in a
+      // newline, which would otherwise collapse and hide it.
+      <div className="grid min-h-[34px] w-full">
+        <span
+          aria-hidden="true"
+          className="invisible col-start-1 row-start-1 w-0 min-w-full whitespace-pre-wrap break-words px-sm py-[7px] text-sm leading-snug"
+        >
+          {draft + " "}
+        </span>
+        <textarea
+          ref={textareaRef}
+          data-cell={cellId}
+          value={draft}
+          autoFocus={autoFocus}
+          aria-label={column.label}
+          aria-invalid={invalid || undefined}
+          rows={1}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            switch (e.key) {
+              case "Enter":
+                if (e.shiftKey) {
+                  // Shift+Enter = commit and move down (like a spreadsheet)
+                  e.preventDefault();
+                  commit();
+                  onNavigate("down");
+                }
+                // Plain Enter = newline (natural textarea behavior)
+                break;
+              case "Escape":
+                e.preventDefault();
+                setDraft(committed.current);
+                textareaRef.current?.blur();
+                break;
+              case "Tab":
                 e.preventDefault();
                 commit();
-                onNavigate("down");
-              }
-              // Plain Enter = newline (natural textarea behavior)
-              break;
-            case "Escape":
-              e.preventDefault();
-              setDraft(committed.current);
-              textareaRef.current?.blur();
-              break;
-            case "Tab":
-              e.preventDefault();
-              commit();
-              onNavigate(e.shiftKey ? "left" : "right");
-              break;
-          }
-        }}
-        className={`${baseClassName} resize-none overflow-hidden py-[7px] leading-snug`}
-        style={{ minHeight: "34px" }}
-      />
+                onNavigate(e.shiftKey ? "left" : "right");
+                break;
+            }
+          }}
+          className={`${baseClassName} col-start-1 row-start-1 resize-none overflow-hidden break-words py-[7px] leading-snug`}
+        />
+      </div>
     );
   }
 
@@ -221,7 +224,7 @@ export const TrackerCell = memo(function TrackerCell({
             break;
         }
       }}
-      className={`h-[34px] ${baseClassName}`}
+      className={`h-full min-h-[34px] ${baseClassName}`}
     />
   );
 });
@@ -229,16 +232,12 @@ export const TrackerCell = memo(function TrackerCell({
 function toText(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
   // A DATE arrives as a full timestamp; a date input accepts only YYYY-MM-DD.
-  if (typeof value === "string")
-    return value.length > 10 ? value.slice(0, 10) : value;
+  if (typeof value === "string") return value.length > 10 ? value.slice(0, 10) : value;
   return String(value);
 }
 
 /** Empty means NULL, not "" or 0 — an untouched cell has no value, not a zero. */
-function fromText(
-  text: string,
-  type: TrackerColumn["type"],
-): string | number | null {
+function fromText(text: string, type: TrackerColumn["type"]): string | number | null {
   const trimmed = text.trim();
   if (trimmed === "") return null;
   if (type !== "number") return trimmed;
