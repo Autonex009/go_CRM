@@ -73,7 +73,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
             {fileName ?? "Choose an .xlsx or .csv file"}
           </span>
           <span className="text-xs text-fg-muted">
-            The first sheet is read. A title row above the headings is fine.
+            Master tracker and client tabs are read. Title rows above headings are supported.
           </span>
           <input
             type="file"
@@ -161,7 +161,12 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
   );
 }
 
-function PreviewLine({ row }: { row: PreviewRow }) {
+interface PreviewLineProps {
+  row: PreviewRow;
+  key?: string;
+}
+
+function PreviewLine({ row }: PreviewLineProps) {
   const tone =
     row.action === "create"
       ? "success"
