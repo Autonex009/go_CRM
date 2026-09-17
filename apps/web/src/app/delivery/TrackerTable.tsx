@@ -160,9 +160,18 @@ export function TrackerTable() {
     // takes it directly. It deliberately does not refetch the tracker: a blanket
     // invalidate per keystroke-pause is what let a stale read overwrite a cell
     // that had just been typed into.
-    onSuccess: (fresh, { id }) => {
+    onSuccess: (fresh, { id, field }) => {
       setError(null);
       patchRow(id, (row) => mergeRow(row, fresh));
+
+      // A stage write may have moved the linked deal on the board — the server
+      // does that half of the sync, and `fresh` already carries the deal's new
+      // stage. Only the board needs telling, and only for this one column: the
+      // blanket invalidate this mutation deliberately avoids is what used to let
+      // a stale read overwrite a cell that had just been typed into.
+      if (field === "currentStages" && fresh.dealId) {
+        void queryClient.invalidateQueries({ queryKey: ["deals"] });
+      }
     },
     onError: (err, { id, field }, context) => {
       // Put back only this cell; other cells on the row may have edits of their

@@ -1,3 +1,4 @@
+import type { DealStage } from "../deals/stages";
 import { apiFetch } from "../lib/api";
 
 /** Mirrors delivery.Row (services/internal/delivery/service.go). */
@@ -88,6 +89,7 @@ export const DELIVERY_STAGE_OPTIONS = [
   "NDA / Demo",
   "Quotation Sent",
   "PoC",
+  "PO Received",
   "Deployment",
   "Deployed / Live",
 ] as const;
@@ -104,9 +106,59 @@ export const DELIVERY_STAGE_COLORS: Record<string, string> = {
   "NDA / Demo": "bg-indigo-100 text-indigo-900",
   "Quotation Sent": "bg-amber-100 text-amber-900",
   PoC: "bg-orange-100 text-orange-900",
+  "PO Received": "bg-lime-100 text-lime-900",
   Deployment: "bg-emerald-100 text-emerald-900",
   "Deployed / Live": "bg-green-200 text-green-900",
 };
+
+/**
+ * The two vocabularies for one pipeline, and the translation between them.
+ *
+ * Mirrors services/internal/delivery/stages.go — the server owns the sync and
+ * these are here so the grid can tell whether a chosen label would actually
+ * move the deal before it says anything about it.
+ *
+ * Neither map is a bijection, which is the whole subtlety:
+ *
+ *   * "NDA / Demo" and "PoC" are sub-stages. They move the deal to their parent,
+ *     and the server will not flatten them back afterwards.
+ *   * `negotiation` has no wording of its own and shows as "Quotation Sent", so
+ *     that label read back naively would drag a negotiating deal backwards. The
+ *     server refuses to move a deal that already displays as the chosen label.
+ */
+export const TRACKER_TO_DEAL_STAGE: Record<string, DealStage> = {
+  "Lead / Intro Call": "discovery",
+  "Use Case Discussion": "site_assessment",
+  "NDA / Demo": "site_assessment",
+  "Quotation Sent": "quote_sent",
+  PoC: "quote_sent",
+  "PO Received": "won",
+  Deployment: "delivery",
+  "Deployed / Live": "post_delivery",
+};
+
+export const DEAL_TO_TRACKER_STAGE: Record<DealStage, string> = {
+  discovery: "Lead / Intro Call",
+  site_assessment: "Use Case Discussion",
+  quote_sent: "Quotation Sent",
+  negotiation: "Quotation Sent",
+  won: "PO Received",
+  delivery: "Deployment",
+  post_delivery: "Deployed / Live",
+};
+
+/**
+ * Whether picking `label` on a row whose deal is in `dealStage` is a real move.
+ *
+ * False when the deal already displays as that label — the "Quotation Sent" on a
+ * negotiating deal case. The server applies the same rule; this is so the grid
+ * does not refetch the board for a write that changed nothing.
+ */
+export function movesTheDeal(label: string, dealStage?: string | null): boolean {
+  if (!TRACKER_TO_DEAL_STAGE[label]) return false;
+  if (!dealStage) return true;
+  return DEAL_TO_TRACKER_STAGE[dealStage as DealStage] !== label;
+}
 
 /**
  * The tracker's editable columns, in table order. One list drives the header,
