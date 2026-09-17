@@ -35,7 +35,7 @@ interface TrackerCellProps {
  * How long typing has to pause before a cell saves itself. Long enough not to
  * fire mid-word, short enough that little is lost if the tab closes.
  */
-const AUTOSAVE_DELAY_MS = 800;
+const AUTOSAVE_DELAY_MS = 1000;
 
 export const TrackerCell = memo(function TrackerCell({
   column,
@@ -46,10 +46,10 @@ export const TrackerCell = memo(function TrackerCell({
   invalid,
   cellId,
 }: TrackerCellProps) {
-  const [draft, setDraft] = useState(() => toText(value));
+  const [draft, setDraft] = useState(() => toText(value, column.type));
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const committed = useRef(toText(value));
+  const committed = useRef(toText(value, column.type));
 
   const isTextColumn = column.type === "text";
   const isSelectColumn = column.type === "select";
@@ -64,12 +64,12 @@ export const TrackerCell = memo(function TrackerCell({
   // so the pending autosave then saw draft === committed, decided there was
   // nothing to save, and the text was silently dropped on the next refetch.
   useEffect(() => {
-    const next = toText(value);
+    const next = toText(value, column.type);
     const activeEl = isTextColumn ? textareaRef.current : inputRef.current;
     if (document.activeElement === activeEl) return;
     committed.current = next;
     setDraft(next);
-  }, [value, isTextColumn]);
+  }, [value, isTextColumn, column.type]);
 
   // onCommit is a fresh closure on every parent render, so the autosave below
   // reads it through a ref. Depending on it directly would restart the timer
@@ -100,6 +100,12 @@ export const TrackerCell = memo(function TrackerCell({
   // saved twice.
   useEffect(() => {
     if (draft === committed.current) return;
+    // An identity column is how a row is told apart from its neighbours, so a
+    // half-typed value is not a smaller version of the change — it is a
+    // different row's name. Renaming "Thermax Jhadia" would save "Thermax J",
+    // "Thermax Jh" and so on, each one checked against the duplicate guard.
+    // These wait for blur, Tab or Enter, which is the whole value or nothing.
+    if ("identity" in column && column.identity) return;
 
     const timer = window.setTimeout(() => {
       if (draft === committed.current) return;
@@ -108,18 +114,39 @@ export const TrackerCell = memo(function TrackerCell({
     }, AUTOSAVE_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [draft, column.type]);
+  }, [draft, column]);
 
-  // Filtering the table, or anything else that unmounts a row, would otherwise
-  // throw away text typed in the last moment before it went: the autosave timer
-  // is cleared with the cell and blur never fires on a node that is removed.
+  // Everything that ends an edit without a blur and without the timer getting
+  // to run: the row being filtered away, the tab being hidden, the page being
+  // reloaded or closed. Each of these used to lose whatever had been typed in
+  // the last second, which is what made an edit "vanish on reload" — the text
+  // was only ever in the draft, never in a request.
   const flushRef = useRef<() => void>(() => {});
   flushRef.current = () => {
     if (draft === committed.current) return;
     committed.current = draft;
     onCommitRef.current(fromText(draft, column.type));
   };
-  useEffect(() => () => flushRef.current(), []);
+
+  useEffect(() => {
+    const flush = () => flushRef.current();
+    // pagehide covers reload, navigation and close — including the bfcache path
+    // that never fires unload. visibilitychange catches switching tab or app,
+    // which on mobile is often the last event a page gets.
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onHidden);
+      // The row itself going away is the same loss by another route.
+      flush();
+    };
+  }, []);
 
   // The input fills its cell edge to edge so the table's gridlines are the
   // only borders on screen — an input with its own border inside a bordered
@@ -133,7 +160,7 @@ export const TrackerCell = memo(function TrackerCell({
     // Widened to string[]: the const assertion on the options list narrows them
     // to a literal union, which cannot be compared against a stored value.
     const options: readonly string[] = column.options ?? [];
-    const current = toText(value);
+    const current = toText(value, column.type);
     return (
       <select
         data-cell={cellId}
@@ -144,7 +171,9 @@ export const TrackerCell = memo(function TrackerCell({
         // Committed on change rather than on blur: there is no half-typed state
         // to protect, and picking from a list is already the deliberate act that
         // blur stands in for on a text cell.
-        onChange={(e) => onCommit(e.target.value === "" ? null : e.target.value)}
+        onChange={(e) =>
+          onCommit(e.target.value === "" ? null : e.target.value)
+        }
         onKeyDown={(e) => {
           if (e.key === "Tab") {
             e.preventDefault();
@@ -160,14 +189,20 @@ export const TrackerCell = memo(function TrackerCell({
       >
         <option value="">—</option>
         {options.map((option) => (
-          <option key={option} value={option} className={DELIVERY_STAGE_COLORS[option] ?? ""}>
+          <option
+            key={option}
+            value={option}
+            className={DELIVERY_STAGE_COLORS[option] ?? ""}
+          >
             {option}
           </option>
         ))}
         {/* A value the sheet's list does not contain — imported before the
             column had one. Offered so the cell shows what it actually holds and
             selecting another row's stage cannot silently drop it. */}
-        {current !== "" && !options.includes(current) && <option value={current}>{current}</option>}
+        {current !== "" && !options.includes(current) && (
+          <option value={current}>{current}</option>
+        )}
       </select>
     );
   }
@@ -286,15 +321,32 @@ export const TrackerCell = memo(function TrackerCell({
   );
 });
 
-function toText(value: string | number | null | undefined): string {
+/**
+ * The stored value as the text a cell edits.
+ *
+ * The date trim is conditional on the column, which it was not: it sliced every
+ * string over ten characters down to its first ten. That is the whole of the
+ * "my edit disappears" bug. A client called "Thermax Jhagadia" came back from
+ * the server, was rendered as "Thermax Jh", and `committed` was set to that —
+ * so the next time the cell was left, the truncation was written to the
+ * database as the real value. Every text column over ten characters was being
+ * shortened on screen and then destroyed on the next blur.
+ */
+function toText(
+  value: string | number | null | undefined,
+  type: TrackerColumn["type"],
+): string {
   if (value === null || value === undefined) return "";
   // A DATE arrives as a full timestamp; a date input accepts only YYYY-MM-DD.
-  if (typeof value === "string") return value.length > 10 ? value.slice(0, 10) : value;
+  if (type === "date" && typeof value === "string") return value.slice(0, 10);
   return String(value);
 }
 
 /** Empty means NULL, not "" or 0 — an untouched cell has no value, not a zero. */
-function fromText(text: string, type: TrackerColumn["type"]): string | number | null {
+function fromText(
+  text: string,
+  type: TrackerColumn["type"],
+): string | number | null {
   const trimmed = text.trim();
   if (trimmed === "") return null;
   if (type !== "number") return trimmed;

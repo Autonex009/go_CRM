@@ -8,11 +8,23 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   headerAction?: ReactNode;
-  /** `lg` for forms, `sm` for confirmations. */
-  size?: "sm" | "lg";
+  /** `lg` for forms, `sm` for confirmations, `xl` for a working surface. */
+  size?: "sm" | "lg" | "xl";
+  /**
+   * Drops the body padding and its scrollbar, for a dialog whose own panels
+   * scroll — a split view needs each side to scroll independently, which one
+   * scroller around the whole body cannot do.
+   */
+  flush?: boolean;
 }
 
-const SIZES = { sm: "max-w-[420px]", lg: "max-w-[560px]" };
+const SIZES = {
+  sm: "max-w-[420px]",
+  lg: "max-w-[560px]",
+  // Tall as well as wide: a working surface is only usable if it keeps the
+  // height it asked for instead of collapsing to its emptiest panel.
+  xl: "max-w-[1280px] h-[88vh]",
+};
 
 /**
  * Centered dialog. Escape and backdrop close, body scroll locked, labelled
@@ -28,7 +40,14 @@ const SIZES = { sm: "max-w-[420px]", lg: "max-w-[560px]" };
  * dragged its own title bar off the top of the screen and took the Save button
  * with it.
  */
-export function Modal({ title, onClose, children, headerAction, size = "lg" }: ModalProps) {
+export function Modal({
+  title,
+  onClose,
+  children,
+  headerAction,
+  size = "lg",
+  flush = false,
+}: ModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -67,7 +86,13 @@ export function Modal({ title, onClose, children, headerAction, size = "lg" }: M
             the body claims its full content height and the dialog overflows the
             viewport instead of scrolling. overscroll-contain stops a scroll that
             reaches the end here from continuing on the page behind. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-lg">{children}</div>
+        <div
+          className={`min-h-0 flex-1 overscroll-contain ${
+            flush ? "overflow-hidden" : "overflow-y-auto p-lg"
+          }`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

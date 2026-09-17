@@ -1,7 +1,13 @@
 import { Link } from "react-router-dom";
 
 import { Badge, Button } from "../ui";
-import { ACTION_STATUS_LABEL, dueLabel, isOverdue, type Action, type ActionStatus } from "./api";
+import {
+  ACTION_STATUS_LABEL,
+  dueLabel,
+  isOverdue,
+  type Action,
+  type ActionStatus,
+} from "./api";
 
 const STATUS_TONE: Record<ActionStatus, "neutral" | "info" | "success"> = {
   open: "neutral",
@@ -53,7 +59,9 @@ export function ActionsTable({
               <tr
                 key={action.id}
                 className={`border-b border-line transition-colors duration-100 last:border-0 ${
-                  overdue ? "bg-bad-soft/40 hover:bg-bad-soft/60" : "hover:bg-surface-hover"
+                  overdue
+                    ? "bg-bad-soft/40 hover:bg-bad-soft/60"
+                    : "hover:bg-surface-hover"
                 }`}
               >
                 <td className="px-lg py-sm">
@@ -88,7 +96,9 @@ export function ActionsTable({
                   </td>
                 )}
 
-                <td className="px-lg py-sm text-fg-muted">{assigneeName(action.assignedTo)}</td>
+                <td className="px-lg py-sm text-fg-muted">
+                  {assigneeName(action.assignedTo)}
+                </td>
 
                 <td
                   className={`px-lg py-sm text-xs ${

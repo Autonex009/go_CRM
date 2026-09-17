@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import {
   Calendar,
   AlertTriangle,
@@ -8,10 +8,10 @@ import {
   Layers,
   FileText,
   Plus,
-  Check,
+  ChevronRight,
 } from "lucide-react";
 
-import { dueLabel, type Action } from "../actions/api";
+import type { Action } from "../actions/api";
 import { formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
 import { Avatar } from "../ui";
@@ -22,8 +22,8 @@ import { daysUntil, formatDate, isClosed } from "./stages";
 interface DealCardProps {
   deal: Deal;
   overlay?: boolean;
-  /** Opens the task editor. */
-  onRemark?: (deal: Deal) => void;
+  /** Opens the deal's working view: its tasks beside its actions. */
+  onOpenWork?: (deal: Deal) => void;
   onGenerateQuote?: (deal: Deal) => void;
   /** This deal's actions, already filtered by the board so the card fetches nothing. */
   actions?: Action[];
@@ -33,10 +33,6 @@ interface DealCardProps {
   canSeeActions?: boolean;
   /** Ticks one task; the server records who did it. */
   onToggleTask?: (task: DealTask) => void;
-  onCompleteAction?: (actionId: string) => void;
-  /** Opens the Actions dialog pre-filled with this deal. */
-  onAddAction?: (deal: Deal) => void;
-  memberName?: (id: string | null) => string;
 }
 
 /**
@@ -98,15 +94,12 @@ function parseDealCardInfo(deal: Deal) {
 export const DealCard = memo(function DealCard({
   deal,
   overlay = false,
-  onRemark,
+  onOpenWork,
   onGenerateQuote,
   actions,
   tasks,
   canSeeActions = false,
   onToggleTask,
-  onCompleteAction,
-  onAddAction,
-  memberName,
 }: DealCardProps) {
   const currency = useCurrency();
   const rawOwner = deal.ownerName?.trim() || deal.ownerEmail;
@@ -117,7 +110,8 @@ export const DealCard = memo(function DealCard({
 
   // A deal without its own name is still about a client, so the card says which
   // one rather than showing an empty header.
-  const cardTitle = deal.title?.trim() || deal.accountName?.trim() || "Untitled deal";
+  const cardTitle =
+    deal.title?.trim() || deal.accountName?.trim() || "Untitled deal";
 
   const allTasks = tasks ?? [];
   const pending = byPriority(allTasks.filter((t) => !t.done));
@@ -187,18 +181,16 @@ export const DealCard = memo(function DealCard({
         </div>
       )}
 
-      {/* Execution panel: quick tasks, or this deal's actions */}
+      {/* Execution panel: the deal's outstanding tasks, and the way in to the
+          full working view. */}
       <TaskPanel
         deal={deal}
         pending={pending}
         doneCount={doneCount}
-        openActions={openActions}
+        openActionCount={openActions.length}
         canSeeActions={canSeeActions}
-        memberName={memberName}
         onToggleTask={onToggleTask}
-        onCompleteAction={onCompleteAction}
-        onAddAction={onAddAction}
-        onEdit={onRemark}
+        onOpenWork={onOpenWork}
       />
 
       {/* Footer: owner on the left, the date that matters on the right. The
@@ -209,10 +201,14 @@ export const DealCard = memo(function DealCard({
           {owner ? (
             <>
               <Avatar name={owner} title={deal.ownerEmail ?? owner} size="xs" />
-              <span className="max-w-24 truncate text-[11px] text-fg-muted">{owner}</span>
+              <span className="max-w-24 truncate text-[11px] text-fg-muted">
+                {owner}
+              </span>
             </>
           ) : (
-            <span className="text-[11px] italic text-fg-subtle">Unassigned</span>
+            <span className="text-[11px] italic text-fg-subtle">
+              Unassigned
+            </span>
           )}
 
           {onGenerateQuote && (
@@ -260,68 +256,70 @@ function TaskPanel({
   deal,
   pending,
   doneCount,
-  openActions,
+  openActionCount,
   canSeeActions,
-  memberName,
   onToggleTask,
-  onCompleteAction,
-  onAddAction,
-  onEdit,
+  onOpenWork,
 }: {
   deal: Deal;
   pending: DealTask[];
   doneCount: number;
-  openActions: Action[];
+  openActionCount: number;
   canSeeActions: boolean;
-  memberName?: (id: string | null) => string;
   onToggleTask?: (task: DealTask) => void;
-  onCompleteAction?: (actionId: string) => void;
-  onAddAction?: (deal: Deal) => void;
-  onEdit?: (deal: Deal) => void;
+  onOpenWork?: (deal: Deal) => void;
 }) {
-  const [tab, setTab] = useState<"tasks" | "actions">("tasks");
-  // The toggle is always present for managers, even on an empty deal: it is how
-  // you reach the Actions side to add the first one.
-  const showing = canSeeActions ? tab : "tasks";
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
-
-  const addHere = showing === "tasks" ? onEdit : onAddAction;
-  const addLabel = showing === "tasks" ? "Add task" : "Add action";
 
   return (
     <div className="mt-2.5 border-t border-line/60 pt-2">
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <div
-          className="flex items-center gap-0.5 rounded-lg bg-surface-muted/70 p-0.5"
-          onClick={stop}
+        {/* One door, not a tab strip: the dialog shows tasks and actions side
+            by side, so there is nothing here to choose between. It carries both
+            counts, which is the reason to open it. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            stop(e);
+            onOpenWork?.(deal);
+          }}
+          disabled={!onOpenWork}
+          title="Open tasks and actions"
+          className="flex items-center gap-1.5 rounded-lg bg-surface-muted/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-fg-subtle transition-colors enabled:hover:bg-indigo-500/10 enabled:hover:text-indigo-600 disabled:cursor-default dark:enabled:hover:text-indigo-400"
         >
-          <PanelTab
-            active={showing === "tasks"}
-            onClick={() => setTab("tasks")}
-            count={pending.length}
-          >
+          <span>
             Tasks
-          </PanelTab>
+            {pending.length > 0 && (
+              <span className="ml-1 tabular-nums opacity-70">
+                {pending.length}
+              </span>
+            )}
+          </span>
           {canSeeActions && (
-            <PanelTab
-              active={showing === "actions"}
-              onClick={() => setTab("actions")}
-              count={openActions.length}
-            >
-              Actions
-            </PanelTab>
+            <>
+              <span className="opacity-40">·</span>
+              <span>
+                Actions
+                {openActionCount > 0 && (
+                  <span className="ml-1 tabular-nums opacity-70">
+                    {openActionCount}
+                  </span>
+                )}
+              </span>
+            </>
           )}
-        </div>
+          <ChevronRight className="h-3 w-3" />
+        </button>
 
-        {addHere && (
+        {onOpenWork && (
           <button
             type="button"
             onClick={(e) => {
               stop(e);
-              addHere(deal);
+              onOpenWork(deal);
             }}
             className="rounded p-0.5 text-fg-subtle transition-colors hover:bg-indigo-500/10 hover:text-indigo-600"
-            title={addLabel}
+            title="Add task"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -329,146 +327,71 @@ function TaskPanel({
       </div>
 
       <ul className="flex flex-col gap-1">
-        {(showing === "tasks" ? pending.length : openActions.length) === 0 && (
+        {pending.length === 0 && (
           <li>
             <button
               type="button"
-              disabled={!addHere}
+              disabled={!onOpenWork}
               onClick={(e) => {
                 stop(e);
-                addHere?.(deal);
+                onOpenWork?.(deal);
               }}
               className="text-left text-[11px] italic text-fg-subtle transition-colors enabled:hover:text-indigo-600 disabled:cursor-default"
             >
-              {showing === "tasks"
-                ? doneCount > 0
-                  ? "All tasks done"
-                  : "No tasks yet — add one"
-                : "No actions yet — add one"}
+              {doneCount > 0 ? "All tasks done" : "No tasks yet — add one"}
             </button>
           </li>
         )}
 
-        {showing === "tasks" &&
-          pending.slice(0, 3).map((task) => (
-            <li key={task.id} className="group flex items-start gap-2" onClick={stop}>
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={false}
-                disabled={!onToggleTask}
-                onClick={() => onToggleTask?.(task)}
-                aria-label={`${PRIORITY_META[task.priority].label} priority — mark "${task.text}" done`}
-                title={`${PRIORITY_META[task.priority].label} priority — mark done`}
-                className={`mt-[2px] h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-transform enabled:hover:scale-125 disabled:cursor-default ${
-                  PRIORITY_META[task.priority].ring
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => onEdit?.(deal)}
-                className="min-w-0 flex-1 text-left text-xs leading-snug text-fg-muted transition-colors group-hover:text-fg"
-              >
-                {/* Wraps onto as many lines as the task needs. It used to be
+        {pending.slice(0, 3).map((task) => (
+          <li
+            key={task.id}
+            className="group flex items-start gap-2"
+            onClick={stop}
+          >
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={false}
+              disabled={!onToggleTask}
+              onClick={() => onToggleTask?.(task)}
+              aria-label={`${PRIORITY_META[task.priority].label} priority — mark "${task.text}" done`}
+              title={`${PRIORITY_META[task.priority].label} priority — mark done`}
+              className={`mt-[2px] h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-transform enabled:hover:scale-125 disabled:cursor-default ${
+                PRIORITY_META[task.priority].ring
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => onOpenWork?.(deal)}
+              className="min-w-0 flex-1 text-left text-xs leading-snug text-fg-muted transition-colors group-hover:text-fg"
+            >
+              {/* Wraps onto as many lines as the task needs. It used to be
                     clamped to two, which cut the end off any task written as a
                     sentence — and a truncated instruction is worse than none.
                     `break-words` is what keeps a long unbroken token (a URL, a
                     part number) from pushing the card wider than its column. */}
-                <span className="block whitespace-pre-wrap break-words">{task.text}</span>
-              </button>
-              {task.assignedToName && (
-                <span className="mt-[1px] shrink-0 truncate text-[10px] text-fg-subtle">
-                  {task.assignedToName}
-                </span>
-              )}
-            </li>
-          ))}
-
-        {showing === "actions" &&
-          openActions.slice(0, 3).map((action) => {
-            const due = dueLabel(action);
-            return (
-              <li key={action.id} className="flex items-start gap-2" onClick={stop}>
-                <button
-                  type="button"
-                  disabled={!onCompleteAction}
-                  onClick={() => onCompleteAction?.(action.id)}
-                  title="Mark done"
-                  className="mt-[3px] flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border border-line text-transparent transition-colors hover:border-emerald-500 hover:text-emerald-500 disabled:cursor-default"
-                >
-                  <Check className="h-2.5 w-2.5" />
-                </button>
-                <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 text-xs leading-snug text-fg-muted">
-                    {action.title}
-                  </span>
-                  {/* Who owns it is the reason this view exists — including
-                      when nobody does yet, which is a prompt to go and pick. */}
-                  {memberName && (
-                    <span
-                      className={`block truncate text-[10px] ${
-                        action.assignedTo ? "text-fg-subtle" : "italic text-amber-600"
-                      }`}
-                    >
-                      {memberName(action.assignedTo)}
-                    </span>
-                  )}
-                </span>
-                <span
-                  className={`mt-[1px] shrink-0 text-[10px] ${
-                    due.tone === "overdue"
-                      ? "font-semibold text-rose-500"
-                      : due.tone === "due"
-                        ? "font-semibold text-amber-600"
-                        : "text-fg-subtle"
-                  }`}
-                >
-                  {due.text}
-                </span>
-              </li>
-            );
-          })}
+              <span className="block whitespace-pre-wrap break-words">
+                {task.text}
+              </span>
+            </button>
+            {task.assignedToName && (
+              <span className="mt-[1px] shrink-0 truncate text-[10px] text-fg-subtle">
+                {task.assignedToName}
+              </span>
+            )}
+          </li>
+        ))}
       </ul>
 
-      {showing === "tasks" && (pending.length > 3 || doneCount > 0) && (
+      {(pending.length > 3 || doneCount > 0) && (
         <p className="mt-1 text-[10px] text-fg-subtle">
           {pending.length > 3 && `+${pending.length - 3} more`}
           {pending.length > 3 && doneCount > 0 && " · "}
           {doneCount > 0 && `${doneCount} done`}
         </p>
       )}
-      {showing === "actions" && openActions.length > 3 && (
-        <p className="mt-1 text-[10px] text-fg-subtle">+{openActions.length - 3} more</p>
-      )}
     </div>
-  );
-}
-
-function PanelTab({
-  active,
-  onClick,
-  count,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  count: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
-        active
-          ? "bg-surface text-indigo-600 shadow-xs dark:text-indigo-400"
-          : "text-fg-subtle hover:text-fg-muted"
-      }`}
-    >
-      {children}
-      {count > 0 && <span className="ml-1 tabular-nums opacity-70">{count}</span>}
-    </button>
   );
 }
 

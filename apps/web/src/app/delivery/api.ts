@@ -114,7 +114,13 @@ export const DELIVERY_STAGE_COLORS: Record<string, string> = {
  * the others.
  */
 export const TRACKER_COLUMNS = [
-  { key: "client", label: "Client", type: "text", width: "min-w-[180px]" },
+  {
+    key: "client",
+    label: "Client",
+    type: "text",
+    width: "min-w-[180px]",
+    identity: true,
+  },
   {
     key: "products",
     label: "Product(s)",
@@ -128,6 +134,7 @@ export const TRACKER_COLUMNS = [
     type: "text",
     width: "min-w-[180px]",
     syncedWithDeal: true,
+    identity: true,
   },
   {
     key: "totalCameras",
@@ -176,6 +183,13 @@ export const TRACKER_COLUMNS = [
    * link is being able to fix a camera count wherever you are looking.
    */
   syncedWithDeal?: boolean;
+  /**
+   * Part of what makes a row unique: no two unlinked rows may share a client
+   * and a location. These commit on blur rather than on a typing pause — a
+   * pause-save would write every half-typed name as a real one, and each of
+   * those has to be checked against the same guard.
+   */
+  identity?: boolean;
 }[];
 
 export type TrackerColumn = (typeof TRACKER_COLUMNS)[number];
@@ -252,10 +266,17 @@ export const deliveryApi = {
   create: (input: TrackerInput) =>
     apiFetch<TrackerRow>(BASE, { method: "POST", body: JSON.stringify(input) }),
 
+  /**
+   * `keepalive` so a write started as the page goes away still leaves the
+   * browser. A cell flushes its draft on pagehide, and without this the request
+   * was cancelled with the document — which is what made a just-typed value
+   * come back blank after a reload.
+   */
   update: (id: string, input: TrackerInput) =>
     apiFetch<TrackerRow>(`${BASE}/${id}`, {
       method: "PUT",
       body: JSON.stringify(input),
+      keepalive: true,
     }),
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),

@@ -109,21 +109,27 @@ export function TrackerTable() {
    * what the cache already holds, because the response was assembled before
    * those writes reached the database.
    */
-  const mergeRow = useCallback((cached: TrackerRow, fresh: TrackerRow): TrackerRow => {
-    const merged = { ...fresh };
-    for (const key of Object.keys(fresh) as (keyof TrackerRow)[]) {
-      if (pending.current.has(pendingKey(cached.id, key as TrackerField))) {
-        (merged as Record<string, unknown>)[key] = cached[key];
+  const mergeRow = useCallback(
+    (cached: TrackerRow, fresh: TrackerRow): TrackerRow => {
+      const merged = { ...fresh };
+      for (const key of Object.keys(fresh) as (keyof TrackerRow)[]) {
+        if (pending.current.has(pendingKey(cached.id, key as TrackerField))) {
+          (merged as Record<string, unknown>)[key] = cached[key];
+        }
       }
-    }
-    return merged;
-  }, []);
+      return merged;
+    },
+    [],
+  );
 
   const patchRow = useCallback(
     (id: string, patch: (row: TrackerRow) => TrackerRow) => {
       queryClient.setQueryData<TrackerPage>(["delivery"], (old) =>
         old
-          ? { ...old, items: old.items.map((r) => (r.id === id ? patch(r) : r)) }
+          ? {
+              ...old,
+              items: old.items.map((r) => (r.id === id ? patch(r) : r)),
+            }
           : old,
       );
     },
@@ -131,8 +137,14 @@ export function TrackerTable() {
   );
 
   const save = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: TrackerInput; field: TrackerField }) =>
-      deliveryApi.update(id, input),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: TrackerInput;
+      field: TrackerField;
+    }) => deliveryApi.update(id, input),
     onMutate: async ({ id, input, field }) => {
       // Stop a refetch already in flight from landing on top of this edit with
       // the value it read before the change.
@@ -155,8 +167,11 @@ export function TrackerTable() {
     onError: (err, { id, field }, context) => {
       // Put back only this cell; other cells on the row may have edits of their
       // own in flight, and restoring a whole snapshot would discard them.
-      patchRow(id, (row) => ({ ...row, [field]: context?.previousValue ?? null }));
-      setError(err instanceof ApiError ? err.message : "Could not save that change");
+      patchRow(id, (row) => ({
+        ...row,
+        [field]: context?.previousValue ?? null,
+      }));
+      setError(saveErrorMessage(err, field));
     },
     onSettled: (_fresh, _err, { id, field }) => {
       clearPending(id, field);
@@ -522,6 +537,24 @@ export function TrackerTable() {
       )}
     </Card>
   );
+}
+
+/**
+ * What went wrong, said in terms of the sheet.
+ *
+ * The one error people actually hit here is the duplicate guard, and the
+ * server's wording for it — "another row already tracks that client" — is true
+ * but unhelpful: rows are unique on client *and* location, so it reads as if a
+ * client may only appear once. That is wrong, and it is exactly what someone
+ * correcting a mistyped plant name needs to understand.
+ */
+function saveErrorMessage(err: unknown, field: TrackerField): string {
+  if (err instanceof ApiError && err.status === 409) {
+    if (field === "client" || field === "locations") {
+      return "Another row already tracks that client at that location. Give this row a different location, or delete the row that duplicates it.";
+    }
+  }
+  return err instanceof ApiError ? err.message : "Could not save that change";
 }
 
 /**

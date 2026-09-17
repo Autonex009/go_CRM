@@ -9,49 +9,31 @@ import {
   ACTION_STATUSES,
   ACTION_STATUS_LABEL,
   actionsApi,
-  isDueToday,
-  isOverdue,
   type Action,
   type ActionFilter,
 } from "../actions/api";
-import { beforeToday, dayRange, weekRange } from "../actions/dates";
+import {
+  DateInput,
+  FilterPill,
+  MetricCard,
+  actionMetrics,
+  hasActiveFilters,
+  viewBounds,
+  type View,
+} from "../actions/ActionViews";
 import { useActionMutations } from "../actions/useActionMutations";
 import { leadsApi } from "../leads/api";
 import { ApiError } from "../lib/api";
 import { memberLabel, orgApi } from "../org/api";
-import { Alert, Button, Card, EmptyState, PageHeader, SelectField, Skeleton } from "../ui";
-
-/**
- * The saved views behind the KPI cards and the due-date pills. Each one is a
- * filter patch rather than a separate code path, which is what keeps a card's
- * number and the list it opens describing the same set of actions.
- */
-type View = "all" | "overdue" | "today" | "week" | "active" | "done" | "custom";
-
-type DueBounds = Pick<ActionFilter, "dueAfter" | "dueBefore" | "status" | "excludeDone">;
-
-function viewBounds(view: View): DueBounds {
-  switch (view) {
-    case "overdue":
-      return { dueAfter: undefined, dueBefore: beforeToday(), excludeDone: true, status: undefined };
-    case "today": {
-      const { start, end } = dayRange();
-      return { dueAfter: start, dueBefore: end, excludeDone: true, status: undefined };
-    }
-    case "week": {
-      const { start, end } = weekRange();
-      return { dueAfter: start, dueBefore: end, excludeDone: undefined, status: undefined };
-    }
-    case "active":
-      return { dueAfter: undefined, dueBefore: undefined, excludeDone: true, status: undefined };
-    case "done":
-      return { dueAfter: undefined, dueBefore: undefined, excludeDone: undefined, status: "done" };
-    case "custom":
-      return {};
-    default:
-      return { dueAfter: undefined, dueBefore: undefined, excludeDone: undefined, status: undefined };
-  }
-}
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  SelectField,
+  Skeleton,
+} from "../ui";
 
 export default function Actions() {
   const [filter, setFilter] = useState<ActionFilter>({});
@@ -88,12 +70,16 @@ export default function Actions() {
   });
 
   const accountName = useMemo(() => {
-    const map = new Map((accounts.data?.items ?? []).map((a) => [a.id, a.name]));
+    const map = new Map(
+      (accounts.data?.items ?? []).map((a) => [a.id, a.name]),
+    );
     return (id: string | null) => (id ? (map.get(id) ?? "—") : "—");
   }, [accounts.data]);
 
   const memberName = useMemo(() => {
-    const map = new Map((members.data ?? []).map((m) => [m.id, memberLabel(m)]));
+    const map = new Map(
+      (members.data ?? []).map((m) => [m.id, memberLabel(m)]),
+    );
     return (id: string | null) => (id ? (map.get(id) ?? "—") : "Unassigned");
   }, [members.data]);
 
@@ -105,23 +91,18 @@ export default function Actions() {
 
   const leadName = useMemo(() => {
     const map = new Map(
-      (leadsQuery.data?.items ?? []).map((l) => [l.id, `${l.firstName} ${l.lastName || ""}`.trim()]),
+      (leadsQuery.data?.items ?? []).map((l) => [
+        l.id,
+        `${l.firstName} ${l.lastName || ""}`.trim(),
+      ]),
     );
     return (id: string | null) => (id ? map.get(id) : undefined);
   }, [leadsQuery.data]);
 
-  // Each count is the size of the list its card opens, so clicking a card never
-  // shows a different number than the card did.
-  const metrics = useMemo(() => {
-    const all = metricsQuery.data ?? [];
-    return {
-      total: all.length,
-      overdue: all.filter(isOverdue).length,
-      dueToday: all.filter(isDueToday).length,
-      active: all.filter((a) => a.status !== "done").length,
-      done: all.filter((a) => a.status === "done").length,
-    };
-  }, [metricsQuery.data]);
+  const metrics = useMemo(
+    () => actionMetrics(metricsQuery.data ?? []),
+    [metricsQuery.data],
+  );
 
   // Views only ever replace the date/status part of the filter — the client and
   // assignee a manager picked stay put while they scan across due dates.
@@ -130,9 +111,7 @@ export default function Actions() {
     setFilter((f) => ({ ...f, ...viewBounds(next) }));
   };
 
-  const hasFilters =
-    !!filter.accountId || !!filter.assignedTo || !!filter.status || !!filter.dueAfter ||
-    !!filter.dueBefore || !!filter.excludeDone;
+  const hasFilters = hasActiveFilters(filter);
 
   const resetFilters = () => {
     setFilter({});
@@ -153,7 +132,11 @@ export default function Actions() {
       <PageHeader
         title="Actions"
         subtitle="Plan and track what needs doing across clients and deals."
-        action={<Button icon="plus" onClick={() => setDialog({ action: null })}>New action</Button>}
+        action={
+          <Button icon="plus" onClick={() => setDialog({ action: null })}>
+            New action
+          </Button>
+        }
       />
 
       <div className="grid grid-cols-2 gap-md sm:grid-cols-5">
@@ -198,7 +181,12 @@ export default function Actions() {
             <AccountSelect
               label="Client"
               value={filter.accountId ?? ""}
-              onChange={(e) => setFilter((f) => ({ ...f, accountId: e.target.value || undefined }))}
+              onChange={(e) =>
+                setFilter((f) => ({
+                  ...f,
+                  accountId: e.target.value || undefined,
+                }))
+              }
             />
           </div>
 
@@ -206,7 +194,12 @@ export default function Actions() {
             <SelectField
               label="Assignee"
               value={filter.assignedTo ?? ""}
-              onChange={(e) => setFilter((f) => ({ ...f, assignedTo: e.target.value || undefined }))}
+              onChange={(e) =>
+                setFilter((f) => ({
+                  ...f,
+                  assignedTo: e.target.value || undefined,
+                }))
+              }
             >
               <option value="">All assignees</option>
               {(members.data ?? []).map((m) => (
@@ -230,7 +223,13 @@ export default function Actions() {
                 <FilterPill
                   key={s}
                   active={filter.status === s}
-                  onClick={() => setFilter((f) => ({ ...f, status: s, excludeDone: undefined }))}
+                  onClick={() =>
+                    setFilter((f) => ({
+                      ...f,
+                      status: s,
+                      excludeDone: undefined,
+                    }))
+                  }
                 >
                   {ACTION_STATUS_LABEL[s]}
                 </FilterPill>
@@ -239,7 +238,12 @@ export default function Actions() {
           </div>
 
           {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={resetFilters} className="mb-1 self-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="mb-1 self-end"
+            >
               Clear filters
             </Button>
           )}
@@ -248,19 +252,34 @@ export default function Actions() {
         <div className="flex flex-wrap items-center gap-md border-t border-line/60 pt-sm">
           <span className="text-xs font-medium text-fg-muted">Due date</span>
           <div className="flex flex-wrap items-center gap-1">
-            <FilterPill active={view === "all"} onClick={() => applyView("all")}>
+            <FilterPill
+              active={view === "all"}
+              onClick={() => applyView("all")}
+            >
               All time
             </FilterPill>
-            <FilterPill active={view === "overdue"} onClick={() => applyView("overdue")}>
+            <FilterPill
+              active={view === "overdue"}
+              onClick={() => applyView("overdue")}
+            >
               Overdue
             </FilterPill>
-            <FilterPill active={view === "today"} onClick={() => applyView("today")}>
+            <FilterPill
+              active={view === "today"}
+              onClick={() => applyView("today")}
+            >
               Today
             </FilterPill>
-            <FilterPill active={view === "week"} onClick={() => applyView("week")}>
+            <FilterPill
+              active={view === "week"}
+              onClick={() => applyView("week")}
+            >
               This week
             </FilterPill>
-            <FilterPill active={view === "custom"} onClick={() => setView("custom")}>
+            <FilterPill
+              active={view === "custom"}
+              onClick={() => setView("custom")}
+            >
               Custom range
             </FilterPill>
           </div>
@@ -271,14 +290,20 @@ export default function Actions() {
                 label="From"
                 value={filter.dueAfter?.slice(0, 10) ?? ""}
                 onChange={(day) =>
-                  setFilter((f) => ({ ...f, dueAfter: day ? `${day}T00:00:00Z` : undefined }))
+                  setFilter((f) => ({
+                    ...f,
+                    dueAfter: day ? `${day}T00:00:00Z` : undefined,
+                  }))
                 }
               />
               <DateInput
                 label="To"
                 value={filter.dueBefore?.slice(0, 10) ?? ""}
                 onChange={(day) =>
-                  setFilter((f) => ({ ...f, dueBefore: day ? `${day}T23:59:59Z` : undefined }))
+                  setFilter((f) => ({
+                    ...f,
+                    dueBefore: day ? `${day}T23:59:59Z` : undefined,
+                  }))
                 }
               />
             </div>
@@ -288,7 +313,11 @@ export default function Actions() {
 
       {error && <Alert>{error}</Alert>}
       {query.isError && (
-        <Alert>{query.error instanceof ApiError ? query.error.message : "Could not load actions"}</Alert>
+        <Alert>
+          {query.error instanceof ApiError
+            ? query.error.message
+            : "Could not load actions"}
+        </Alert>
       )}
 
       {query.isPending ? (
@@ -314,7 +343,11 @@ export default function Actions() {
                 Clear filters
               </Button>
             ) : (
-              <Button icon="plus" size="sm" onClick={() => setDialog({ action: null })}>
+              <Button
+                icon="plus"
+                size="sm"
+                onClick={() => setDialog({ action: null })}
+              >
                 New action
               </Button>
             )
@@ -338,93 +371,14 @@ export default function Actions() {
         <ActionDialog
           action={dialog.action}
           onClose={() => setDialog(null)}
-          onSubmit={(input) => save.mutateAsync({ id: dialog.action?.id, input })}
-          onDelete={dialog.action ? () => deleteAction(dialog.action!.id) : undefined}
+          onSubmit={(input) =>
+            save.mutateAsync({ id: dialog.action?.id, input })
+          }
+          onDelete={
+            dialog.action ? () => deleteAction(dialog.action!.id) : undefined
+          }
         />
       )}
     </section>
-  );
-}
-
-const METRIC_TONE = {
-  neutral: { label: "text-fg-muted", value: "text-fg", ring: "border-accent ring-accent" },
-  bad: { label: "text-bad-fg", value: "text-bad-fg", ring: "border-bad ring-bad" },
-  warn: { label: "text-warn-fg", value: "text-warn-fg", ring: "border-warn ring-warn" },
-  good: { label: "text-good-fg", value: "text-good-fg", ring: "border-good ring-good" },
-} as const;
-
-function MetricCard({
-  label,
-  value,
-  tone = "neutral",
-  active,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  tone?: keyof typeof METRIC_TONE;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const t = METRIC_TONE[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex flex-col gap-xs rounded-xl border p-md text-left transition-all hover:shadow-xs ${
-        active ? `${t.ring} bg-surface-hover ring-1` : "border-line bg-surface hover:border-accent"
-      }`}
-    >
-      <span className={`text-[11px] font-bold uppercase tracking-wider ${t.label}`}>{label}</span>
-      <span className={`text-2xl font-bold tracking-tight ${t.value}`}>{value}</span>
-    </button>
-  );
-}
-
-function DateInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (day: string) => void;
-}) {
-  return (
-    <label className="flex items-center gap-xs text-xs text-fg-muted">
-      {label}
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-[32px] rounded-md border border-line bg-surface px-sm text-xs text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
-      />
-    </label>
-  );
-}
-
-function FilterPill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`whitespace-nowrap rounded-lg px-3 py-1 text-xs font-medium transition-all ${
-        active
-          ? "bg-accent font-semibold text-white shadow-xs"
-          : "bg-surface-muted/80 text-fg-muted hover:bg-surface-hover hover:text-fg"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

@@ -5,11 +5,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { DealCard } from "../deals/DealCard";
 import { TrackerTable } from "../delivery/TrackerTable";
 import { DealDialog } from "../deals/DealDialog";
-import { TasksDialog } from "../deals/TasksDialog";
+import { DealWorkDialog } from "../deals/DealWorkDialog";
 import { dealsApi, type Deal, type DealInput } from "../deals/api";
 import { dealTasksApi, type DealTask } from "../deals/tasks";
-import { ActionDialog } from "../actions/ActionDialog";
-import { actionsApi, type Action, type ActionInput } from "../actions/api";
+import { actionsApi, type Action } from "../actions/api";
 import { MANAGER_ROLES } from "../auth/roles";
 import { useAuthStore } from "../auth/store";
 import { memberLabel, orgApi } from "../org/api";
@@ -18,7 +17,14 @@ import { DEAL_COLUMNS, type DealStage } from "../deals/stages";
 import { formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
 import { ApiError } from "../lib/api";
-import { Alert, BoardSkeleton, Button, Icon, KanbanBoard, PageHeader } from "../ui";
+import {
+  Alert,
+  BoardSkeleton,
+  Button,
+  Icon,
+  KanbanBoard,
+  PageHeader,
+} from "../ui";
 
 /**
  * Whether the board is collapsed, remembered per browser.
@@ -123,10 +129,13 @@ export default function Deals() {
   // rather than inside the dialog: the dialog closes on success, so an error
   // that lived in it would vanish with it.
   const [actionError, setActionError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<{ deal: Deal | null; stage: DealStage } | null>(null);
-  const [remarkDeal, setRemarkDeal] = useState<Deal | null>(null);
+  const [dialog, setDialog] = useState<{
+    deal: Deal | null;
+    stage: DealStage;
+  } | null>(null);
+  // The deal whose tasks/actions working view is open.
+  const [work, setWork] = useState<Deal | null>(null);
   // The deal an action is being created for, straight from its card.
-  const [actionDeal, setActionDeal] = useState<Deal | null>(null);
   const [boardCollapsed, setBoardCollapsed] = useState(readCollapsed);
 
   const toggleBoard = useCallback(() => {
@@ -166,8 +175,14 @@ export default function Deals() {
       if (ownerFilter && d.ownerUserId !== ownerFilter) return false;
       if (!term) return true;
       // The fields someone actually types when hunting for a deal.
-      return [d.title, d.accountName, d.leadName, d.contactName, d.location, d.products]
-        .some((v) => v?.toLowerCase().includes(term));
+      return [
+        d.title,
+        d.accountName,
+        d.leadName,
+        d.contactName,
+        d.location,
+        d.products,
+      ].some((v) => v?.toLowerCase().includes(term));
     });
 
     if (sortBy === "default") return filtered;
@@ -180,7 +195,9 @@ export default function Deals() {
           return a.amount - b.amount;
         case "closeSoon":
           // Deals with no close date sink rather than claiming the top slot.
-          return (a.expectedCloseDate ?? "9999").localeCompare(b.expectedCloseDate ?? "9999");
+          return (a.expectedCloseDate ?? "9999").localeCompare(
+            b.expectedCloseDate ?? "9999",
+          );
         case "recent":
           return b.updatedAt.localeCompare(a.updatedAt);
         default:
@@ -189,7 +206,8 @@ export default function Deals() {
     });
   }, [allDeals, search, ownerFilter, sortBy]);
 
-  const filtersActive = !!search.trim() || !!ownerFilter || sortBy !== "default";
+  const filtersActive =
+    !!search.trim() || !!ownerFilter || sortBy !== "default";
 
   const totals = useMemo(() => {
     let open = 0;
@@ -213,10 +231,19 @@ export default function Deals() {
   }, [queryClient]);
 
   const move = useMutation({
-    mutationFn: ({ id, stage, index }: { id: string; stage: string; index: number }) =>
-      dealsApi.move(id, stage as DealStage, index),
+    mutationFn: ({
+      id,
+      stage,
+      index,
+    }: {
+      id: string;
+      stage: string;
+      index: number;
+    }) => dealsApi.move(id, stage as DealStage, index),
     onError: (err) => {
-      setMoveError(err instanceof ApiError ? err.message : "Could not move that deal");
+      setMoveError(
+        err instanceof ApiError ? err.message : "Could not move that deal",
+      );
       // Local state and the server have diverged — the server wins.
       invalidate();
     },
@@ -261,15 +288,19 @@ export default function Deals() {
   // Stable callbacks, so the memoised board and cards aren't invalidated on
   // every parent render.
   const onMove = useCallback(
-    (id: string, stage: string, index: number) => move.mutate({ id, stage, index }),
+    (id: string, stage: string, index: number) =>
+      move.mutate({ id, stage, index }),
     [move],
   );
-  const onOpen = useCallback((deal: Deal) => setDialog({ deal, stage: deal.stage }), []);
+  const onOpen = useCallback(
+    (deal: Deal) => setDialog({ deal, stage: deal.stage }),
+    [],
+  );
   const onAdd = useCallback(
     (stage: string) => setDialog({ deal: null, stage: stage as DealStage }),
     [],
   );
-  const onRemark = useCallback((deal: Deal) => setRemarkDeal(deal), []);
+  const onOpenWork = useCallback((deal: Deal) => setWork(deal), []);
 
   // Ticking a task from the card. The server stamps who completed it, which is
   // the reason this is a request rather than a local edit.
@@ -285,32 +316,17 @@ export default function Deals() {
       void queryClient.invalidateQueries({ queryKey: ["dealTasks"] });
     },
     onError: (err) =>
-      setActionError(err instanceof ApiError ? err.message : "Could not update that task"),
+      setActionError(
+        err instanceof ApiError ? err.message : "Could not update that task",
+      ),
   });
-  const onToggleTask = useCallback((task: DealTask) => toggleTask.mutate(task), [toggleTask]);
+  const onToggleTask = useCallback(
+    (task: DealTask) => toggleTask.mutate(task),
+    [toggleTask],
+  );
 
   // Completing here and completing on the Actions dashboard are the same call,
   // so the two surfaces can never disagree about an action's status.
-  const completeAction = useMutation({
-    mutationFn: (id: string) => actionsApi.complete(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["actions"] });
-    },
-    onError: (err) =>
-      setActionError(err instanceof ApiError ? err.message : "Could not complete that action"),
-  });
-  const onCompleteAction = useCallback((id: string) => completeAction.mutate(id), [completeAction]);
-
-  const onAddAction = useCallback((deal: Deal) => setActionDeal(deal), []);
-
-  // Creating from a card and creating from the Actions dashboard are the same
-  // endpoint and the same cache key, so a new action appears in both at once.
-  const createAction = useMutation({
-    mutationFn: (input: ActionInput) => actionsApi.create(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["actions"] });
-    },
-  });
 
   const onGenerateQuote = useCallback(
     (deal: Deal) => {
@@ -325,33 +341,30 @@ export default function Deals() {
       <DealCard
         deal={deal}
         overlay={overlay}
-        onRemark={onRemark}
+        onOpenWork={onOpenWork}
         onGenerateQuote={onGenerateQuote}
         actions={actionsByDeal.get(deal.id)}
         tasks={tasksByDeal.get(deal.id)}
         canSeeActions={canSeeActions}
         onToggleTask={onToggleTask}
-        onCompleteAction={onCompleteAction}
-        onAddAction={onAddAction}
-        memberName={memberName}
       />
     ),
     [
-      onRemark,
+      onOpenWork,
       onGenerateQuote,
       actionsByDeal,
       tasksByDeal,
       canSeeActions,
       onToggleTask,
-      onCompleteAction,
-      onAddAction,
-      memberName,
     ],
   );
-  const columnSummary = useCallback((items: Deal[]) => {
-    const amount = items.reduce((sum, d) => sum + d.amount, 0);
-    return amount > 0 ? formatMoneyCompact(amount, currency) : null;
-  }, [currency]);
+  const columnSummary = useCallback(
+    (items: Deal[]) => {
+      const amount = items.reduce((sum, d) => sum + d.amount, 0);
+      return amount > 0 ? formatMoneyCompact(amount, currency) : null;
+    },
+    [currency],
+  );
 
   return (
     <section className="flex flex-col gap-lg">
@@ -366,7 +379,10 @@ export default function Deals() {
               )} open · ${formatMoneyCompact(totals.won, currency)} won`
         }
         action={
-          <Button icon="plus" onClick={() => setDialog({ deal: null, stage: "discovery" })}>
+          <Button
+            icon="plus"
+            onClick={() => setDialog({ deal: null, stage: "discovery" })}
+          >
             New deal
           </Button>
         }
@@ -376,7 +392,9 @@ export default function Deals() {
       {actionError && <Alert>{actionError}</Alert>}
       {query.isError && (
         <Alert>
-          {query.error instanceof ApiError ? query.error.message : "Could not load the board"}
+          {query.error instanceof ApiError
+            ? query.error.message
+            : "Could not load the board"}
         </Alert>
       )}
 
@@ -509,20 +527,7 @@ export default function Deals() {
         />
       )}
 
-      {actionDeal && (
-        <ActionDialog
-          action={null}
-          defaultDealId={actionDeal.id}
-          defaultAccountId={actionDeal.accountId ?? undefined}
-          defaultLeadId={actionDeal.leadId ?? undefined}
-          onClose={() => setActionDeal(null)}
-          onSubmit={({ status: _status, ...input }) => createAction.mutateAsync(input)}
-        />
-      )}
-
-      {remarkDeal && (
-        <TasksDialog deal={remarkDeal} onClose={() => setRemarkDeal(null)} />
-      )}
+      {work && <DealWorkDialog deal={work} onClose={() => setWork(null)} />}
     </section>
   );
 }
