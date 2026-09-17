@@ -24,6 +24,7 @@ import QuoteEditor from "./routes/QuoteEditor";
 import Quotes from "./routes/Quotes";
 import Register from "./routes/Register";
 import Team from "./routes/Team";
+import VigilProposalEditor from "./routes/VigilProposalEditor";
 import { useSystemThemeSync } from "./ui";
 
 // SSO returns with the token in the URL fragment; capture it before the first
@@ -70,6 +71,12 @@ export default function AppRoot() {
               <Route path="/quotes" element={<Quotes />} />
               {/* new + :id share one editor; the route decides which */}
               <Route path="/quotes/new" element={<QuoteEditor />} />
+              {/* The VIGIL proposal is the same quote record under a document
+                  template, so it sits under /quotes and keeps its own editor:
+                  twenty narrative sections and a price grid is not the same
+                  screen as a price grid. */}
+              <Route path="/quotes/new/proposal" element={<VigilProposalEditor />} />
+              <Route path="/quotes/:id/proposal" element={<VigilProposalEditor />} />
               <Route path="/quotes/:id" element={<QuoteEditor />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/invoices/new" element={<InvoiceEditor />} />

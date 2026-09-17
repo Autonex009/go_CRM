@@ -45,10 +45,22 @@ export default function Quotes() {
         title="Quotes"
         subtitle={total === 0 ? "No quotes yet" : `${total} quote${total === 1 ? "" : "s"}`}
         action={
-          <Link to="/quotes/new" className={buttonClass({})}>
-            <Icon name="plus" size={16} />
-            New quote
-          </Link>
+          <div className="flex flex-wrap items-center gap-sm">
+            {/* The full techno-commercial document, pre-filled with the standard
+                VIGIL scope, SLA and AMC clauses. A plain quote is still one
+                click away for the times a price list is all that is wanted. */}
+            <Link
+              to="/quotes/new/proposal"
+              className={buttonClass({ variant: "secondary" })}
+            >
+              <Icon name="printer" size={16} />
+              VIGIL proposal
+            </Link>
+            <Link to="/quotes/new" className={buttonClass({})}>
+              <Icon name="plus" size={16} />
+              New quote
+            </Link>
+          </div>
         }
       />
 
@@ -112,7 +124,17 @@ export default function Quotes() {
               </thead>
               <tbody>
                 {page!.items.map((quote) => (
-                  <Row key={quote.id} quote={quote} onOpen={() => navigate(`/quotes/${quote.id}`)} />
+                  <Row
+                    key={quote.id}
+                    quote={quote}
+                    onOpen={() =>
+                      navigate(
+                        quote.template
+                          ? `/quotes/${quote.id}/proposal`
+                          : `/quotes/${quote.id}`,
+                      )
+                    }
+                  />
                 ))}
               </tbody>
             </table>
@@ -159,7 +181,10 @@ function Row({ quote, onOpen }: { quote: Quote; onOpen: () => void }) {
       className="cursor-pointer border-b border-line transition-colors duration-100 last:border-0 hover:bg-surface-hover"
     >
       <td className="px-lg py-sm">
-        <span className="block font-medium tabular-nums text-fg">{quote.number}</span>
+        <span className="flex items-center gap-sm">
+          <span className="font-medium tabular-nums text-fg">{quote.number}</span>
+          {quote.template && <Badge tone="brand">Proposal</Badge>}
+        </span>
         <span className="block text-xs text-fg-muted">
           {quote.title || `${quote.itemCount} line${quote.itemCount === 1 ? "" : "s"}`}
         </span>

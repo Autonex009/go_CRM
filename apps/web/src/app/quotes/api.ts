@@ -51,6 +51,17 @@ export interface Quote {
   createdAt: string;
   updatedAt: string;
 
+  /**
+   * Names a document layout richer than a price list — see quotes/vigil.ts.
+   * Null is the ordinary quote, which is most of them.
+   */
+  template: string | null;
+  /**
+   * The template's stored content. Present on GET /{id} only: the list has no
+   * use for a multi-kilobyte document it does not render.
+   */
+  proposal?: unknown;
+
   /** Present on GET /{id}; absent from list rows. */
   items?: QuoteItem[];
   itemCount: number;
@@ -76,6 +87,9 @@ export interface QuoteInput {
   notes?: string;
   validUntil?: string;
   items: QuoteItemInput[];
+  /** Send both together, or neither: a template with no content is an empty document. */
+  template?: string;
+  proposal?: unknown;
 }
 
 export const PAGE_SIZE = 25;
