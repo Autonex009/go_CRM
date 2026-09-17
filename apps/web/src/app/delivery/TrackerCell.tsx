@@ -19,10 +19,10 @@ interface TrackerCellProps {
 /**
  * One editable cell.
  *
- * It keeps a local draft and reports it on blur or Enter rather than on every
- * keystroke: a spreadsheet is edited by typing, and a PUT per character would
- * put the server in the middle of the user's typing — including its validation
- * errors, which would fire on every half-finished value.
+ * It keeps a local draft and reports it when typing pauses, and immediately on
+ * blur, Tab or Shift+Enter — never on every keystroke: a request per character
+ * would put the server in the middle of the user's typing, including its
+ * validation errors, which would fire on every half-finished value.
  *
  * Text cells use a `<textarea>` that auto-expands vertically so long text is
  * always fully visible. Date and number cells stay as `<input>` because they
@@ -31,6 +31,12 @@ interface TrackerCellProps {
  * Escape restores the last committed value, which is the only undo a table
  * like this needs.
  */
+/**
+ * How long typing has to pause before a cell saves itself. Long enough not to
+ * fire mid-word, short enough that little is lost if the tab closes.
+ */
+const AUTOSAVE_DELAY_MS = 800;
+
 export const TrackerCell = memo(function TrackerCell({
   column,
   value,
@@ -58,11 +64,44 @@ export const TrackerCell = memo(function TrackerCell({
     if (document.activeElement !== activeEl) setDraft(next);
   }, [value, isTextColumn]);
 
+  // onCommit is a fresh closure on every parent render, so the autosave below
+  // reads it through a ref. Depending on it directly would restart the timer
+  // each time the table re-rendered — which it does on every refetch — and a
+  // cell edited while anything else was loading would never save itself.
+  const onCommitRef = useRef(onCommit);
+  useEffect(() => {
+    onCommitRef.current = onCommit;
+  });
+
   const commit = () => {
     if (draft === committed.current) return;
     committed.current = draft;
     onCommit(fromText(draft, column.type));
   };
+
+  // Save shortly after typing stops, not only when the cell is left.
+  //
+  // Blur alone loses work in the ways people actually edit a sheet: typing a
+  // note and then closing the tab, switching app or following a link never
+  // fires it. A pause is the closest thing to "done" a cell can observe without
+  // saving per keystroke, which would put the server — and its validation
+  // errors — in the middle of a half-typed value.
+  //
+  // Blur, Tab and Shift+Enter still save immediately; they are a clearer signal
+  // than a pause. When one of them wins the race, `committed` already matches
+  // the draft and the pending timer finds nothing to do, so no cell is ever
+  // saved twice.
+  useEffect(() => {
+    if (draft === committed.current) return;
+
+    const timer = window.setTimeout(() => {
+      if (draft === committed.current) return;
+      committed.current = draft;
+      onCommitRef.current(fromText(draft, column.type));
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [draft, column.type]);
 
   // The input fills its cell edge to edge so the table's gridlines are the
   // only borders on screen — an input with its own border inside a bordered

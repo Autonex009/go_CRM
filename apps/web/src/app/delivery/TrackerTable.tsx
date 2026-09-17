@@ -15,6 +15,7 @@ import {
   toInput,
   type TrackerColumn,
   type TrackerInput,
+  type TrackerPage,
   type TrackerRow,
 } from "./api";
 
@@ -71,14 +72,45 @@ export function TrackerTable() {
     [invalidate],
   );
 
+  // A cell edit sends the whole row, so the row it is built from has to be the
+  // freshest one — and the cache has to carry the change the moment it is made.
+  //
+  // Without the optimistic write below, editing a second cell reverted the
+  // first: the second request was assembled from a row snapshot taken before
+  // the first save had landed, so it still carried the old value for that
+  // column and the server faithfully wrote it back. Applying each change to the
+  // cache in onMutate means every later payload is built on top of it.
   const save = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TrackerInput }) =>
       deliveryApi.update(id, input),
-    onSuccess: () => {
-      setError(null);
-      invalidate();
+    onMutate: async ({ id, input }) => {
+      // Stop a refetch already in flight from landing on top of this edit with
+      // the value it read before the change.
+      await queryClient.cancelQueries({ queryKey: ["delivery"] });
+      const previous = queryClient.getQueryData<TrackerPage>(["delivery"]);
+      queryClient.setQueryData<TrackerPage>(["delivery"], (old) =>
+        old
+          ? {
+              ...old,
+              items: old.items.map((r) =>
+                r.id === id ? { ...r, ...input } : r,
+              ),
+            }
+          : old,
+      );
+      return { previous };
     },
-    onError: (err) => fail(err, "Could not save that change"),
+    onError: (err, _vars, context) => {
+      // Put back exactly what was there; the server never took the change.
+      if (context?.previous) {
+        queryClient.setQueryData<TrackerPage>(["delivery"], context.previous);
+      }
+      fail(err, "Could not save that change");
+    },
+    onSuccess: () => setError(null),
+    // Refetch once the write has settled either way, so the row picks up what
+    // the server derived from it (the linked deal's fields, updated_by).
+    onSettled: () => invalidate(),
   });
 
   const add = useMutation({
@@ -125,12 +157,20 @@ export function TrackerTable() {
         invalidate();
         return;
       }
+      // Build on the cached row, not the one captured in this render: an edit
+      // to another cell moments ago is already in the cache but not in the
+      // props this callback closed over.
+      const current =
+        queryClient
+          .getQueryData<TrackerPage>(["delivery"])
+          ?.items.find((r) => r.id === row.id) ?? row;
+
       save.mutate({
         id: row.id,
-        input: { ...toInput(row), [column.key]: value },
+        input: { ...toInput(current), [column.key]: value },
       });
     },
-    [save, invalidate],
+    [save, invalidate, queryClient],
   );
 
   // Arrow/Tab movement across the grid. Cells are addressed by data attributes
