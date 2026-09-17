@@ -57,11 +57,18 @@ export const TrackerCell = memo(function TrackerCell({
   // A background refetch or an import can change the row under an idle cell.
   // Only adopt it when the cell is not being typed in, so a save in flight
   // cannot yank the caret.
+  //
+  // `committed` is left alone while the cell has focus, which is the other half
+  // of the same rule. It used to take whatever arrived, and an older response
+  // landing mid-edit would set it to the value the user had just typed over —
+  // so the pending autosave then saw draft === committed, decided there was
+  // nothing to save, and the text was silently dropped on the next refetch.
   useEffect(() => {
     const next = toText(value);
-    committed.current = next;
     const activeEl = isTextColumn ? textareaRef.current : inputRef.current;
-    if (document.activeElement !== activeEl) setDraft(next);
+    if (document.activeElement === activeEl) return;
+    committed.current = next;
+    setDraft(next);
   }, [value, isTextColumn]);
 
   // onCommit is a fresh closure on every parent render, so the autosave below
@@ -102,6 +109,17 @@ export const TrackerCell = memo(function TrackerCell({
 
     return () => window.clearTimeout(timer);
   }, [draft, column.type]);
+
+  // Filtering the table, or anything else that unmounts a row, would otherwise
+  // throw away text typed in the last moment before it went: the autosave timer
+  // is cleared with the cell and blur never fires on a node that is removed.
+  const flushRef = useRef<() => void>(() => {});
+  flushRef.current = () => {
+    if (draft === committed.current) return;
+    committed.current = draft;
+    onCommitRef.current(fromText(draft, column.type));
+  };
+  useEffect(() => () => flushRef.current(), []);
 
   // The input fills its cell edge to edge so the table's gridlines are the
   // only borders on screen — an input with its own border inside a bordered

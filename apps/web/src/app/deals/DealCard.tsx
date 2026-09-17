@@ -369,7 +369,12 @@ function TaskPanel({
                 onClick={() => onEdit?.(deal)}
                 className="min-w-0 flex-1 text-left text-xs leading-snug text-fg-muted transition-colors group-hover:text-fg"
               >
-                <span className="line-clamp-2">{task.text}</span>
+                {/* Wraps onto as many lines as the task needs. It used to be
+                    clamped to two, which cut the end off any task written as a
+                    sentence — and a truncated instruction is worse than none.
+                    `break-words` is what keeps a long unbroken token (a URL, a
+                    part number) from pushing the card wider than its column. */}
+                <span className="block whitespace-pre-wrap break-words">{task.text}</span>
               </button>
               {task.assignedToName && (
                 <span className="mt-[1px] shrink-0 truncate text-[10px] text-fg-subtle">

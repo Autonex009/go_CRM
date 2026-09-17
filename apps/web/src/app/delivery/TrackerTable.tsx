@@ -14,6 +14,7 @@ import {
   deliveryApi,
   toInput,
   type TrackerColumn,
+  type TrackerField,
   type TrackerInput,
   type TrackerPage,
   type TrackerRow,
@@ -80,37 +81,90 @@ export function TrackerTable() {
   // the first save had landed, so it still carried the old value for that
   // column and the server faithfully wrote it back. Applying each change to the
   // cache in onMutate means every later payload is built on top of it.
+  //
+  // `pending` is the other half of that: which (row, field) pairs have a write
+  // in flight. Anything listed here is newer in the cache than it can be in any
+  // response still on the wire, so a landing response is not allowed to write
+  // over it. That is what stopped edited cells going blank at random — a save
+  // for one cell used to trigger a full refetch, and if it was read before a
+  // second cell's write had committed, the older snapshot came back and wiped
+  // the text the user had just typed.
+  const pending = useRef(new Map<string, number>());
+  const pendingKey = (id: string, field: TrackerField) => `${id}:${field}`;
+
+  const markPending = useCallback((id: string, field: TrackerField) => {
+    const key = pendingKey(id, field);
+    pending.current.set(key, (pending.current.get(key) ?? 0) + 1);
+  }, []);
+
+  const clearPending = useCallback((id: string, field: TrackerField) => {
+    const key = pendingKey(id, field);
+    const left = (pending.current.get(key) ?? 1) - 1;
+    if (left > 0) pending.current.set(key, left);
+    else pending.current.delete(key);
+  }, []);
+
+  /**
+   * The server's row, except for the fields still being written: those keep
+   * what the cache already holds, because the response was assembled before
+   * those writes reached the database.
+   */
+  const mergeRow = useCallback((cached: TrackerRow, fresh: TrackerRow): TrackerRow => {
+    const merged = { ...fresh };
+    for (const key of Object.keys(fresh) as (keyof TrackerRow)[]) {
+      if (pending.current.has(pendingKey(cached.id, key as TrackerField))) {
+        (merged as Record<string, unknown>)[key] = cached[key];
+      }
+    }
+    return merged;
+  }, []);
+
+  const patchRow = useCallback(
+    (id: string, patch: (row: TrackerRow) => TrackerRow) => {
+      queryClient.setQueryData<TrackerPage>(["delivery"], (old) =>
+        old
+          ? { ...old, items: old.items.map((r) => (r.id === id ? patch(r) : r)) }
+          : old,
+      );
+    },
+    [queryClient],
+  );
+
   const save = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: TrackerInput }) =>
+    mutationFn: ({ id, input }: { id: string; input: TrackerInput; field: TrackerField }) =>
       deliveryApi.update(id, input),
-    onMutate: async ({ id, input }) => {
+    onMutate: async ({ id, input, field }) => {
       // Stop a refetch already in flight from landing on top of this edit with
       // the value it read before the change.
       await queryClient.cancelQueries({ queryKey: ["delivery"] });
-      const previous = queryClient.getQueryData<TrackerPage>(["delivery"]);
-      queryClient.setQueryData<TrackerPage>(["delivery"], (old) =>
-        old
-          ? {
-              ...old,
-              items: old.items.map((r) =>
-                r.id === id ? { ...r, ...input } : r,
-              ),
-            }
-          : old,
-      );
-      return { previous };
+      const before = queryClient
+        .getQueryData<TrackerPage>(["delivery"])
+        ?.items.find((r) => r.id === id);
+      markPending(id, field);
+      patchRow(id, (row) => ({ ...row, ...input }));
+      return { previousValue: before ? before[field] : null };
     },
-    onError: (err, _vars, context) => {
-      // Put back exactly what was there; the server never took the change.
-      if (context?.previous) {
-        queryClient.setQueryData<TrackerPage>(["delivery"], context.previous);
-      }
-      fail(err, "Could not save that change");
+    // The write is authoritative and comes back as the whole row, so the cache
+    // takes it directly. It deliberately does not refetch the tracker: a blanket
+    // invalidate per keystroke-pause is what let a stale read overwrite a cell
+    // that had just been typed into.
+    onSuccess: (fresh, { id }) => {
+      setError(null);
+      patchRow(id, (row) => mergeRow(row, fresh));
     },
-    onSuccess: () => setError(null),
-    // Refetch once the write has settled either way, so the row picks up what
-    // the server derived from it (the linked deal's fields, updated_by).
-    onSettled: () => invalidate(),
+    onError: (err, { id, field }, context) => {
+      // Put back only this cell; other cells on the row may have edits of their
+      // own in flight, and restoring a whole snapshot would discard them.
+      patchRow(id, (row) => ({ ...row, [field]: context?.previousValue ?? null }));
+      setError(err instanceof ApiError ? err.message : "Could not save that change");
+    },
+    onSettled: (_fresh, _err, { id, field }) => {
+      clearPending(id, field);
+      // The board mirrors products, location and camera count, so it still has
+      // to hear about the write — otherwise the card keeps the figure the
+      // tracker just replaced until the page is reloaded.
+      void queryClient.invalidateQueries({ queryKey: ["deals"] });
+    },
   });
 
   const add = useMutation({
@@ -154,7 +208,10 @@ export function TrackerTable() {
       // orphan the line. Refuse and let the refetch restore what was there.
       if (column.key === "client" && !String(value ?? "").trim()) {
         setError("A row needs a client name — delete the row instead.");
-        invalidate();
+        // Refetching is how the rejected cell gets its name back, but only when
+        // nothing else is mid-save: the response would be older than those
+        // writes and would undo them on screen.
+        if (pending.current.size === 0) invalidate();
         return;
       }
       // Build on the cached row, not the one captured in this render: an edit
@@ -167,6 +224,7 @@ export function TrackerTable() {
 
       save.mutate({
         id: row.id,
+        field: column.key,
         input: { ...toInput(current), [column.key]: value },
       });
     },
