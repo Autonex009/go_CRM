@@ -12,7 +12,7 @@ import { formatMoneyExact } from "../lib/money";
 import { memberLabel, orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
 import { LineItems } from "../documents/LineItems";
-import { emptyDocumentItem } from "../documents/types";
+import { asTimestamp, emptyDocumentItem } from "../documents/types";
 import { PDFPreviewModal } from "../documents/PDFPreviewModal";
 import { buildQuoteStateFromDeal } from "../deals/quote-utils";
 import {
@@ -221,7 +221,7 @@ export default function QuoteEditor() {
       dealId: text(header.dealId),
       ownerUserId: text(header.ownerUserId),
       notes: text(header.notes),
-      validUntil: header.validUntil ? `${header.validUntil}T00:00:00Z` : undefined,
+      validUntil: asTimestamp(header.validUntil),
       // Blank trailing rows are dropped server-side too; this keeps the request tidy.
       items: items.filter((i) => i.description.trim() || i.unitPrice || i.quantity !== 1),
     };

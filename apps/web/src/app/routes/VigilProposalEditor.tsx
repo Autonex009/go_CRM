@@ -5,7 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AccountSelect } from "../accounts/AccountSelect";
 import { dealsApi } from "../deals/api";
 import { LineItems } from "../documents/LineItems";
-import { emptyDocumentItem } from "../documents/types";
+import { asTimestamp, emptyDocumentItem } from "../documents/types";
 import { ApiError } from "../lib/api";
 import { memberLabel, orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
@@ -130,7 +130,7 @@ export default function VigilProposalEditor() {
         accountId: links.accountId || undefined,
         dealId: links.dealId || undefined,
         ownerUserId: links.ownerUserId || undefined,
-        validUntil: links.validUntil || undefined,
+        validUntil: asTimestamp(links.validUntil),
         items,
         template: VIGIL_TEMPLATE,
         proposal,
