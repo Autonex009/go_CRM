@@ -107,7 +107,7 @@ function TaskRow({ task }: { task: DealTask }) {
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className={`text-sm leading-snug ${task.done ? "text-fg-subtle line-through" : "text-fg"}`}>
+        <p className={`whitespace-pre-wrap break-words text-sm leading-snug ${task.done ? "text-fg-subtle line-through" : "text-fg"}`}>
           {task.text}
         </p>
 

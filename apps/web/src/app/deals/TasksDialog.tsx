@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ApiError } from "../lib/api";
 import { memberLabel, orgApi } from "../org/api";
@@ -135,25 +135,21 @@ export function TasksDialog({ deal, onClose }: TasksDialogProps) {
               return (
                 <li
                   key={task.id}
-                  className="flex items-center gap-sm rounded-md border border-line bg-surface p-xs"
+                  className="flex items-start gap-sm rounded-md border border-line bg-surface p-xs"
                 >
-                  <PriorityCheck
-                    priority={task.priority}
-                    done={task.done}
-                    label={task.text}
-                    onToggle={() => save.mutate({ task, change: { done: !task.done } })}
-                  />
+                  <div className="mt-[4px]">
+                    <PriorityCheck
+                      priority={task.priority}
+                      done={task.done}
+                      label={task.text}
+                      onToggle={() => save.mutate({ task, change: { done: !task.done } })}
+                    />
+                  </div>
 
                   <div className="min-w-0 flex-1">
-                    <input
-                      defaultValue={task.text}
-                      onBlur={(e) => {
-                        const text = e.target.value.trim();
-                        if (text && text !== task.text) save.mutate({ task, change: { text } });
-                      }}
-                      className={`w-full bg-transparent text-sm text-fg focus:outline-none ${
-                        task.done ? "text-fg-subtle line-through" : ""
-                      }`}
+                    <TaskText
+                      task={task}
+                      onSave={(text) => save.mutate({ task, change: { text } })}
                     />
                     {audit && <span className="text-[10px] text-fg-subtle">{audit}</span>}
                   </div>
@@ -164,7 +160,7 @@ export function TasksDialog({ deal, onClose }: TasksDialogProps) {
                       save.mutate({ task, change: { assignedTo: e.target.value || null } })
                     }
                     aria-label={`Assignee for "${task.text}"`}
-                    className="h-7 max-w-32 shrink-0 rounded border border-line bg-surface px-1 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    className="mt-[1px] h-7 max-w-32 shrink-0 rounded border border-line bg-surface px-1 text-xs text-fg-muted focus:border-accent focus:outline-none"
                   >
                     <option value="">Unassigned</option>
                     {memberOptions.map((m) => (
@@ -183,7 +179,7 @@ export function TasksDialog({ deal, onClose }: TasksDialogProps) {
                     type="button"
                     onClick={() => remove.mutate(task.id)}
                     aria-label={`Remove "${task.text}"`}
-                    className="shrink-0 rounded p-1 text-fg-subtle transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                    className="mt-[5px] shrink-0 rounded p-1 text-fg-subtle transition-colors hover:bg-rose-500/10 hover:text-rose-500"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -249,6 +245,57 @@ export function TasksDialog({ deal, onClose }: TasksDialogProps) {
  * The round, priority-tinted tick. Colour carries the urgency and the same
  * control completes the task, so a row stays one circle and one line of text.
  */
+/**
+ * The editable task text.
+ *
+ * A textarea rather than an input, because a task is often a sentence: in a
+ * single-line input everything past the visible width simply scrolled out of
+ * sight, so a task you could not fully read was also one you could not check
+ * was right. This wraps and grows instead.
+ *
+ * The height comes from a hidden copy of the text sharing one grid cell with
+ * the textarea — the browser wraps and measures in the same layout pass, so the
+ * row is always exactly as tall as its text, at any dialog width, with nothing
+ * measured in JS. The trailing space holds the last line open when the text
+ * ends in a newline.
+ */
+function TaskText({ task, onSave }: { task: DealTask; onSave: (text: string) => void }) {
+  const [draft, setDraft] = useState(task.text);
+
+  // Someone else's edit, or the server's own normalisation, arriving on a
+  // refetch. Adopted only when this box is not being typed in.
+  useEffect(() => {
+    setDraft(task.text);
+  }, [task.text]);
+
+  const shared = `text-sm leading-snug ${task.done ? "text-fg-subtle line-through" : "text-fg"}`;
+
+  return (
+    <div className="grid">
+      <span
+        aria-hidden="true"
+        className={`invisible col-start-1 row-start-1 w-0 min-w-full whitespace-pre-wrap break-words py-1 ${shared}`}
+      >
+        {draft + " "}
+      </span>
+      <textarea
+        rows={1}
+        value={draft}
+        aria-label="Task"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const text = draft.trim();
+          // An empty task is a delete by accident; put the old text back rather
+          // than saving a row with no label.
+          if (!text) return setDraft(task.text);
+          if (text !== task.text) onSave(text);
+        }}
+        className={`col-start-1 row-start-1 w-full resize-none overflow-hidden break-words bg-transparent py-1 focus:outline-none ${shared}`}
+      />
+    </div>
+  );
+}
+
 export function PriorityCheck({
   priority,
   done,
