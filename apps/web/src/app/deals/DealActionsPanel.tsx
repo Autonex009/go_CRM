@@ -2,10 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { actionsApi, dueLabel, type Action } from "../actions/api";
+import {
+  ACTION_PRIORITIES,
+  ACTION_PRIORITY_META,
+  actionPriority,
+  actionsApi,
+  byPriority,
+  dueLabel,
+  type Action,
+  type ActionPriority,
+} from "../actions/api";
 import { useActionMutations } from "../actions/useActionMutations";
 import { memberLabel, orgApi } from "../org/api";
-import { Alert, Button, Field } from "../ui";
+import { Alert, Button, Field, PriorityCheck, PriorityPicker } from "../ui";
 import type { Deal } from "./api";
 
 /**
@@ -40,13 +49,12 @@ export function DealActionsPanel({ deal }: { deal: Deal }) {
   const [title, setTitle] = useState("");
   const [due, setDue] = useState(today());
   const [assignee, setAssignee] = useState("");
+  const [priority, setPriority] = useState<ActionPriority>("normal");
 
-  // Open first, then by when they are due: the overdue line at the top is the
-  // reason to open this panel at all.
-  const items = [...(query.data ?? [])].sort(
-    (a, b) =>
-      Number(a.status === "done") - Number(b.status === "done") ||
-      a.dueAt.localeCompare(b.dueAt),
+  // Open first, then highest priority, then soonest due — what is still to do,
+  // what matters most, what is next, in that order.
+  const items = [...byPriority(query.data ?? [])].sort(
+    (a, b) => Number(a.status === "done") - Number(b.status === "done"),
   );
   const openCount = items.filter((a) => a.status !== "done").length;
 
@@ -58,6 +66,7 @@ export function DealActionsPanel({ deal }: { deal: Deal }) {
         title: change.title ?? action.title,
         dueAt: change.dueAt ?? action.dueAt,
         status: change.status ?? action.status,
+        priority: change.priority ?? actionPriority(action),
         assignedTo:
           (change.assignedTo !== undefined
             ? change.assignedTo
@@ -85,6 +94,7 @@ export function DealActionsPanel({ deal }: { deal: Deal }) {
           title: text,
           dueAt: `${due}T09:00:00Z`,
           status: "open",
+          priority,
           assignedTo: assignee || undefined,
           dealId: deal.id,
           accountId: deal.accountId ?? undefined,
@@ -96,6 +106,7 @@ export function DealActionsPanel({ deal }: { deal: Deal }) {
           setTitle("");
           setAssignee("");
           setDue(today());
+          setPriority("normal");
         },
       },
     );
@@ -130,23 +141,19 @@ export function DealActionsPanel({ deal }: { deal: Deal }) {
                 key={action.id}
                 className="flex items-start gap-sm rounded-md border border-line bg-surface p-xs"
               >
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={action.status === "done"}
-                  onClick={() => toggleDone(action)}
-                  aria-label={`Mark "${action.title}" ${
-                    action.status === "done" ? "not done" : "done"
-                  }`}
-                  title={action.status === "done" ? "Re-open" : "Mark done"}
-                  className={`mt-[5px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-                    action.status === "done"
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-line text-transparent hover:border-emerald-500 hover:text-emerald-500"
-                  }`}
-                >
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </button>
+                <div className="mt-[5px]">
+                  <PriorityCheck
+                    priority={actionPriority(action)}
+                    meta={ACTION_PRIORITY_META}
+                    done={action.status === "done"}
+                    label={action.title}
+                    onToggle={() => toggleDone(action)}
+                  >
+                    {action.status === "done" && (
+                      <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                    )}
+                  </PriorityCheck>
+                </div>
 
                 <div className="min-w-0 flex-1">
                   <ActionTitle
@@ -181,6 +188,15 @@ export function DealActionsPanel({ deal }: { deal: Deal }) {
                       </span>
                     )}
                   </div>
+                </div>
+
+                <div className="mt-[1px]">
+                  <PriorityPicker
+                    value={actionPriority(action)}
+                    levels={ACTION_PRIORITIES}
+                    meta={ACTION_PRIORITY_META}
+                    onChange={(next) => patch(action, { priority: next })}
+                  />
                 </div>
 
                 <select
@@ -230,6 +246,12 @@ export function DealActionsPanel({ deal }: { deal: Deal }) {
           }}
         />
         <div className="flex flex-wrap items-center gap-sm">
+          <PriorityPicker
+            value={priority}
+            levels={ACTION_PRIORITIES}
+            meta={ACTION_PRIORITY_META}
+            onChange={setPriority}
+          />
           <label className="flex items-center gap-xs text-xs text-fg-muted">
             Due
             <input

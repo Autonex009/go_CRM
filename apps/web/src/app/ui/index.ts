@@ -7,6 +7,7 @@ export { Button, IconButton, LinkButton, buttonClass } from "./Button";
 export { Field, SelectField, TextareaField } from "./Field";
 export { Icon, type IconName } from "./Icon";
 export { Modal } from "./Modal";
+export { PriorityCheck, PriorityPicker, type PriorityMeta } from "./Priority";
 export {
   KanbanBoard,
   type KanbanColumnDef,

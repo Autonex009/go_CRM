@@ -19,13 +19,19 @@ export function localDay(date: Date = new Date()): string {
 }
 
 /** A whole calendar day, as the inclusive ISO bounds the API filters on. */
-export function dayRange(date: Date = new Date()): { start: string; end: string } {
+export function dayRange(date: Date = new Date()): {
+  start: string;
+  end: string;
+} {
   const day = localDay(date);
   return { start: `${day}T00:00:00Z`, end: `${day}T23:59:59Z` };
 }
 
 /** Monday to Sunday around `date`, as inclusive ISO bounds. */
-export function weekRange(date: Date = new Date()): { start: string; end: string } {
+export function weekRange(date: Date = new Date()): {
+  start: string;
+  end: string;
+} {
   const dayOfWeek = date.getDay();
   const monday = new Date(date);
   monday.setDate(date.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
@@ -33,7 +39,10 @@ export function weekRange(date: Date = new Date()): { start: string; end: string
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
 
-  return { start: `${localDay(monday)}T00:00:00Z`, end: `${localDay(sunday)}T23:59:59Z` };
+  return {
+    start: `${localDay(monday)}T00:00:00Z`,
+    end: `${localDay(sunday)}T23:59:59Z`,
+  };
 }
 
 /** The last instant before today — the upper bound of "overdue". */

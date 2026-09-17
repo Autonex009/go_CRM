@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 
 import { ApiError } from "../lib/api";
 import { memberLabel, orgApi } from "../org/api";
-import { Alert, Badge, Button, Field, Modal } from "../ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Field,
+  Modal,
+  PriorityCheck,
+  PriorityPicker,
+} from "../ui";
 import type { Deal } from "./api";
 import { getStageMeta, stageLabel } from "./stages";
 import {
@@ -171,12 +179,17 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
                 <div className="mt-[4px]">
                   <PriorityCheck
                     priority={task.priority}
+                    meta={PRIORITY_META}
                     done={task.done}
                     label={task.text}
                     onToggle={() =>
                       save.mutate({ task, change: { done: !task.done } })
                     }
-                  />
+                  >
+                    {task.done && (
+                      <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                    )}
+                  </PriorityCheck>
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -210,6 +223,8 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
 
                 <PriorityPicker
                   value={task.priority}
+                  levels={TASK_PRIORITIES}
+                  meta={PRIORITY_META}
                   onChange={(priority) =>
                     save.mutate({ task, change: { priority } })
                   }
@@ -244,7 +259,12 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
           autoFocus
         />
         <div className="flex flex-wrap items-center gap-sm">
-          <PriorityPicker value={draftPriority} onChange={setDraftPriority} />
+          <PriorityPicker
+            value={draftPriority}
+            levels={TASK_PRIORITIES}
+            meta={PRIORITY_META}
+            onChange={setDraftPriority}
+          />
           <select
             value={draftAssignee}
             onChange={(e) => setDraftAssignee(e.target.value)}
@@ -274,10 +294,6 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
   );
 }
 
-/**
- * The round, priority-tinted tick. Colour carries the urgency and the same
- * control completes the task, so a row stays one circle and one line of text.
- */
 /**
  * The editable task text.
  *
@@ -332,64 +348,5 @@ function TaskText({
         className={`col-start-1 row-start-1 w-full resize-none overflow-hidden break-words bg-transparent py-1 focus:outline-none ${shared}`}
       />
     </div>
-  );
-}
-
-export function PriorityCheck({
-  priority,
-  done,
-  label,
-  onToggle,
-  disabled = false,
-}: {
-  priority: TaskPriority;
-  done: boolean;
-  label: string;
-  onToggle: () => void;
-  disabled?: boolean;
-}) {
-  const meta = PRIORITY_META[priority];
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={done}
-      disabled={disabled}
-      aria-label={`${meta.label} priority — mark "${label}" done`}
-      title={`${meta.label} priority`}
-      onClick={onToggle}
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${meta.ring} ${
-        done ? meta.fill : "bg-transparent enabled:hover:scale-110"
-      }`}
-    >
-      {done && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-    </button>
-  );
-}
-
-/** Cycles a task through the three priorities; the dot is the whole control. */
-function PriorityPicker({
-  value,
-  onChange,
-}: {
-  value: TaskPriority;
-  onChange: (next: TaskPriority) => void;
-}) {
-  const meta = PRIORITY_META[value];
-  const next =
-    TASK_PRIORITIES[
-      (TASK_PRIORITIES.indexOf(value) + 1) % TASK_PRIORITIES.length
-    ];
-
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(next)}
-      title={`${meta.label} priority — click for ${PRIORITY_META[next].label}`}
-      className="flex shrink-0 items-center gap-1.5 rounded px-1.5 py-1 text-[11px] font-medium text-fg-muted transition-colors hover:bg-surface-muted"
-    >
-      <span className={`h-2.5 w-2.5 rounded-full ${meta.dot}`} />
-      {meta.label}
-    </button>
   );
 }

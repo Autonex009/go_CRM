@@ -26,7 +26,8 @@ export function useActionMutations() {
         setError(null);
         invalidate();
       },
-      onError: (err: unknown) => setError(err instanceof ApiError ? err.message : fallback),
+      onError: (err: unknown) =>
+        setError(err instanceof ApiError ? err.message : fallback),
     }),
     [invalidate],
   );

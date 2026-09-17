@@ -9,7 +9,15 @@ import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
 import { Alert, Button, Field, Modal, SelectField } from "../ui";
-import { ACTION_STATUSES, ACTION_STATUS_LABEL, type Action, type ActionUpdateInput } from "./api";
+import {
+  ACTION_PRIORITIES,
+  ACTION_PRIORITY_META,
+  ACTION_STATUSES,
+  ACTION_STATUS_LABEL,
+  actionPriority,
+  type Action,
+  type ActionUpdateInput,
+} from "./api";
 import { actionFormSchema, toPayload, type ActionFormValues } from "./schemas";
 
 interface ActionDialogProps {
@@ -60,6 +68,7 @@ export function ActionDialog({
       leadId: action?.leadId ?? defaultLeadId ?? "",
       dealId: action?.dealId ?? defaultDealId ?? "",
       status: action?.status ?? "open",
+      priority: action ? actionPriority(action) : "normal",
     },
   });
 
@@ -117,7 +126,9 @@ export function ActionDialog({
       await onSubmit(toPayload(values));
       onClose();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not save this action");
+      setFormError(
+        err instanceof ApiError ? err.message : "Could not save this action",
+      );
     }
   });
 
@@ -136,7 +147,11 @@ export function ActionDialog({
       <form onSubmit={submit} className="flex flex-col gap-md" noValidate>
         {formError && <Alert>{formError}</Alert>}
 
-        <Field label="Title" error={errors.title?.message} {...register("title")} />
+        <Field
+          label="Title"
+          error={errors.title?.message}
+          {...register("title")}
+        />
 
         <div className="grid gap-md sm:grid-cols-2">
           <Field
@@ -146,7 +161,11 @@ export function ActionDialog({
             {...register("dueDate")}
           />
 
-          <SelectField label="Assignee" error={errors.assignedTo?.message} {...register("assignedTo")}>
+          <SelectField
+            label="Assignee"
+            error={errors.assignedTo?.message}
+            {...register("assignedTo")}
+          >
             <option value="">Unassigned</option>
             {(members.data ?? []).map((m) => (
               <option key={m.id} value={m.id}>
@@ -176,7 +195,8 @@ export function ActionDialog({
                   </option>
                   {selectableLeads.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
+                      {l.firstName} {l.lastName ?? ""}{" "}
+                      {l.title ? `(${l.title})` : ""}
                     </option>
                   ))}
                 </>
@@ -190,7 +210,8 @@ export function ActionDialog({
                 </option>
                 {selectableLeads.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}{" "}
+                    {l.firstName} {l.lastName ?? ""}{" "}
+                    {l.title ? `(${l.title})` : ""}{" "}
                     {l.company ? `— ${l.company}` : ""}
                   </option>
                 ))}
@@ -199,7 +220,11 @@ export function ActionDialog({
           </SelectField>
         </div>
 
-        <SelectField label="Deal (optional)" error={errors.dealId?.message} {...register("dealId")}>
+        <SelectField
+          label="Deal (optional)"
+          error={errors.dealId?.message}
+          {...register("dealId")}
+        >
           <option value="">
             {selectableDeals.length > 0
               ? "— Select deal —"
@@ -214,8 +239,24 @@ export function ActionDialog({
           ))}
         </SelectField>
 
+        <SelectField
+          label="Priority"
+          error={errors.priority?.message}
+          {...register("priority")}
+        >
+          {ACTION_PRIORITIES.map((p) => (
+            <option key={p} value={p}>
+              {ACTION_PRIORITY_META[p].label}
+            </option>
+          ))}
+        </SelectField>
+
         {action && (
-          <SelectField label="Status" error={errors.status?.message} {...register("status")}>
+          <SelectField
+            label="Status"
+            error={errors.status?.message}
+            {...register("status")}
+          >
             {ACTION_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {ACTION_STATUS_LABEL[s]}
@@ -229,7 +270,11 @@ export function ActionDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : action ? "Save changes" : "Create action"}
+            {isSubmitting
+              ? "Saving…"
+              : action
+                ? "Save changes"
+                : "Create action"}
           </Button>
         </div>
       </form>

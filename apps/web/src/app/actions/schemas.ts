@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ACTION_STATUSES } from "./api";
+import { ACTION_PRIORITIES, ACTION_STATUSES } from "./api";
 import type { ActionUpdateInput } from "./api";
 
 /**
@@ -8,7 +8,11 @@ import type { ActionUpdateInput } from "./api";
  * editing — a new action always starts "open" (see ActionDialog).
  */
 export const actionFormSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(160, "160 characters or fewer"),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(160, "160 characters or fewer"),
   // A native date input gives "" or YYYY-MM-DD.
   dueDate: z.string().min(1, "Due date is required"),
   assignedTo: z.string().optional(),
@@ -16,6 +20,7 @@ export const actionFormSchema = z.object({
   leadId: z.string().optional(),
   dealId: z.string().optional(),
   status: z.enum(ACTION_STATUSES),
+  priority: z.enum(ACTION_PRIORITIES),
 });
 
 export type ActionFormValues = z.infer<typeof actionFormSchema>;
@@ -33,6 +38,7 @@ export function toPayload(values: ActionFormValues): ActionUpdateInput {
     // same suffix convention as the deal/quote/invoice date fields.
     dueAt: `${values.dueDate.trim()}T00:00:00Z`,
     status: values.status,
+    priority: values.priority,
     assignedTo: text(values.assignedTo),
     accountId: text(values.accountId),
     leadId: text(values.leadId),

@@ -7,6 +7,8 @@ import {
   isOverdue,
   type Action,
   type ActionStatus,
+  ACTION_PRIORITY_META,
+  actionPriority,
 } from "./api";
 
 const STATUS_TONE: Record<ActionStatus, "neutral" | "info" | "success"> = {
@@ -68,8 +70,15 @@ export function ActionsTable({
                   <div className="flex flex-col">
                     <button
                       onClick={() => onOpen(action)}
-                      className="text-left font-medium text-fg hover:underline"
+                      className="flex items-center gap-2 text-left font-medium text-fg hover:underline"
                     >
+                      {/* The same dot the deal's working view draws, so an
+                          action's urgency reads identically wherever it is
+                          listed. */}
+                      <span
+                        title={`${ACTION_PRIORITY_META[actionPriority(action)].label} priority`}
+                        className={`h-2 w-2 shrink-0 rounded-full ${ACTION_PRIORITY_META[actionPriority(action)].dot}`}
+                      />
                       {action.title}
                     </button>
                     {leadName && action.leadId && leadName(action.leadId) && (
