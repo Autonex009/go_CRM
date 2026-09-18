@@ -54,7 +54,10 @@ export function StatTile({
         </div>
       )}
       {note && (
-        <div className="mt-0.5 truncate text-[11px] text-fg-subtle" title={note}>
+        <div
+          className="mt-0.5 truncate text-[11px] text-fg-subtle"
+          title={note}
+        >
           {note}
         </div>
       )}

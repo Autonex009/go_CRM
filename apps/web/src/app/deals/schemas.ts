@@ -62,6 +62,8 @@ export const dealFormSchema = z.object({
       .nullable(),
   ),
   location: z.string().trim().max(500, "500 characters or fewer").optional(),
+  /** The company sites this deal delivers to, in pick order. */
+  locationIds: z.array(z.string()).optional(),
   products: z.string().trim().max(500, "500 characters or fewer").optional(),
 });
 
@@ -91,6 +93,7 @@ export function toPayload(values: DealFormValues): DealInput {
     leadId: text(values.leadId),
     totalCameras: values.totalCameras,
     location: text(values.location),
+    locationIds: values.locationIds ?? [],
     products: text(values.products),
   };
 }

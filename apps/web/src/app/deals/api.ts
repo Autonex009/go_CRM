@@ -24,6 +24,9 @@ export interface Deal {
   /** What is being deployed on this deal. */
   totalCameras: number | null;
   location: string | null;
+  /** The company sites this deal delivers to. `location` above carries their
+   *  names joined with "; ", kept in step by the server. */
+  locationIds: string[];
   products: string | null;
   expectedCloseDate: string | null;
   position: number;
@@ -51,6 +54,7 @@ export interface DealInput {
   leadId?: string;
   totalCameras?: number | null;
   location?: string;
+  locationIds?: string[];
   products?: string;
 }
 
@@ -63,7 +67,10 @@ export interface DealInput {
  * used to drop the deal's cameras, location, products, lead and contact for
  * exactly this reason — build partial updates through here instead.
  */
-export function toDealInput(deal: Deal, changes: Partial<DealInput> = {}): DealInput {
+export function toDealInput(
+  deal: Deal,
+  changes: Partial<DealInput> = {},
+): DealInput {
   return {
     title: deal.title,
     description: deal.description ?? undefined,
@@ -77,6 +84,7 @@ export function toDealInput(deal: Deal, changes: Partial<DealInput> = {}): DealI
     expectedCloseDate: deal.expectedCloseDate ?? undefined,
     totalCameras: deal.totalCameras,
     location: deal.location ?? undefined,
+    locationIds: deal.locationIds ?? [],
     products: deal.products ?? undefined,
     ...changes,
   };

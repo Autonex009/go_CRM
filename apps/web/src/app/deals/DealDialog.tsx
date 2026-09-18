@@ -1,23 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
 import { AccountSelect } from "../accounts/AccountSelect";
+import { LocationSelect } from "../accounts/LocationSelect";
 import { leadsApi } from "../leads/api";
 import { Timeline } from "../activities/Timeline";
 
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
-import {
-  Alert,
-  Badge,
-  Button,
-  Field,
-  Modal,
-  SelectField,
-} from "../ui";
+import { Alert, Badge, Button, Field, Modal, SelectField } from "../ui";
 import type { Deal, DealInput } from "./api";
 import { buildQuoteStateFromDeal } from "./quote-utils";
 import { TaskHistory } from "./TaskHistory";
@@ -58,7 +52,6 @@ export function DealDialog({
     staleTime: 5 * 60_000,
   });
 
-
   const {
     register,
     handleSubmit,
@@ -81,6 +74,7 @@ export function DealDialog({
       leadId: deal?.leadId ?? "",
       totalCameras: deal?.totalCameras ?? null,
       location: deal?.location ?? "",
+      locationIds: deal?.locationIds ?? [],
       products: deal?.products ?? "",
     },
   });
@@ -88,6 +82,10 @@ export function DealDialog({
   const accountId = useWatch({
     control,
     name: "accountId",
+  });
+  const locationIds = useWatch({
+    control,
+    name: "locationIds",
   });
 
   // The picker asks the server for the leads it needs rather than paging through
@@ -209,12 +207,32 @@ export function DealDialog({
                   : Number(v),
             })}
           />
-          <Field
-            label="Location"
-            placeholder="e.g. Mumbai, Plant 2"
-            error={errors.location?.message}
-            {...register("location")}
+          {/* The company's saved sites. A deal can name several — one
+              commercial conversation often covers three plants — and the
+              server joins their names into the deal's location text, which is
+              what the quote builder and the delivery sync read. */}
+          <LocationSelect
+            accountId={accountId ?? ""}
+            value={locationIds ?? []}
+            error={errors.locationIds?.message}
+            onChange={(next) => {
+              setValue("locationIds", next);
+              // Picking saved sites makes the text box redundant: the server
+              // fills deals.location from their names. Clearing it stops a
+              // stale hand-typed value being sent alongside them.
+              if (next.length > 0) setValue("location", "");
+            }}
           />
+          {/* Still typeable, for a site nobody has recorded yet. Offered only
+              when nothing is ticked, so the two cannot disagree. */}
+          {(locationIds ?? []).length === 0 && (
+            <Field
+              label="Site (not saved on the company)"
+              placeholder="e.g. Mumbai, Plant 2"
+              error={errors.location?.message}
+              {...register("location")}
+            />
+          )}
           <Field
             label="Products"
             placeholder="e.g. Safety AI, ANPR"
@@ -284,7 +302,8 @@ export function DealDialog({
                   </option>
                   {selectableLeads.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}
+                      {l.firstName} {l.lastName ?? ""}{" "}
+                      {l.title ? `(${l.title})` : ""}
                     </option>
                   ))}
                 </>
@@ -298,7 +317,8 @@ export function DealDialog({
                 </option>
                 {selectableLeads.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.firstName} {l.lastName ?? ""} {l.title ? `(${l.title})` : ""}{" "}
+                    {l.firstName} {l.lastName ?? ""}{" "}
+                    {l.title ? `(${l.title})` : ""}{" "}
                     {l.company ? `— ${l.company}` : ""}
                   </option>
                 ))}

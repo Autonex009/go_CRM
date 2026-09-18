@@ -357,8 +357,7 @@ function DueDate({
   if (!iso) return <span className="text-xs text-fg-subtle">—</span>;
 
   const days = daysFromToday(iso);
-  const overdue =
-    days !== null && days < 0 && dealStage !== "won" && !settled;
+  const overdue = days !== null && days < 0 && dealStage !== "won" && !settled;
 
   return (
     <span

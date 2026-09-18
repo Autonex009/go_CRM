@@ -30,7 +30,8 @@ export function FinancialsTab({
   currency: string;
 }) {
   const navigate = useNavigate();
-  const collected = m.invoiced > 0 ? Math.round((m.paid / m.invoiced) * 100) : 0;
+  const collected =
+    m.invoiced > 0 ? Math.round((m.paid / m.invoiced) * 100) : 0;
 
   return (
     <div className="mt-md flex flex-col gap-lg">

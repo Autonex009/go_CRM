@@ -107,7 +107,12 @@ function cellClass<T>(column: RecordColumn<T>, base: string): string {
 export function TotalsRow({
   cells,
 }: {
-  cells: { key: string; value: ReactNode; align?: "left" | "right"; secondary?: boolean }[];
+  cells: {
+    key: string;
+    value: ReactNode;
+    align?: "left" | "right";
+    secondary?: boolean;
+  }[];
 }) {
   return (
     <tr>

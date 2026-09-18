@@ -8,7 +8,14 @@ import { useActionMutations } from "../../actions/useActionMutations";
 import { ApiError } from "../../lib/api";
 import { leadsApi } from "../../leads/api";
 import { memberLabel, orgApi } from "../../org/api";
-import { Alert, Button, Card, CardHeader, EmptyState, Skeleton } from "../../ui";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Skeleton,
+} from "../../ui";
 
 interface ActionsTabProps {
   accountId: string;
@@ -40,13 +47,18 @@ export function ActionsTab({ accountId }: ActionsTabProps) {
   });
 
   const memberName = useMemo(() => {
-    const map = new Map((members.data ?? []).map((m) => [m.id, memberLabel(m)]));
+    const map = new Map(
+      (members.data ?? []).map((m) => [m.id, memberLabel(m)]),
+    );
     return (id: string | null) => (id ? (map.get(id) ?? "—") : "Unassigned");
   }, [members.data]);
 
   const leadName = useMemo(() => {
     const map = new Map(
-      (leadsQuery.data?.items ?? []).map((l) => [l.id, `${l.firstName} ${l.lastName || ""}`.trim()]),
+      (leadsQuery.data?.items ?? []).map((l) => [
+        l.id,
+        `${l.firstName} ${l.lastName || ""}`.trim(),
+      ]),
     );
     return (id: string | null) => (id ? map.get(id) : undefined);
   }, [leadsQuery.data]);
@@ -89,7 +101,9 @@ export function ActionsTab({ accountId }: ActionsTabProps) {
         {query.isError && (
           <div className="px-md pb-md">
             <Alert>
-              {query.error instanceof ApiError ? query.error.message : "Could not load actions"}
+              {query.error instanceof ApiError
+                ? query.error.message
+                : "Could not load actions"}
             </Alert>
           </div>
         )}
@@ -126,8 +140,12 @@ export function ActionsTab({ accountId }: ActionsTabProps) {
           action={dialog.action}
           defaultAccountId={accountId}
           onClose={() => setDialog(null)}
-          onSubmit={(input) => save.mutateAsync({ id: dialog.action?.id, input })}
-          onDelete={dialog.action ? () => deleteAction(dialog.action!.id) : undefined}
+          onSubmit={(input) =>
+            save.mutateAsync({ id: dialog.action?.id, input })
+          }
+          onDelete={
+            dialog.action ? () => deleteAction(dialog.action!.id) : undefined
+          }
         />
       )}
     </div>

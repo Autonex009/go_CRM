@@ -23,16 +23,16 @@ export function StageBar({
 
   // With no value anywhere, weight by count so the bar still says something.
   const weight = (s: StageSlice) =>
-    total > 0 ? s.value / total : s.count / stages.reduce((n, x) => n + x.count, 0);
+    total > 0
+      ? s.value / total
+      : s.count / stages.reduce((n, x) => n + x.count, 0);
 
   return (
     <div className="flex flex-col gap-sm">
       <div
         className="flex h-2 w-full overflow-hidden rounded-full bg-surface-muted"
         role="img"
-        aria-label={stages
-          .map((s) => `${s.label}: ${s.count}`)
-          .join(", ")}
+        aria-label={stages.map((s) => `${s.label}: ${s.count}`).join(", ")}
       >
         {stages.map((s) => (
           <div

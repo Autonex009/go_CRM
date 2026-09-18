@@ -65,6 +65,7 @@ export function OverviewTab({
 
       <div className="grid grid-cols-1 gap-lg md:grid-cols-3">
         <ProfileDetails
+          accountId={accountId}
           mode={mode}
           formData={formData}
           setFormData={setFormData}

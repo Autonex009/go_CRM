@@ -17,10 +17,13 @@ import { accountsApi } from "./api";
  * typeahead against the search endpoint the companies page now uses, rather
  * than pretending a dropdown scales.
  */
-export const AccountSelect = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement> & {
-  label?: string;
-  error?: string;
-}>(function AccountSelect({ label = "Company", error, ...props }, ref) {
+export const AccountSelect = forwardRef<
+  HTMLSelectElement,
+  SelectHTMLAttributes<HTMLSelectElement> & {
+    label?: string;
+    error?: string;
+  }
+>(function AccountSelect({ label = "Company", error, ...props }, ref) {
   const accounts = useQuery({
     queryKey: ["accountOptions"],
     queryFn: () => accountsApi.list(0, 500),

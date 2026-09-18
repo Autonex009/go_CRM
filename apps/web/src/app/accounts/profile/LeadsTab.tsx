@@ -68,7 +68,12 @@ export function LeadsTab({
                     value: formatMoney(estimate, currency),
                     align: "right",
                   },
-                  { key: "created", value: "", align: "right", secondary: true },
+                  {
+                    key: "created",
+                    value: "",
+                    align: "right",
+                    secondary: true,
+                  },
                 ]}
               />
             ) : undefined

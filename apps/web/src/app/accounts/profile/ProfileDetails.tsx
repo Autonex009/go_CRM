@@ -1,5 +1,6 @@
 import type { ProfileInput } from "../api";
 import { Badge, Button, Card, CardHeader } from "../../ui";
+import { PlantSitesCard } from "./PlantSitesCard";
 import { SpecList } from "./SpecList";
 import type { ProfileMetrics } from "./metrics";
 
@@ -30,17 +31,22 @@ const COMMON_AI_DETECTIONS = [
  * address no longer re-renders the pipeline metrics above it.
  */
 export function ProfileDetails({
+  accountId,
   mode,
   formData,
   setFormData,
   metrics,
 }: {
+  accountId: string;
   mode: "preview" | "edit";
   formData: ProfileInput;
   setFormData: (next: ProfileInput) => void;
   /** Read only for the deployment strip — the form itself never touches it. */
   metrics: ProfileMetrics;
 }) {
+  // Sites live in their own table now and are counted by PlantSitesCard. This
+  // strip still reads the legacy array so an older profile that was never
+  // re-saved does not show zero where it used to show a number.
   const sites = formData.plantLocations?.length ?? 0;
   const modules = formData.aiDetections?.length ?? 0;
   return (
@@ -61,8 +67,7 @@ export function ProfileDetails({
         ) : (
           <>
             <p className="text-sm leading-relaxed text-fg-muted">
-              {formData.description ||
-                "No company description provided yet."}
+              {formData.description || "No company description provided yet."}
             </p>
 
             {/* What is actually deployed, read off the deals and the profile.
@@ -87,7 +92,8 @@ export function ProfileDetails({
                 },
                 {
                   label: "Sites in deals",
-                  value: metrics.siteCount > 0 ? String(metrics.siteCount) : "—",
+                  value:
+                    metrics.siteCount > 0 ? String(metrics.siteCount) : "—",
                   note: "named by deal locations",
                 },
                 {
@@ -146,8 +152,7 @@ export function ProfileDetails({
           </div>
         ) : (
           <div className="flex flex-wrap gap-xs">
-            {formData.aiDetections &&
-            formData.aiDetections.length > 0 ? (
+            {formData.aiDetections && formData.aiDetections.length > 0 ? (
               formData.aiDetections.map((det) => (
                 <Badge key={det} tone="brand">
                   {det}
@@ -162,197 +167,10 @@ export function ProfileDetails({
         )}
       </Card>
 
-      {/* Plant Locations & Sites */}
-      <Card>
-        <CardHeader
-          title={`Plant Sites (${formData.plantLocations?.length || 0})`}
-          action={
-            mode === "edit" ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                icon="plus"
-                onClick={() => {
-                  const locs = formData.plantLocations || [];
-                  setFormData({
-                    ...formData,
-                    plantLocations: [
-                      ...locs,
-                      {
-                        name: "New Plant",
-                        city: "",
-                        address: "",
-                        spocName: "",
-                        spocPhone: "",
-                      },
-                    ],
-                  });
-                }}
-              >
-                Add Site
-              </Button>
-            ) : undefined
-          }
-          className="mb-md"
-        />
-        {formData.plantLocations &&
-        formData.plantLocations.length > 0 ? (
-          <div className="flex flex-col gap-md">
-            {formData.plantLocations.map((loc, idx) => (
-              <div
-                key={idx}
-                className="p-md rounded-lg border border-line bg-surface-muted flex flex-col gap-xs relative"
-              >
-                {mode === "edit" ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-sm">
-                    <div>
-                      <label className="text-xs text-fg-muted font-medium">
-                        Plant Name
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                        value={loc.name}
-                        onChange={(e) => {
-                          const locs = [
-                            ...(formData.plantLocations || []),
-                          ];
-                          locs[idx] = {
-                            ...locs[idx],
-                            name: e.target.value,
-                          };
-                          setFormData({
-                            ...formData,
-                            plantLocations: locs,
-                          });
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-fg-muted font-medium">
-                        City / Region
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                        value={loc.city}
-                        onChange={(e) => {
-                          const locs = [
-                            ...(formData.plantLocations || []),
-                          ];
-                          locs[idx] = {
-                            ...locs[idx],
-                            city: e.target.value,
-                          };
-                          setFormData({
-                            ...formData,
-                            plantLocations: locs,
-                          });
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-fg-muted font-medium">
-                        Site SPOC Name
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                        value={loc.spocName || ""}
-                        onChange={(e) => {
-                          const locs = [
-                            ...(formData.plantLocations || []),
-                          ];
-                          locs[idx] = {
-                            ...locs[idx],
-                            spocName: e.target.value,
-                          };
-                          setFormData({
-                            ...formData,
-                            plantLocations: locs,
-                          });
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-fg-muted font-medium">
-                        Site SPOC Phone
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full text-xs bg-surface border border-line rounded px-xs py-xs text-fg"
-                        value={loc.spocPhone || ""}
-                        onChange={(e) => {
-                          const locs = [
-                            ...(formData.plantLocations || []),
-                          ];
-                          locs[idx] = {
-                            ...locs[idx],
-                            spocPhone: e.target.value,
-                          };
-                          setFormData({
-                            ...formData,
-                            plantLocations: locs,
-                          });
-                        }}
-                      />
-                    </div>
-                    <div className="md:col-span-2 flex justify-end mt-xs">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const locs = (
-                            formData.plantLocations || []
-                          ).filter((_, i) => i !== idx);
-                          setFormData({
-                            ...formData,
-                            plantLocations: locs,
-                          });
-                        }}
-                      >
-                        <span className="text-bad-fg text-xs">
-                          Remove Site
-                        </span>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-semibold text-fg">
-                        {loc.name}
-                      </h4>
-                      {loc.city && (
-                        <Badge tone="neutral">{loc.city}</Badge>
-                      )}
-                    </div>
-                    {loc.address && (
-                      <p className="text-xs text-fg-muted">
-                        {loc.address}
-                      </p>
-                    )}
-                    {(loc.spocName || loc.spocPhone) && (
-                      <div className="text-xs text-fg-muted mt-xs pt-xs border-t border-line flex items-center gap-md">
-                        <span>
-                          SPOC: <strong>{loc.spocName || "N/A"}</strong>
-                        </span>
-                        {loc.spocPhone && (
-                          <span>Phone: {loc.spocPhone}</span>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-fg-subtle">
-            No plant sites configured.
-          </p>
-        )}
-      </Card>
+      {/* The company's sites. Rows now, not the profile's JSONB array, so a
+          deal can point at one — see PlantSitesCard. It saves on its own,
+          outside this form's Save. */}
+      <PlantSitesCard accountId={accountId} editable={mode === "edit"} />
 
       {/* Custom Sections Builder */}
       {formData.customSections &&
@@ -389,18 +207,16 @@ export function ProfileDetails({
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      const secs = (
-                        formData.customSections || []
-                      ).filter((_, i) => i !== idx);
+                      const secs = (formData.customSections || []).filter(
+                        (_, i) => i !== idx,
+                      );
                       setFormData({
                         ...formData,
                         customSections: secs,
                       });
                     }}
                   >
-                    <span className="text-bad-fg text-xs">
-                      Remove Section
-                    </span>
+                    <span className="text-bad-fg text-xs">Remove Section</span>
                   </Button>
                 </div>
               </div>

@@ -28,7 +28,10 @@ export function SpecList({
             {item.value}
           </dd>
           {item.note && (
-            <dd className="truncate text-[11px] text-fg-subtle" title={item.note}>
+            <dd
+              className="truncate text-[11px] text-fg-subtle"
+              title={item.note}
+            >
               {item.note}
             </dd>
           )}

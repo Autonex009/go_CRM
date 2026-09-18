@@ -77,9 +77,7 @@ export function ProfileSidebar({
             )}
           </div>
           <div className="flex justify-between items-center py-xs border-b border-line">
-            <span className="text-fg-muted">
-              Audio / Speaker Units:
-            </span>
+            <span className="text-fg-muted">Audio / Speaker Units:</span>
             {mode === "edit" ? (
               <input
                 type="number"

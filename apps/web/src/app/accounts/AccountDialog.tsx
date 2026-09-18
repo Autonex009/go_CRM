@@ -5,7 +5,15 @@ import { useForm } from "react-hook-form";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { memberLabel, orgApi } from "../org/api";
-import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField } from "../ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Field,
+  Modal,
+  SelectField,
+  TextareaField,
+} from "../ui";
 import type { Account, AccountFormValues } from "./api";
 import { accountFormSchema } from "./api";
 
@@ -18,7 +26,12 @@ interface AccountDialogProps {
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-export function AccountDialog({ account, onClose, onSubmit, onDelete }: AccountDialogProps) {
+export function AccountDialog({
+  account,
+  onClose,
+  onSubmit,
+  onDelete,
+}: AccountDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const members = useQuery({
@@ -49,7 +62,9 @@ export function AccountDialog({ account, onClose, onSubmit, onDelete }: AccountD
       await onSubmit(values);
       onClose();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not save this account");
+      setFormError(
+        err instanceof ApiError ? err.message : "Could not save this account",
+      );
     }
   });
 
@@ -74,7 +89,8 @@ export function AccountDialog({ account, onClose, onSubmit, onDelete }: AccountD
           <div className="flex flex-wrap items-center gap-sm">
             {account.contactCount > 0 && (
               <Badge tone="brand">
-                {account.contactCount} contact{account.contactCount === 1 ? "" : "s"}
+                {account.contactCount} contact
+                {account.contactCount === 1 ? "" : "s"}
               </Badge>
             )}
             {account.dealCount > 0 && (
@@ -82,11 +98,17 @@ export function AccountDialog({ account, onClose, onSubmit, onDelete }: AccountD
                 {account.dealCount} deal{account.dealCount === 1 ? "" : "s"}
               </Badge>
             )}
-            <span className="text-xs text-fg-subtle">must be unlinked before deleting</span>
+            <span className="text-xs text-fg-subtle">
+              must be unlinked before deleting
+            </span>
           </div>
         )}
 
-        <Field label="Company name" error={errors.name?.message} {...register("name")} />
+        <Field
+          label="Company name"
+          error={errors.name?.message}
+          {...register("name")}
+        />
 
         <div className="grid gap-md sm:grid-cols-2">
           <Field
@@ -95,8 +117,17 @@ export function AccountDialog({ account, onClose, onSubmit, onDelete }: AccountD
             error={errors.website?.message}
             {...register("website")}
           />
-          <Field label="Phone" type="tel" error={errors.phone?.message} {...register("phone")} />
-          <Field label="Industry" error={errors.industry?.message} {...register("industry")} />
+          <Field
+            label="Phone"
+            type="tel"
+            error={errors.phone?.message}
+            {...register("phone")}
+          />
+          <Field
+            label="Industry"
+            error={errors.industry?.message}
+            {...register("industry")}
+          />
 
           <SelectField
             label="Owner"
@@ -124,7 +155,11 @@ export function AccountDialog({ account, onClose, onSubmit, onDelete }: AccountD
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : account ? "Save changes" : "Create account"}
+            {isSubmitting
+              ? "Saving…"
+              : account
+                ? "Save changes"
+                : "Create account"}
           </Button>
         </div>
       </form>

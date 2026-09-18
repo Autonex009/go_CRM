@@ -44,6 +44,37 @@ export interface PlantLocation {
   spocPhone?: string;
 }
 
+/**
+ * One site belonging to a company.
+ *
+ * Mirrors accounts.Location. These used to be the `plantLocations` JSONB array
+ * above, which had no ids — so a deal named its site as free text and renaming
+ * a plant orphaned every deal that named it. PlantLocation is kept for the
+ * moment because the old profile editor still writes it; the rows here are what
+ * the deal picker selects from.
+ */
+export interface AccountLocation {
+  id: string;
+  accountId: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  spocName: string | null;
+  spocPhone: string | null;
+  position: number;
+  archivedAt: string | null;
+  /** Live deals naming this site, so archiving is an informed choice. */
+  dealCount: number;
+}
+
+export interface AccountLocationInput {
+  name: string;
+  city?: string | null;
+  address?: string | null;
+  spocName?: string | null;
+  spocPhone?: string | null;
+}
+
 export interface HardwareSpecs {
   edgeProcessor?: string;
   cameraCount?: number;
@@ -194,6 +225,36 @@ export const accountsApi = {
     }),
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),
+
+  /** A company's sites. Archived ones are left out unless asked for. */
+  locations: (accountId: string, includeArchived = false) =>
+    apiFetch<{ items: AccountLocation[] }>(
+      `${BASE}/${accountId}/locations${includeArchived ? "?includeArchived=true" : ""}`,
+    ).then((r) => r.items),
+
+  createLocation: (accountId: string, input: AccountLocationInput) =>
+    apiFetch<AccountLocation>(`${BASE}/${accountId}/locations`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateLocation: (
+    accountId: string,
+    id: string,
+    input: AccountLocationInput,
+  ) =>
+    apiFetch<AccountLocation>(`${BASE}/${accountId}/locations/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  /** Archive, or restore with `archived: false`. Sites are never deleted: a
+   *  deal delivered to a plant still has to be able to say where. */
+  archiveLocation: (accountId: string, id: string, archived = true) =>
+    apiFetch<AccountLocation>(
+      `${BASE}/${accountId}/locations/${id}?archived=${archived}`,
+      { method: "DELETE" },
+    ),
 
   getProfile: (id: string) =>
     apiFetch<FullCompanyProfilePayload>(`${BASE}/${id}/profile`),
