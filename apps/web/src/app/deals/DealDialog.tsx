@@ -193,7 +193,10 @@ export function DealDialog({
           {...register("title")}
         />
 
-        <div className="grid gap-md sm:grid-cols-3">
+        {/* Cameras and products are short values and pair on one line. The
+            site picker gets a row of its own: it opens a panel, and a dropdown
+            squeezed into a third of the width wrapped its own label. */}
+        <div className="grid gap-md sm:grid-cols-2">
           <Field
             label="Total cameras"
             type="number"
@@ -207,10 +210,19 @@ export function DealDialog({
                   : Number(v),
             })}
           />
-          {/* The company's saved sites. A deal can name several — one
-              commercial conversation often covers three plants — and the
-              server joins their names into the deal's location text, which is
-              what the quote builder and the delivery sync read. */}
+          <Field
+            label="Products"
+            placeholder="e.g. Safety AI, ANPR"
+            error={errors.products?.message}
+            {...register("products")}
+          />
+        </div>
+
+        {/* The company's saved sites. A deal can name several — one commercial
+            conversation often covers three plants — and the server joins their
+            names into the deal's location text, which is what the quote builder
+            and the delivery sync read. */}
+        <div className="grid gap-md sm:grid-cols-2">
           <LocationSelect
             accountId={accountId ?? ""}
             value={locationIds ?? []}
@@ -227,18 +239,12 @@ export function DealDialog({
               when nothing is ticked, so the two cannot disagree. */}
           {(locationIds ?? []).length === 0 && (
             <Field
-              label="Site (not saved on the company)"
+              label="Or type a site"
               placeholder="e.g. Mumbai, Plant 2"
               error={errors.location?.message}
               {...register("location")}
             />
           )}
-          <Field
-            label="Products"
-            placeholder="e.g. Safety AI, ANPR"
-            error={errors.products?.message}
-            {...register("products")}
-          />
         </div>
 
         <div className="grid gap-md sm:grid-cols-2">
