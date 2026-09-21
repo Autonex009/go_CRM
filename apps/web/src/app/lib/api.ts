@@ -90,11 +90,34 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 }
 
+/** Which ways in this deployment offers. Mirrors GET /auth/methods. */
+export interface AuthMethods {
+  /** False when new accounts come only from invitations, which is the default. */
+  selfRegistration: boolean;
+}
+
 export const authApi = {
   login: (email: string, password: string) =>
     postJSON<AuthResponse>("/login", { email, password }),
   register: (email: string, password: string, name?: string) =>
     postJSON<AuthResponse>("/register", { email, password, name }),
+
+  /**
+   * Read before the sign-in screen offers a "create an account" link.
+   *
+   * Fails closed: if the call itself fails, assume sign-up is off rather than
+   * advertise a form that will refuse whoever fills it in.
+   */
+  methods: async (): Promise<AuthMethods> => {
+    try {
+      return await request<AuthMethods>(`${AUTH_BASE}/methods`, {
+        method: "GET",
+        credentials: "include",
+      });
+    } catch {
+      return { selfRegistration: false };
+    }
+  },
 };
 
 /**

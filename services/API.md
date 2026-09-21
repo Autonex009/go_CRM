@@ -18,8 +18,9 @@ and return `{ items, total, limit, offset }`.
 
 | Method | Path | Body / Params | Returns |
 | --- | --- | --- | --- |
-| POST | `/register` **public** | `email`, `password` (≥8), `name?` | `{ token, user }` · `409` if email exists |
+| POST | `/register` **public** | `email`, `password` (≥8), `name?` | `{ token, user }` · `403` when sign-up is closed · `409` if email exists |
 | POST | `/login` **public** | `email`, `password` | `{ token, user }` · `401` on bad credentials |
+| GET | `/methods` **public** | — | `{ selfRegistration }` |
 | POST | `/refresh` **public** | — (reads `refresh_token` cookie) | `{ token, user }` · `401` if no session |
 | POST | `/logout` **public** | — | `204`, clears the cookie |
 | GET | `/sso/{provider}` **public** | `provider` = `google` \| `github` | `302` to the provider |
@@ -28,7 +29,19 @@ and return `{ items, total, limit, offset }`.
 
 `user`: `id`, `email`, `name`, `orgId`, `authProvider`
 
-SSO is restricted by `SSO_ALLOWED_DOMAINS`; new SSO users join `SSO_DEFAULT_ORG_ID`.
+**Who may get in.** Access is granted per person, not per domain, and both
+doors are closed by default:
+
+* `SSO_ALLOWED_DOMAINS` is the outer gate on both `/register` and SSO.
+* SSO then signs people **in** but not **up**. An address that is not already a
+  member needs an unaccepted, unexpired `invitations` row; their first sign-in
+  consumes it and puts them in that invitation's organization. Otherwise `403`.
+  `SSO_AUTO_PROVISION=true` restores provisioning into `SSO_DEFAULT_ORG_ID`.
+* `/register` refuses outright unless `ALLOW_SELF_REGISTRATION=true`. Existing
+  password accounts are unaffected — this gates sign-up, not sign-in.
+
+New people therefore arrive one way: invited from Team & Settings, then either
+accepting the invite link (which sets a password) or signing in with Google.
 
 ---
 

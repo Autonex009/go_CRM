@@ -35,6 +35,9 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/register", h.register)
 	r.Post("/login", h.login)
+	// Public on purpose: the sign-in screen has to know whether to offer a
+	// "create an account" link at all, and it asks before anyone is authenticated.
+	r.Get("/methods", h.methods)
 	// Both read the refresh cookie rather than an Authorization header: the
 	// caller's access token is expected to be expired by the time it refreshes.
 	r.Post("/refresh", h.refresh)
@@ -60,12 +63,31 @@ type authResponse struct {
 	User  User   `json:"user"`
 }
 
+// methods reports which ways in this deployment offers, so the login and
+// sign-up screens can stop advertising one that is switched off.
+//
+// It deliberately exposes only booleans. Whether sign-up is open is not a
+// secret — the register endpoint says so on the first attempt anyway — but the
+// allowed domains and the default organization are not published here.
+func (h *Handler) methods(w http.ResponseWriter, _ *http.Request) {
+	httpx.WriteJSON(w, http.StatusOK, map[string]bool{
+		"selfRegistration": h.cfg.AllowSelfRegistration,
+	})
+}
+
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	in, ok := decodeCredentials(w, r)
 	if !ok {
 		return
 	}
 	session, err := h.svc.Register(r.Context(), in.Email, in.Password, in.Name)
+	if errors.Is(err, ErrRegistrationClosed) {
+		httpx.WriteError(w, http.StatusForbidden,
+			"Sign-up is closed for this workspace. Ask an admin to invite you from "+
+				"Team & Settings — the invitation link lets you set a password, or you "+
+				"can sign in with Google once it has been sent.")
+		return
+	}
 	if errors.Is(err, ErrEmailTaken) {
 		httpx.WriteError(w, http.StatusConflict, "email already registered")
 		return
@@ -168,6 +190,13 @@ func (h *Handler) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	case errors.Is(err, ErrDomainNotAllowed):
 		redirectError("Sign in with your work account. Only accounts on the company domain can use this app.")
+		return
+	case errors.Is(err, ErrNotInvited):
+		// Deliberately says what to do rather than only what went wrong: the
+		// person reading this has a valid company account and no way to guess
+		// that access is granted per person rather than per domain.
+		redirectError("This Google account does not have access to the workspace yet. " +
+			"Ask an admin to invite you from Team & Settings, then sign in again.")
 		return
 	case errors.Is(err, ErrOrgNotFound):
 		redirectError("Sign-in is misconfigured: the workspace new accounts join was not found. Contact an administrator.")

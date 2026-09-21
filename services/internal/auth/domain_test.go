@@ -71,7 +71,12 @@ func TestDomainAllowedAcceptsSeveralDomains(t *testing.T) {
 func TestRegisterRejectsDisallowedDomainBeforeTouchingTheStore(t *testing.T) {
 	svc := &Service{
 		store: &store{pool: nil},
-		cfg:   config.Config{SSOAllowedDomains: []string{"autonexai360.com"}},
+		// Sign-up is closed by default now and refuses before the domain is even
+		// read, so reaching the check under test means opting this deployment in.
+		cfg: config.Config{
+			SSOAllowedDomains:     []string{"autonexai360.com"},
+			AllowSelfRegistration: true,
+		},
 	}
 
 	_, err := svc.Register(context.Background(), "outsider@gmail.com", "hunter2-long-enough", "Outsider")
@@ -85,11 +90,34 @@ func TestRegisterRejectsDisallowedDomainBeforeTouchingTheStore(t *testing.T) {
 func TestRegisterNormalizesEmailBeforeCheckingTheDomain(t *testing.T) {
 	svc := &Service{
 		store: &store{pool: nil},
-		cfg:   config.Config{SSOAllowedDomains: []string{"autonexai360.com"}},
+		cfg: config.Config{
+			SSOAllowedDomains:     []string{"autonexai360.com"},
+			AllowSelfRegistration: true,
+		},
 	}
 
 	_, err := svc.Register(context.Background(), "  OUTSIDER@GMAIL.COM ", "hunter2-long-enough", "")
 	if !errors.Is(err, ErrDomainNotAllowed) {
 		t.Fatalf("err = %v, want ErrDomainNotAllowed", err)
+	}
+}
+
+// Sign-up being closed is checked before anything else, including the domain
+// rule and any lookup: the answer does not depend on who is asking, and it must
+// not reveal whether an address is already registered.
+//
+// The nil store is the proof, as above — if this guard is ever moved below the
+// lookup, this panics instead of returning.
+func TestRegisterRefusesWhenSignUpIsClosed(t *testing.T) {
+	svc := &Service{
+		store: &store{pool: nil},
+		cfg:   config.Config{SSOAllowedDomains: []string{"autonexai360.com"}},
+	}
+
+	// An address on the *allowed* domain, so only the sign-up switch can be
+	// refusing it. This is the door the SSO restriction would otherwise leave open.
+	_, err := svc.Register(context.Background(), "someone.new@autonexai360.com", "hunter2-long-enough", "New")
+	if !errors.Is(err, ErrRegistrationClosed) {
+		t.Fatalf("err = %v, want ErrRegistrationClosed", err)
 	}
 }

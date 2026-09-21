@@ -63,6 +63,30 @@ type Config struct {
 	// separate organizations again.
 	SSODefaultOrgID string
 
+	// SSOAutoProvision decides what happens when an SSO identity clears the
+	// domain check but belongs to nobody in the workspace.
+	//
+	// Off (the default) means SSO signs people in but never signs them up: an
+	// unknown address needs an invitation from Team & Settings first. That makes
+	// the member list the access list, which is the only place it can be kept
+	// honest — a domain allow-list admits every mailbox the Google Workspace will
+	// ever have, including ones created next year.
+	//
+	// On restores the old behaviour, where any address on an allowed domain was
+	// provisioned into SSODefaultOrgID on first sign-in.
+	SSOAutoProvision bool
+
+	// AllowSelfRegistration decides whether anyone may create their own
+	// password account at POST /auth/register.
+	//
+	// Off by default, and off is the only setting consistent with a per-person
+	// access list. A domain-checked open registration endpoint is a way straight
+	// past that list: a colleague with a company address could sign themselves
+	// up and land in the shared workspace without anyone granting it. Existing
+	// password accounts are untouched either way — this gates sign-up, not
+	// sign-in, and new people arrive by invitation instead.
+	AllowSelfRegistration bool
+
 	// SMTP settings for notification email. SMTPHost and SMTPFrom are what make
 	// mail live: with either missing, notifications are skipped rather than
 	// failing, so a deployment without a relay still works normally.
@@ -99,6 +123,10 @@ func Load() Config {
 		OAuthCreds:        loadOAuthCreds(),
 		SSOAllowedDomains: loadAllowedDomains(),
 		SSODefaultOrgID:   getenv("SSO_DEFAULT_ORG_ID", ""),
+		SSOAutoProvision:  getenv("SSO_AUTO_PROVISION", "") == "true",
+
+		AllowSelfRegistration: getenv("ALLOW_SELF_REGISTRATION", "") == "true",
+
 		SMTPHost:          getenv("SMTP_HOST", ""),
 		SMTPPort:          getint("SMTP_PORT", 587),
 		SMTPUser:          getenv("SMTP_USER", ""),

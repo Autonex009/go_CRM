@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,6 +20,10 @@ var (
 	ErrEmailTaken = errors.New("email already registered")
 	// ErrUnknownProvider is returned for an unconfigured SSO provider.
 	ErrUnknownProvider = errors.New("unknown or unconfigured provider")
+	// ErrRegistrationClosed is returned when self-service sign-up is off, which
+	// is the default. New people join by invitation; see sso_admission.go.
+	ErrRegistrationClosed = errors.New("self-service sign-up is closed for this workspace")
+
 	// ErrDomainNotAllowed is returned when an SSO identity's email domain is not
 	// on the allow-list.
 	ErrDomainNotAllowed = errors.New("that email domain is not allowed to sign in")
@@ -49,6 +54,19 @@ func newService(pool *pgxpool.Pool, cfg config.Config) *Service {
 // Register creates a password-backed user and starts a session.
 func (s *Service) Register(ctx context.Context, email, password, name string) (Session, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
+
+	// Checked first, before the domain rule and before any lookup: when sign-up
+	// is closed the answer does not depend on who is asking, and it must not
+	// leak whether an address is already registered.
+	//
+	// This is the other half of the SSO restriction. Gating SSO alone left this
+	// endpoint as an open door onto the same workspace — anyone on an allowed
+	// domain could register a password account and be dropped into
+	// SSO_DEFAULT_ORG_ID, which is exactly the outcome the SSO gate exists to
+	// prevent. Existing accounts are unaffected: they sign in through Login.
+	if !s.cfg.AllowSelfRegistration {
+		return Session{}, ErrRegistrationClosed
+	}
 
 	// Checked before the lookup, and before any account exists: the allow-list is
 	// a rule about who may sign in at all, not a rule about SSO. It used to be
@@ -190,9 +208,15 @@ func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Sessi
 		return Session{}, e
 	}
 
-	// 3. First time → provision the user. With SSO_DEFAULT_ORG_ID set they join
-	//    that workspace, so colleagues signing in with SSO land together instead
-	//    of each getting their own.
+	// 3. First time. Everyone above was already a member; from here on this is a
+	//    stranger, and whether a stranger may join is a decision, not a default.
+	//    See sso_admission.go — an invitation admits them, otherwise they are
+	//    refused unless the deployment has explicitly opted into an open door.
+	adm, err := s.admit(ctx, id.Email)
+	if err != nil {
+		return Session{}, err
+	}
+
 	var namePtr *string
 	if id.Name != "" {
 		namePtr = &id.Name
@@ -204,13 +228,28 @@ func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Sessi
 		AuthProvider:   provider,
 		ProviderUserID: &id.ProviderUserID,
 	}
-	if s.cfg.SSODefaultOrgID != "" {
-		u, err = s.store.createUserInOrg(ctx, s.cfg.SSODefaultOrgID, joining)
+
+	// The invitation's own organization wins over the configured default: someone
+	// invited into a workspace must land in the one they were invited to.
+	org := adm.orgID
+	if org == "" {
+		org = s.cfg.SSODefaultOrgID
+	}
+	if org != "" {
+		u, err = s.store.createUserInOrg(ctx, org, joining)
 	} else {
 		u, err = s.store.createUserWithOrg(ctx, joining)
 	}
 	if err != nil {
 		return Session{}, err
+	}
+
+	// Bookkeeping, and deliberately not fatal — they are already a member.
+	if adm.invitationID != "" {
+		if cerr := s.store.consumeInvitation(ctx, adm.invitationID); cerr != nil {
+			log.Printf("auth: could not mark invitation %s accepted: %v",
+				adm.invitationID, cerr)
+		}
 	}
 	return IssueSession(ctx, s.pool, s.cfg, u)
 }

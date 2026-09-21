@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -21,6 +22,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   const displayError = formError || urlError;
+
+  // Fails closed, so a failed lookup hides the link rather than dangling it.
+  const methods = useQuery({
+    queryKey: ["authMethods"],
+    queryFn: authApi.methods,
+    staleTime: Infinity,
+  });
 
   const {
     register,
@@ -131,11 +139,23 @@ export default function Login() {
       </div>
       <SsoButtons />
 
+      {/* Only shown when the deployment actually accepts sign-ups. With access
+          granted per person, a permanent "create one" link is a dead end: the
+          form would take a name, an email and a password and then refuse them. */}
       <p className="mt-6 text-center text-xs text-fg-muted">
-        Don&apos;t have an account?{" "}
-        <Link to="/register" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
-          Create one
-        </Link>
+        {methods.data?.selfRegistration ? (
+          <>
+            Don&apos;t have an account?{" "}
+            <Link
+              to="/register"
+              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              Create one
+            </Link>
+          </>
+        ) : (
+          <>Need access? Ask an admin to invite you from Team &amp; Settings.</>
+        )}
       </p>
     </AuthLayout>
   );
