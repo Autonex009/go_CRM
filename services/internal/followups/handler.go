@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-crm/services/internal/notify"
 	"github.com/go-crm/services/pkg/httpx"
 	"github.com/go-crm/services/pkg/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,8 +23,8 @@ type Handler struct {
 
 // NewHandler wires the Actions service to the pgx pool. secret is the JWT
 // signing key used by the route guard.
-func NewHandler(pool *pgxpool.Pool, secret string) *Handler {
-	return &Handler{svc: newService(pool), secret: secret}
+func NewHandler(pool *pgxpool.Pool, secret string, notifier *notify.Notifier) *Handler {
+	return &Handler{svc: newService(pool, notifier), secret: secret}
 }
 
 // Routes returns the actions sub-router, mounted at /api/v1/actions.
@@ -131,7 +132,8 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &in) {
 		return
 	}
-	a, err := h.svc.Create(r.Context(), middleware.OrgID(r.Context()), in)
+	ctx := r.Context()
+	a, err := h.svc.Create(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), in)
 	if err != nil {
 		h.writeErr(w, err, "could not create action")
 		return
@@ -144,7 +146,8 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &in) {
 		return
 	}
-	a, err := h.svc.Update(r.Context(), middleware.OrgID(r.Context()), chi.URLParam(r, "id"), in)
+	ctx := r.Context()
+	a, err := h.svc.Update(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), chi.URLParam(r, "id"), in)
 	if err != nil {
 		h.writeErr(w, err, "could not update action")
 		return

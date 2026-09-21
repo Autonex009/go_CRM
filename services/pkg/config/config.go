@@ -96,6 +96,11 @@ type Config struct {
 	SMTPPassword string
 	SMTPFrom     string
 	SMTPFromName string
+
+	// ExpoAccessToken authenticates pushes to Expo's service. Expo accepts
+	// unauthenticated sends, so this stays empty unless the project has enhanced
+	// security enabled — then it comes from expo.dev > Account > Access tokens.
+	ExpoAccessToken string
 }
 
 // knownProviders is the set of OIDC providers whose endpoints the auth module
@@ -127,12 +132,14 @@ func Load() Config {
 
 		AllowSelfRegistration: getenv("ALLOW_SELF_REGISTRATION", "") == "true",
 
-		SMTPHost:          getenv("SMTP_HOST", ""),
-		SMTPPort:          getint("SMTP_PORT", 587),
-		SMTPUser:          getenv("SMTP_USER", ""),
-		SMTPPassword:      getenv("SMTP_PASSWORD", ""),
-		SMTPFrom:          getenv("SMTP_FROM", ""),
-		SMTPFromName:      getenv("SMTP_FROM_NAME", "go-CRM"),
+		SMTPHost:     getenv("SMTP_HOST", ""),
+		SMTPPort:     getint("SMTP_PORT", 587),
+		SMTPUser:     getenv("SMTP_USER", ""),
+		SMTPPassword: getenv("SMTP_PASSWORD", ""),
+		SMTPFrom:     getenv("SMTP_FROM", ""),
+		SMTPFromName: getenv("SMTP_FROM_NAME", "go-CRM"),
+
+		ExpoAccessToken: getenv("EXPO_ACCESS_TOKEN", ""),
 	}
 }
 

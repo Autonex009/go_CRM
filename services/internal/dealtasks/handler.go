@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-crm/services/internal/notify"
 	"github.com/go-crm/services/pkg/httpx"
 	"github.com/go-crm/services/pkg/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,8 +20,8 @@ type Handler struct {
 	secret string
 }
 
-func NewHandler(pool *pgxpool.Pool, secret string) *Handler {
-	return &Handler{svc: newService(pool), secret: secret}
+func NewHandler(pool *pgxpool.Pool, secret string, notifier *notify.Notifier) *Handler {
+	return &Handler{svc: newService(pool, notifier), secret: secret}
 }
 
 // Routes returns the sub-router mounted at /api/v1/deal-tasks.

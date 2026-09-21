@@ -10,6 +10,7 @@ import {
   FileText,
   Receipt,
   ListChecks,
+  ChartColumnBig,
   Settings,
   Search,
   Plus,
@@ -65,6 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/quotes", label: "Quotes", icon: FileText },
       { to: "/invoices", label: "Invoices", icon: Receipt },
+      { to: "/metrics", label: "Analytics", icon: ChartColumnBig },
     ],
   },
   {
@@ -84,6 +86,7 @@ const TITLES: Record<string, string> = {
   "/actions": "Actions",
   "/quotes": "Quotes Workbench",
   "/invoices": "Tax Invoices",
+  "/metrics": "Sales Analytics",
   "/team": "Team & Settings",
 };
 

@@ -9,6 +9,7 @@ import { MANAGER_ROLES } from "./auth/roles";
 import AcceptInvite from "./routes/AcceptInvite";
 import Accounts from "./routes/Accounts";
 import Actions from "./routes/Actions";
+import Metrics from "./routes/Metrics";
 import CompanyProfilePage from "./routes/CompanyProfile";
 import AppLayout from "./routes/AppLayout";
 import { DocumentPreview } from "./documents/DocumentPreview";
@@ -90,6 +91,8 @@ export default function AppRoot() {
               <Route element={<RequireRole roles={MANAGER_ROLES} />}>
                 <Route path="/actions" element={<Actions />} />
               </Route>
+
+              <Route path="/metrics" element={<Metrics />} />
 
               <Route path="/team" element={<Team />} />
             </Route>

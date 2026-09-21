@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-crm/services/internal/notify"
 	"github.com/go-crm/services/pkg/apperr"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,10 +35,14 @@ type Input struct {
 // Service holds the deal-task business logic.
 type Service struct {
 	store *store
+	// notifier tells an assignee that work landed on them. A nil *Notifier is
+	// usable and does nothing, so tests and a mail-less deployment need no
+	// special case.
+	notifier *notify.Notifier
 }
 
-func newService(pool *pgxpool.Pool) *Service {
-	return &Service{store: &store{pool: pool}}
+func newService(pool *pgxpool.Pool, notifier *notify.Notifier) *Service {
+	return &Service{store: &store{pool: pool}, notifier: notifier}
 }
 
 func (s *Service) List(ctx context.Context, dealID string) ([]Task, error) {
@@ -49,7 +54,12 @@ func (s *Service) Create(ctx context.Context, orgID, actorID string, in Input) (
 	if err != nil {
 		return Task{}, err
 	}
-	return s.store.create(ctx, in, actorID)
+	t, err := s.store.create(ctx, in, actorID)
+	if err != nil {
+		return Task{}, err
+	}
+	s.announce(ctx, orgID, actorID, t, nil)
+	return t, nil
 }
 
 func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Input) (Task, error) {
@@ -57,7 +67,38 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 	if err != nil {
 		return Task{}, err
 	}
-	return s.store.update(ctx, id, in, actorID)
+
+	// Read the current assignee before the write, so announce can tell a genuine
+	// reassignment from an edit that left it alone. A missing row is not fatal
+	// here: the update below reports that properly.
+	before, _ := s.store.get(ctx, id)
+
+	t, err := s.store.update(ctx, id, in, actorID)
+	if err != nil {
+		return Task{}, err
+	}
+	s.announce(ctx, orgID, actorID, t, before.AssignedTo)
+	return t, nil
+}
+
+// announce notifies the assignee when, and only when, the assignment changed.
+//
+// previous is nil on create. On update it is who held the task beforehand, so
+// ticking a task done, renaming it or reprioritising it stays silent — without
+// that check every edit would re-notify, and the alert would be trained into
+// noise within a day.
+func (s *Service) announce(ctx context.Context, orgID, actorID string, t Task, previous *string) {
+	if !assignmentChanged(previous, t.AssignedTo) {
+		return
+	}
+	s.notifier.TaskAssigned(ctx, orgID, notify.TaskAssignment{
+		TaskID:     t.ID,
+		DealID:     t.DealID,
+		Text:       t.Text,
+		Priority:   t.Priority,
+		AssigneeID: *t.AssignedTo,
+		ActorID:    actorID,
+	})
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
@@ -116,4 +157,17 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requireDe
 		}
 	}
 	return in, nil
+}
+
+// assignmentChanged reports whether an assignee is worth telling.
+//
+// previous is nil on create, where any assignee is news. On update it is who
+// held the task beforehand: the same person again means the edit was about
+// something else — a rename, a tick, a due date — and re-notifying them would
+// train the alert into noise within a day. Unassigning is not news either.
+func assignmentChanged(previous, next *string) bool {
+	if next == nil {
+		return false
+	}
+	return previous == nil || *previous != *next
 }
