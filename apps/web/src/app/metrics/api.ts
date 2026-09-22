@@ -108,15 +108,22 @@ export const metricsApi = {
     apiFetch<Report>(`${BASE}${query(filter)}`),
 };
 
-/** Named ranges the page offers, as a number of days back from today. */
-export const RANGES = {
-  30: "Last 30 days",
-  90: "Last quarter",
-  365: "Last year",
-  0: "All time",
-} as const;
+/**
+ * Named ranges the page offers, as a number of days back from today.
+ *
+ * A list rather than an object keyed by the day count. JavaScript orders
+ * integer-like keys numerically however they were written, so the object form
+ * put "All time" (0) at the top of the dropdown instead of the bottom, where
+ * the code plainly says it belongs.
+ */
+export const RANGES = [
+  { days: 30, label: "Last 30 days" },
+  { days: 90, label: "Last quarter" },
+  { days: 365, label: "Last year" },
+  { days: 0, label: "All time" },
+] as const;
 
-export type RangeKey = keyof typeof RANGES;
+export type RangeKey = (typeof RANGES)[number]["days"];
 
 /**
  * Turns a named range into the filter the API takes.

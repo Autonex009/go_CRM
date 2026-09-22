@@ -69,15 +69,22 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 	}
 
 	// Read the current assignee before the write, so announce can tell a genuine
-	// reassignment from an edit that left it alone. A missing row is not fatal
-	// here: the update below reports that properly.
-	before, _ := s.store.get(ctx, id)
+	// reassignment from an edit that left it alone.
+	//
+	// A read that fails is not fatal to the update — the write below reports a
+	// missing row properly — but it does disqualify the notification: a
+	// transient database error would otherwise look exactly like "nobody held
+	// this before", and every unrelated edit would fire a fresh "assigned to
+	// you". Silence is the safe wrong answer here.
+	before, readErr := s.store.get(ctx, id)
 
 	t, err := s.store.update(ctx, id, in, actorID)
 	if err != nil {
 		return Task{}, err
 	}
-	s.announce(ctx, orgID, actorID, t, before.AssignedTo)
+	if readErr == nil {
+		s.announce(ctx, orgID, actorID, t, before.AssignedTo)
+	}
 	return t, nil
 }
 
@@ -88,7 +95,7 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 // that check every edit would re-notify, and the alert would be trained into
 // noise within a day.
 func (s *Service) announce(ctx context.Context, orgID, actorID string, t Task, previous *string) {
-	if !assignmentChanged(previous, t.AssignedTo) {
+	if !notify.AssignmentChanged(previous, t.AssignedTo) {
 		return
 	}
 	s.notifier.TaskAssigned(ctx, orgID, notify.TaskAssignment{
@@ -157,17 +164,4 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requireDe
 		}
 	}
 	return in, nil
-}
-
-// assignmentChanged reports whether an assignee is worth telling.
-//
-// previous is nil on create, where any assignee is news. On update it is who
-// held the task beforehand: the same person again means the edit was about
-// something else — a rename, a tick, a due date — and re-notifying them would
-// train the alert into noise within a day. Unassigning is not news either.
-func assignmentChanged(previous, next *string) bool {
-	if next == nil {
-		return false
-	}
-	return previous == nil || *previous != *next
 }

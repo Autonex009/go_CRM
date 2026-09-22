@@ -79,7 +79,7 @@ func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	// Cast to uuid in SQL, so a malformed value would surface as a 500 rather
 	// than the client error it actually is.
 	if v := q.Get("ownerId"); v != "" {
-		if !isUUID(v) {
+		if !httpx.IsUUID(v) {
 			httpx.WriteError(w, http.StatusBadRequest, "ownerId must be a UUID")
 			return Filter{}, false
 		}
@@ -102,26 +102,4 @@ func scope(r *http.Request, f Filter) Filter {
 	}
 	f.OwnerID = middleware.UserID(ctx)
 	return f
-}
-
-// isUUID reports whether s has the shape of a UUID. Same check the other
-// modules make on a filter they cast in SQL.
-func isUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, c := range s {
-		switch i {
-		case 8, 13, 18, 23:
-			if c != '-' {
-				return false
-			}
-		default:
-			isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-			if !isHex {
-				return false
-			}
-		}
-	}
-	return true
 }

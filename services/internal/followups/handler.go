@@ -74,19 +74,19 @@ func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	}
 	// Filters are cast to uuid in SQL, so a malformed value would surface
 	// as a 500 rather than the client error it actually is.
-	if v := f.AccountID; v != "" && !isUUID(v) {
+	if v := f.AccountID; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "accountId must be a UUID")
 		return Filter{}, false
 	}
-	if v := f.LeadID; v != "" && !isUUID(v) {
+	if v := f.LeadID; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "leadId must be a UUID")
 		return Filter{}, false
 	}
-	if v := f.AssignedTo; v != "" && !isUUID(v) {
+	if v := f.AssignedTo; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "assignedTo must be a UUID")
 		return Filter{}, false
 	}
-	if v := f.DealID; v != "" && !isUUID(v) {
+	if v := f.DealID; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "dealId must be a UUID")
 		return Filter{}, false
 	}
@@ -188,27 +188,4 @@ func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 		httpx.Rule{Err: ErrAssigneeNotFound, Status: http.StatusBadRequest,
 			Message: "that assignee is not a member of your workspace"},
 	)
-}
-
-// isUUID reports whether s is a canonical 8-4-4-4-12 hex UUID. Query filters
-// are interpolated into ::uuid casts, and Postgres answers a bad cast with an
-// error, not an empty result.
-func isUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, c := range s {
-		switch i {
-		case 8, 13, 18, 23:
-			if c != '-' {
-				return false
-			}
-		default:
-			isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-			if !isHex {
-				return false
-			}
-		}
-	}
-	return true
 }

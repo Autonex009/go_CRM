@@ -79,7 +79,7 @@ export default function Metrics() {
               value={String(range)}
               onChange={(e) => setRange(Number(e.target.value) as RangeKey)}
             >
-              {Object.entries(RANGES).map(([days, label]) => (
+              {RANGES.map(({ days, label }) => (
                 <option key={days} value={days}>
                   {label}
                 </option>
@@ -129,8 +129,9 @@ export default function Metrics() {
           {!showValue && (
             <Alert tone="warning">
               Only {data.coverage.priced} of {data.coverage.deals} deals have a
-              value on them, so money figures are hidden — the camera and count
-              columns are complete. Add amounts to the rest to unlock them.
+              value on them, so money figures are hidden. Camera counts cover{" "}
+              {data.coverage.withCameras} of {data.coverage.deals}. Add amounts
+              to the rest to unlock the money columns.
             </Alert>
           )}
 
@@ -199,11 +200,15 @@ export default function Metrics() {
             </Card>
           </div>
 
-          {data.months.length > 1 && (
+          {data.months.length > 0 && (
             <Card className="flex flex-col gap-md">
               <CardHeader
                 title="Deals opened"
-                subtitle="Per month, with the won share filled in."
+                subtitle={
+                  data.months.length > 1
+                    ? "Per month, with the won share filled in."
+                    : "Per month, with the won share filled in. Only one month falls in this period — widen it to see a trend."
+                }
               />
               <Trend months={data.months} />
             </Card>

@@ -95,15 +95,22 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 	}
 
 	// Read the current assignee before the write, so announce can tell a genuine
-	// reassignment from an edit that left it alone. A missing row is not fatal
-	// here: the update below reports that properly.
-	before, _ := s.store.get(ctx, orgID, id)
+	// reassignment from an edit that left it alone.
+	//
+	// A read that fails is not fatal to the update — the write below reports a
+	// missing row properly — but it does disqualify the notification: a
+	// transient database error would otherwise look exactly like "nobody held
+	// this before", and every unrelated edit would fire a fresh "assigned to
+	// you". Silence is the safe wrong answer here.
+	before, readErr := s.store.get(ctx, orgID, id)
 
 	a, err := s.store.update(ctx, orgID, id, in)
 	if err != nil {
 		return Action{}, err
 	}
-	s.announce(ctx, orgID, actorID, a, before.AssignedTo)
+	if readErr == nil {
+		s.announce(ctx, orgID, actorID, a, before.AssignedTo)
+	}
 	return a, nil
 }
 
@@ -114,19 +121,20 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 // check every edit would re-notify, and the alert would be trained into noise
 // within a day.
 func (s *Service) announce(ctx context.Context, orgID, actorID string, a Action, previous *string) {
-	if !assignmentChanged(previous, a.AssignedTo) {
+	if !notify.AssignmentChanged(previous, a.AssignedTo) {
 		return
 	}
 
-	deal := ""
-	if a.DealID != nil {
-		deal = *a.DealID
-	}
 	s.notifier.TaskAssigned(ctx, orgID, notify.TaskAssignment{
-		TaskID:     a.ID,
-		DealID:     deal,
-		Text:       a.Title,
-		Priority:   a.Priority,
+		TaskID:   a.ID,
+		Text:     a.Title,
+		Priority: a.Priority,
+		// All three are optional and any of them may name the work: an action
+		// filed against a lead carried no context at all when only the deal was
+		// passed through.
+		DealID:     deref(a.DealID),
+		AccountID:  deref(a.AccountID),
+		LeadID:     deref(a.LeadID),
 		AssigneeID: *a.AssignedTo,
 		ActorID:    actorID,
 	})
@@ -243,15 +251,10 @@ func validate(in Input, requireStatus bool) error {
 	return nil
 }
 
-// assignmentChanged reports whether an assignee is worth telling.
-//
-// previous is nil on create, where any assignee is news. On update it is who
-// held the action beforehand: the same person again means the edit was about
-// something else — a rename, a tick, a due date — and re-notifying them would
-// train the alert into noise within a day. Unassigning is not news either.
-func assignmentChanged(previous, next *string) bool {
-	if next == nil {
-		return false
+// deref reads an optional id, treating absent as empty.
+func deref(v *string) string {
+	if v == nil {
+		return ""
 	}
-	return previous == nil || *previous != *next
+	return *v
 }

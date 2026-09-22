@@ -2,9 +2,12 @@ package notify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/go-crm/services/pkg/mailer"
 )
@@ -14,12 +17,35 @@ import (
 // and the notification still makes sense without a deal to name.
 type TaskAssignment struct {
 	TaskID   string
-	DealID   string
 	Text     string
 	Priority string
+	// DealID, AccountID and LeadID are the three things a task can hang off,
+	// all optional. A deal-card task always has a deal; an Action may instead
+	// name only a client or a lead, and saying which one is most of what makes
+	// the notification worth reading.
+	DealID    string
+	AccountID string
+	LeadID    string
 	// AssigneeID is who the work landed on, and ActorID who put it there.
 	AssigneeID string
 	ActorID    string
+}
+
+// AssignmentChanged reports whether an assignee is worth telling.
+//
+// previous is nil on create, where any assignee is news. On update it is who
+// held the task beforehand: the same person again means the edit was about
+// something else — a rename, a tick, a due date — and re-notifying them would
+// train the alert into noise within a day. Unassigning is not news either.
+//
+// It lives here rather than in each module because both task surfaces ask the
+// identical question of the same notifier, and two copies of a rule this small
+// drift without anyone noticing.
+func AssignmentChanged(previous, next *string) bool {
+	if next == nil {
+		return false
+	}
+	return previous == nil || *previous != *next
 }
 
 // TaskAssigned tells someone that a task is now theirs.
@@ -49,7 +75,7 @@ func (n *Notifier) TaskAssigned(ctx context.Context, orgID string, t TaskAssignm
 	go func() {
 		defer cancel()
 
-		deal, company := n.taskContext(sendCtx, t.DealID)
+		deal, company := n.taskContext(sendCtx, orgID, t)
 		actor := n.actorName(sendCtx, t.ActorID)
 
 		if err := n.deliver(sendCtx, NotificationItem{
@@ -96,41 +122,85 @@ func taskPriority(p string) string {
 	return "info"
 }
 
-// taskContext looks up the deal a task hangs off, and the client it belongs to.
-// Both are best-effort: a task with no deal, or a deal with no account, still
-// produces a sensible notification.
-func (n *Notifier) taskContext(ctx context.Context, dealID string) (deal, company string) {
-	if dealID == "" {
-		return "", ""
+// taskContext names what the task hangs off: its deal, and the client — falling
+// back to the lead when there is no deal, which is how an Action filed against
+// a lead still reads as being about someone.
+//
+// Every lookup is best-effort. A task with no deal, a deal with no account, or
+// a row this caller may not see all produce a notification with less context
+// rather than no notification.
+func (n *Notifier) taskContext(ctx context.Context, orgID string, t TaskAssignment) (deal, company string) {
+	if t.DealID != "" {
+		deal, company = n.dealLabels(ctx, orgID, t.DealID)
 	}
+	if company == "" && t.AccountID != "" {
+		company = n.lookup(ctx, `SELECT coalesce(name, '') FROM accounts WHERE id = $1::uuid`, t.AccountID)
+	}
+	if company == "" && t.LeadID != "" {
+		company = n.lookup(ctx,
+			`SELECT coalesce(nullif(btrim(coalesce(contact_name, '')), ''), coalesce(title, ''))
+			   FROM leads WHERE id = $1::uuid`, t.LeadID)
+	}
+	return deal, company
+}
+
+// dealLabels reads a deal's title and client, but only for a deal that belongs
+// to the caller's organization.
+//
+// The join through the owner is what scopes it. deals carry no org_id of their
+// own, and deal_tasks are addressed by id alone, so without this a caller who
+// knows a task id from another workspace could have its deal title and client
+// name delivered to their own phone by assigning the task to themselves. The
+// join fails closed: an unowned or foreign deal simply contributes no labels.
+func (n *Notifier) dealLabels(ctx context.Context, orgID, dealID string) (deal, company string) {
 	err := n.pool.QueryRow(ctx,
 		`SELECT coalesce(d.title, ''), coalesce(a.name, '')
 		   FROM deals d
+		   JOIN users u ON u.id = d.owner_id AND u.org_id = $2::uuid
 		   LEFT JOIN accounts a ON a.id = d.account_id
-		  WHERE d.id = $1::uuid`, dealID).Scan(&deal, &company)
+		  WHERE d.id = $1::uuid`, dealID, orgID).Scan(&deal, &company)
 	if err != nil {
-		log.Printf("notify: could not load deal %s for a task: %v", dealID, err)
+		// No row is the ordinary case for a deal outside this organization, and
+		// is not worth logging as a failure.
+		if !errors.Is(err, pgx.ErrNoRows) {
+			log.Printf("notify: could not load deal %s for a task: %v", dealID, err)
+		}
 		return "", ""
 	}
 	return deal, company
 }
 
-// actorName is the display name of whoever assigned the task, or "" when they
-// have no profile — in which case the wording drops the attribution rather than
-// naming a blank.
+// lookup runs a single-string query, returning "" for anything that does not
+// resolve. The label is decoration on a notification that is going out either
+// way, so a miss is not an error.
+func (n *Notifier) lookup(ctx context.Context, query, id string) string {
+	var value string
+	if err := n.pool.QueryRow(ctx, query, id).Scan(&value); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+// actorName is the display name of whoever assigned the task.
+//
+// Falls back to the email when the profile has no name, which is what
+// details() does for a deal move — a workspace where people signed up without
+// filling in a name would otherwise attribute every task to nobody. Returns ""
+// only when neither exists, and the wording then drops the attribution rather
+// than naming a blank.
 func (n *Notifier) actorName(ctx context.Context, actorID string) string {
 	if actorID == "" {
 		return ""
 	}
-	var name *string
+	var name string
 	if err := n.pool.QueryRow(ctx,
-		`SELECT full_name FROM profiles WHERE id = $1::uuid`, actorID).Scan(&name); err != nil {
+		`SELECT coalesce(nullif(btrim(coalesce(p.full_name, '')), ''), u.email, '')
+		   FROM users u
+		   LEFT JOIN profiles p ON p.id = u.id
+		  WHERE u.id = $1::uuid`, actorID).Scan(&name); err != nil {
 		return ""
 	}
-	if name == nil {
-		return ""
-	}
-	return strings.TrimSpace(*name)
+	return strings.TrimSpace(name)
 }
 
 // userEmail is the address a single member is reachable at. Like orgRecipients,
