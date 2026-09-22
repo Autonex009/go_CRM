@@ -34,14 +34,11 @@ const reportFanOut = 3
 // Service computes the analytics report.
 type Service struct {
 	store *store
-	// now is injectable so the stalled-deal cutoff can be tested against a
-	// fixed clock rather than whenever the suite happens to run.
-	now func() time.Time
 }
 
 // NewService builds the service over a pgx pool.
 func NewService(pool *pgxpool.Pool) *Service {
-	return &Service{store: &store{pool: pool}, now: time.Now}
+	return &Service{store: &store{pool: pool}}
 }
 
 // Report assembles the whole analytics page.
@@ -54,7 +51,7 @@ func (s *Service) Report(ctx context.Context, f Filter) (Report, error) {
 		idle   []StalledRow
 		cov    Coverage
 	)
-	now := s.now().UTC()
+	now := time.Now().UTC()
 
 	// Each goroutine writes one distinct variable and reads none of the others,
 	// so no lock is needed. Keep it that way — a piece that starts depending on
