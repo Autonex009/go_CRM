@@ -24,6 +24,7 @@ import (
 	"github.com/go-crm/services/internal/integrations"
 	"github.com/go-crm/services/internal/invoices"
 	"github.com/go-crm/services/internal/leads"
+	"github.com/go-crm/services/internal/metrics"
 	"github.com/go-crm/services/internal/notify"
 	"github.com/go-crm/services/internal/org"
 	"github.com/go-crm/services/internal/quotes"
@@ -55,7 +56,7 @@ func main() {
 		Password: cfg.SMTPPassword,
 		From:     cfg.SMTPFrom,
 		FromName: cfg.SMTPFromName,
-	}), cfg.WebAppURL)
+	}), cfg.WebAppURL, cfg.ExpoAccessToken)
 
 	// Third-party connections (Google Calendar) and the meeting booking they enable.
 	meetings := integrations.NewService(pool, cfg)
@@ -90,9 +91,10 @@ func main() {
 	r.Mount("/api/v1/invoices", invoices.NewHandler(pool, cfg.JWTSecret).Routes())
 	r.Mount("/api/v1/activities", activities.NewHandler(pool, cfg.JWTSecret).Routes())
 	r.Mount("/api/v1/dashboard", dashboard.NewHandler(pool, cfg.JWTSecret).Routes())
+	r.Mount("/api/v1/metrics", metrics.NewHandler(pool, cfg.JWTSecret).Routes())
 	r.Mount("/api/v1/notifications", notify.NewHandler(notifier.Store(), cfg.JWTSecret).Routes())
-	r.Mount("/api/v1/actions", followups.NewHandler(pool, cfg.JWTSecret).Routes())
-	r.Mount("/api/v1/deal-tasks", dealtasks.NewHandler(pool, cfg.JWTSecret).Routes())
+	r.Mount("/api/v1/actions", followups.NewHandler(pool, cfg.JWTSecret, notifier).Routes())
+	r.Mount("/api/v1/deal-tasks", dealtasks.NewHandler(pool, cfg.JWTSecret, notifier).Routes())
 
 	srv := &http.Server{
 		Addr:              cfg.GatewayAddr,

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-crm/services/internal/notify"
 	"github.com/go-crm/services/pkg/apperr"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -53,10 +54,14 @@ type Input struct {
 // Service holds the Actions business logic.
 type Service struct {
 	store *store
+	// notifier tells an assignee that work landed on them. A nil *Notifier is
+	// usable and does nothing, so tests and a mail-less deployment need no
+	// special case.
+	notifier *notify.Notifier
 }
 
-func newService(pool *pgxpool.Pool) *Service {
-	return &Service{store: &store{pool: pool}}
+func newService(pool *pgxpool.Pool, notifier *notify.Notifier) *Service {
+	return &Service{store: &store{pool: pool}, notifier: notifier}
 }
 
 func (s *Service) List(ctx context.Context, orgID string, f Filter) ([]Action, error) {
@@ -69,21 +74,70 @@ func (s *Service) Get(ctx context.Context, orgID, id string) (Action, error) {
 
 // Create validates and stores a new action. It always starts "open" —
 // Input.Status is ignored here, and only consulted by Update.
-func (s *Service) Create(ctx context.Context, orgID string, in Input) (Action, error) {
+func (s *Service) Create(ctx context.Context, orgID, actorID string, in Input) (Action, error) {
 	in, err := s.prepare(ctx, orgID, in, false)
 	if err != nil {
 		return Action{}, err
 	}
-	return s.store.create(ctx, orgID, in)
+	a, err := s.store.create(ctx, orgID, in)
+	if err != nil {
+		return Action{}, err
+	}
+	s.announce(ctx, orgID, actorID, a, nil)
+	return a, nil
 }
 
 // Update replaces an action's fields, including its status.
-func (s *Service) Update(ctx context.Context, orgID, id string, in Input) (Action, error) {
+func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Input) (Action, error) {
 	in, err := s.prepare(ctx, orgID, in, true)
 	if err != nil {
 		return Action{}, err
 	}
-	return s.store.update(ctx, orgID, id, in)
+
+	// Read the current assignee before the write, so announce can tell a genuine
+	// reassignment from an edit that left it alone.
+	//
+	// A read that fails is not fatal to the update — the write below reports a
+	// missing row properly — but it does disqualify the notification: a
+	// transient database error would otherwise look exactly like "nobody held
+	// this before", and every unrelated edit would fire a fresh "assigned to
+	// you". Silence is the safe wrong answer here.
+	before, readErr := s.store.get(ctx, orgID, id)
+
+	a, err := s.store.update(ctx, orgID, id, in)
+	if err != nil {
+		return Action{}, err
+	}
+	if readErr == nil {
+		s.announce(ctx, orgID, actorID, a, before.AssignedTo)
+	}
+	return a, nil
+}
+
+// announce notifies the assignee when, and only when, the assignment changed.
+//
+// previous is nil on create. On update it is who held the action beforehand, so
+// completing it, renaming it or moving its due date stays silent — without that
+// check every edit would re-notify, and the alert would be trained into noise
+// within a day.
+func (s *Service) announce(ctx context.Context, orgID, actorID string, a Action, previous *string) {
+	if !notify.AssignmentChanged(previous, a.AssignedTo) {
+		return
+	}
+
+	s.notifier.TaskAssigned(ctx, orgID, notify.TaskAssignment{
+		TaskID:   a.ID,
+		Text:     a.Title,
+		Priority: a.Priority,
+		// All three are optional and any of them may name the work: an action
+		// filed against a lead carried no context at all when only the deal was
+		// passed through.
+		DealID:     deref(a.DealID),
+		AccountID:  deref(a.AccountID),
+		LeadID:     deref(a.LeadID),
+		AssigneeID: *a.AssignedTo,
+		ActorID:    actorID,
+	})
 }
 
 func (s *Service) Delete(ctx context.Context, orgID, id string) error {
@@ -195,4 +249,12 @@ func validate(in Input, requireStatus bool) error {
 		return apperr.Invalid("priority must be one of high, medium, normal")
 	}
 	return nil
+}
+
+// deref reads an optional id, treating absent as empty.
+func deref(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }

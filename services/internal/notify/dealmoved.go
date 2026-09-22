@@ -40,15 +40,52 @@ type Notifier struct {
 	store     *Store
 	mail      mailer.Sender
 	webAppURL string
+	pusher    *Pusher
 }
 
-func New(pool *pgxpool.Pool, mail mailer.Sender, webAppURL string) *Notifier {
+func New(pool *pgxpool.Pool, mail mailer.Sender, webAppURL, expoAccessToken string) *Notifier {
+	store := NewStore(pool)
 	return &Notifier{
 		pool:      pool,
-		store:     NewStore(pool),
+		store:     store,
 		mail:      mail,
 		webAppURL: webAppURL,
+		pusher:    NewPusher(store, expoAccessToken),
 	}
+}
+
+// deliver records one notification and sends it on to every channel the
+// recipient has: the in-app bell (the row itself), the live SSE stream
+// (broadcast by CreateNotification) and their phones.
+//
+// Every notification type goes through here rather than calling
+// CreateNotification directly, so a new kind of alert reaches the mobile app
+// without anyone having to remember a second call.
+func (n *Notifier) deliver(ctx context.Context, item NotificationItem) error {
+	saved, err := n.store.CreateNotification(ctx, item)
+	if err != nil {
+		return err
+	}
+	n.pushToDevices(ctx, saved)
+	return nil
+}
+
+// pushToDevices sends one recorded notification on to the user's phones.
+//
+// The badge is read back rather than counted in memory because the user may
+// have cleared notifications on another device between the insert and now, and
+// a badge that disagrees with the list is worse than no badge.
+//
+// Errors are swallowed inside Pusher.Push: the notification is already durable
+// and the app can list it, so a failure to nudge must not fail the operation
+// that caused it.
+func (n *Notifier) pushToDevices(ctx context.Context, item NotificationItem) {
+	badge, err := n.store.UnreadCount(ctx, item.OrgID, item.UserID)
+	if err != nil {
+		log.Printf("notify: could not read unread count for %s: %v", item.UserID, err)
+		badge = 0
+	}
+	n.pusher.Push(ctx, item, badge)
 }
 
 func (n *Notifier) Store() *Store {
@@ -140,7 +177,7 @@ func (n *Notifier) recordDealMoved(ctx context.Context, orgID, actorID string, m
 		if userID == actorID {
 			continue
 		}
-		if _, err := n.store.CreateNotification(ctx, NotificationItem{
+		if err := n.deliver(ctx, NotificationItem{
 			OrgID:     orgID,
 			UserID:    userID,
 			Type:      "deal_moved",

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-crm/services/internal/notify"
 	"github.com/go-crm/services/pkg/httpx"
 	"github.com/go-crm/services/pkg/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,8 +23,8 @@ type Handler struct {
 
 // NewHandler wires the Actions service to the pgx pool. secret is the JWT
 // signing key used by the route guard.
-func NewHandler(pool *pgxpool.Pool, secret string) *Handler {
-	return &Handler{svc: newService(pool), secret: secret}
+func NewHandler(pool *pgxpool.Pool, secret string, notifier *notify.Notifier) *Handler {
+	return &Handler{svc: newService(pool, notifier), secret: secret}
 }
 
 // Routes returns the actions sub-router, mounted at /api/v1/actions.
@@ -73,19 +74,19 @@ func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	}
 	// Filters are cast to uuid in SQL, so a malformed value would surface
 	// as a 500 rather than the client error it actually is.
-	if v := f.AccountID; v != "" && !isUUID(v) {
+	if v := f.AccountID; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "accountId must be a UUID")
 		return Filter{}, false
 	}
-	if v := f.LeadID; v != "" && !isUUID(v) {
+	if v := f.LeadID; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "leadId must be a UUID")
 		return Filter{}, false
 	}
-	if v := f.AssignedTo; v != "" && !isUUID(v) {
+	if v := f.AssignedTo; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "assignedTo must be a UUID")
 		return Filter{}, false
 	}
-	if v := f.DealID; v != "" && !isUUID(v) {
+	if v := f.DealID; v != "" && !httpx.IsUUID(v) {
 		httpx.WriteError(w, http.StatusBadRequest, "dealId must be a UUID")
 		return Filter{}, false
 	}
@@ -131,7 +132,8 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &in) {
 		return
 	}
-	a, err := h.svc.Create(r.Context(), middleware.OrgID(r.Context()), in)
+	ctx := r.Context()
+	a, err := h.svc.Create(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), in)
 	if err != nil {
 		h.writeErr(w, err, "could not create action")
 		return
@@ -144,7 +146,8 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &in) {
 		return
 	}
-	a, err := h.svc.Update(r.Context(), middleware.OrgID(r.Context()), chi.URLParam(r, "id"), in)
+	ctx := r.Context()
+	a, err := h.svc.Update(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), chi.URLParam(r, "id"), in)
 	if err != nil {
 		h.writeErr(w, err, "could not update action")
 		return
@@ -185,27 +188,4 @@ func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 		httpx.Rule{Err: ErrAssigneeNotFound, Status: http.StatusBadRequest,
 			Message: "that assignee is not a member of your workspace"},
 	)
-}
-
-// isUUID reports whether s is a canonical 8-4-4-4-12 hex UUID. Query filters
-// are interpolated into ::uuid casts, and Postgres answers a bad cast with an
-// error, not an empty result.
-func isUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, c := range s {
-		switch i {
-		case 8, 13, 18, 23:
-			if c != '-' {
-				return false
-			}
-		default:
-			isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-			if !isHex {
-				return false
-			}
-		}
-	}
-	return true
 }
