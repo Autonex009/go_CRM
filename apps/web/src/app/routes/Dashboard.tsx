@@ -14,7 +14,8 @@ import { KIND_META, relativeTime, type ActivityKind } from "../activities/api";
 import { useAuthStore } from "../auth/store";
 import { STAGE_META as DEAL_META, stageLabel as dealStageLabel } from "../deals/stages";
 import { ApiError } from "../lib/api";
-import { dashboardApi, type Attention, type Pipeline, type Recent, type Summary } from "../lib/dashboard";
+import { ActivityCard } from "../dashboard/ActivityCard";
+import { dashboardApi, type Attention, type Pipeline, type Summary } from "../lib/dashboard";
 import { formatMoney, formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
 import {
@@ -158,7 +159,7 @@ export default function Dashboard() {
                 emptyIcon="deals"
                 emptyText="No deals in pipeline yet."
               />
-              <RecentCard className="lg:col-span-12" items={data.recent} />
+              <ActivityCard className="lg:col-span-12" />
             </div>
           </>
         )
@@ -387,8 +388,8 @@ const ATTENTION_META: Record<Attention["kind"], { icon: IconName; href: (id: str
   invoice: { icon: "building", href: (id) => `/invoices/${id}` },
   // The board has no per-deal route, so an overdue deal links to the pipeline.
   deal: { icon: "deals", href: () => "/deals" },
-  // Actions and tasks live on boards rather than pages of their own.
-  action: { icon: "check", href: () => "/actions" },
+  // Asks and tasks live on boards rather than pages of their own.
+  ask: { icon: "check", href: () => "/implementation" },
   task: { icon: "check", href: () => "/deals" },
 };
 
@@ -480,92 +481,6 @@ function AttentionCard({
                     )}
                   </span>
                 </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Recent activity                                                            */
-/* -------------------------------------------------------------------------- */
-
-function RecentCard({ items, className = "" }: { items: Recent[]; className?: string }) {
-  return (
-    <Card className={className} padded={false}>
-      <CardHeader
-        className="p-lg pb-md"
-        title="Recent activity"
-        subtitle="The last things that happened here"
-      />
-
-      {items.length === 0 ? (
-        <div className="px-lg pb-lg">
-          <EmptyState
-            size="sm"
-            icon="leads"
-            title="Nothing logged yet"
-            description="Calls, notes and stage changes will appear here as they happen."
-          />
-        </div>
-      ) : (
-        <ul>
-          {items.map((item, i) => {
-            const meta = KIND_META[item.kind as ActivityKind] ?? KIND_META.system;
-
-            // The whole row is the link when the record has a page; a plain
-            // list item when it does not, rather than a link that goes nowhere.
-            const row = (
-              <>
-                <span className="mt-[2px] flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md bg-surface-muted text-fg-muted">
-                  <Icon name={meta.icon} size={13} />
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-baseline gap-x-1.5">
-                    <span className="truncate text-sm font-medium text-fg">{item.subject}</span>
-                    {item.entity && (
-                      <span className="rounded bg-surface-muted px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
-                        {item.entity}
-                      </span>
-                    )}
-                  </span>
-
-                  {item.body && (
-                    <span className="mt-px block truncate text-xs text-fg-muted">{item.body}</span>
-                  )}
-
-                  {item.actor && (
-                    <span className="mt-px block truncate text-[11px] text-fg-subtle">
-                      by {item.actor}
-                    </span>
-                  )}
-                </span>
-
-                <span
-                  className="shrink-0 whitespace-nowrap text-xs text-fg-subtle"
-                  title={new Date(item.at).toLocaleString()}
-                >
-                  {relativeTime(item.at)}
-                </span>
-              </>
-            );
-
-            const className =
-              "flex items-start gap-md border-t border-line px-lg py-sm transition-colors";
-
-            return (
-              <li key={`${item.at}-${i}`}>
-                {item.actionUrl ? (
-                  <Link to={item.actionUrl} className={`${className} hover:bg-surface-hover`}>
-                    {row}
-                  </Link>
-                ) : (
-                  <div className={className}>{row}</div>
-                )}
               </li>
             );
           })}

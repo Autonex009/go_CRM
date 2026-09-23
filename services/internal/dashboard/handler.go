@@ -81,6 +81,7 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireJWT(h.secret))
 	r.Get("/", h.summary)
+	r.Get("/activity", h.activity)
 	return r
 }
 

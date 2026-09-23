@@ -14,7 +14,8 @@ interface KanbanColumnProps {
   itemIds: string[];
   children: ReactNode;
   addLabel: string;
-  onAdd: (stage: string) => void;
+  /** Omitted on a board whose items cannot be created from a column. */
+  onAdd?: (stage: string) => void;
 }
 
 /** One board column: funnel rule, header, sortable card list, add button. */
@@ -63,14 +64,16 @@ export const KanbanColumn = memo(function KanbanColumn({
           {children}
         </SortableContext>
 
-        <button
-          type="button"
-          onClick={() => onAdd(column.key)}
-          className="flex h-[32px] items-center justify-center gap-xs rounded-md text-xs font-medium text-fg-muted transition-colors duration-100 hover:bg-surface hover:text-fg"
-        >
-          <Icon name="plus" size={13} />
-          {addLabel}
-        </button>
+        {onAdd && (
+          <button
+            type="button"
+            onClick={() => onAdd(column.key)}
+            className="flex h-[32px] items-center justify-center gap-xs rounded-md text-xs font-medium text-fg-muted transition-colors duration-100 hover:bg-surface hover:text-fg"
+          >
+            <Icon name="plus" size={13} />
+            {addLabel}
+          </button>
+        )}
       </div>
     </div>
   );

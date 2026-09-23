@@ -9,7 +9,7 @@ import {
   Handshake,
   FileText,
   Receipt,
-  ListChecks,
+  Wrench,
   ChartColumnBig,
   Settings,
   Search,
@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 
 import { endSession } from "../auth/session";
-import { MANAGER_ROLES } from "../auth/roles";
 import { useAuthStore } from "../auth/store";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useWorkspaceStore, useWorkspaceSync } from "../org/workspace";
@@ -58,7 +57,7 @@ const NAV_GROUPS: NavGroup[] = [
 
       { to: "/leads", label: "Leads", icon: TrendingUp },
       { to: "/deals", label: "Deals", icon: Handshake },
-      { to: "/actions", label: "Actions", icon: ListChecks, roles: MANAGER_ROLES },
+      { to: "/implementation", label: "Implementation", icon: Wrench },
     ],
   },
   {
@@ -83,7 +82,7 @@ const TITLES: Record<string, string> = {
 
   "/leads": "Leads",
   "/deals": "Deals",
-  "/actions": "Actions",
+  "/implementation": "Implementation",
   "/quotes": "Quotes Workbench",
   "/invoices": "Tax Invoices",
   "/metrics": "Sales Analytics",

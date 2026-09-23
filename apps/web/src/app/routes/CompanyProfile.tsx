@@ -7,7 +7,7 @@ import {
   websiteLabel,
   type ProfileInput,
 } from "../accounts/api";
-import { ActionsTab } from "../accounts/profile/ActionsTab";
+import { ImplementationTab } from "../accounts/profile/ImplementationTab";
 import { FinancialsTab } from "../accounts/profile/FinancialsTab";
 import { LeadsTab } from "../accounts/profile/LeadsTab";
 import { OverviewTab } from "../accounts/profile/OverviewTab";
@@ -17,9 +17,7 @@ import { humanise } from "../accounts/profile/columns";
 import { formatDay } from "../accounts/profile/format";
 import { computeMetrics } from "../accounts/profile/metrics";
 import type { ProfileTab } from "../accounts/profile/tabs";
-import { actionsApi } from "../actions/api";
-import { MANAGER_ROLES } from "../auth/roles";
-import { useAuthStore } from "../auth/store";
+import { implementationApi } from "../implementation/api";
 import { ApiError } from "../lib/api";
 import { formatMoney } from "../lib/money";
 import { useCurrency } from "../org/workspace";
@@ -96,23 +94,21 @@ export default function CompanyProfilePage() {
     },
   });
 
-  const userRole = useAuthStore((s) => s.user?.role);
-  const canSeeActions = !!userRole && MANAGER_ROLES.includes(userRole);
+  // The implementation tab is open to everyone: the board is a shared queue.
 
-  // Shares its key with ActionsTab, so the tab's list and this count are one
+  // Shares its key with ImplementationTab, so the tab's list and this count are one
   // request. Reps never see the tab, and the API would refuse them anyway.
-  const actionsQuery = useQuery({
-    queryKey: ["actions", { accountId: id }],
-    queryFn: () => actionsApi.list({ accountId: id }),
-    enabled: !!id && canSeeActions,
+  const asksQuery = useQuery({
+    queryKey: ["implementation", { accountId: id }],
+    queryFn: () => implementationApi.board({ accountId: id }),
+    enabled: !!id,
   });
-  const actionsCount = actionsQuery.data?.length ?? 0;
+  const asksCount = asksQuery.data?.asks.length ?? 0;
 
   // A demotion mid-session would otherwise leave the page on a tab that renders
   // nothing at all.
   useEffect(() => {
-    if (activeTab === "actions" && !canSeeActions) setActiveTab("overview");
-  }, [activeTab, canSeeActions]);
+  }, [activeTab]);
 
   if (query.isPending || !formData) {
     return (
@@ -448,7 +444,7 @@ export default function CompanyProfilePage() {
             label: "Financials",
             count: quotes.length + invoices.length,
           },
-          ...(canSeeActions ? [{ id: "actions" as ProfileTab, label: "Actions", count: actionsCount }] : []),
+          { id: "implementation" as ProfileTab, label: "Implementation", count: asksCount },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -510,7 +506,7 @@ export default function CompanyProfilePage() {
         />
       )}
 
-      {activeTab === "actions" && canSeeActions && <ActionsTab accountId={id!} />}
+      {activeTab === "implementation" && <ImplementationTab accountId={id!} />}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/go-crm/services/internal/dealtasks"
 	"github.com/go-crm/services/internal/delivery"
 	"github.com/go-crm/services/internal/followups"
+	"github.com/go-crm/services/internal/implementation"
 	"github.com/go-crm/services/internal/integrations"
 	"github.com/go-crm/services/internal/invoices"
 	"github.com/go-crm/services/internal/leads"
@@ -95,6 +96,11 @@ func main() {
 	r.Mount("/api/v1/notifications", notify.NewHandler(notifier.Store(), cfg.JWTSecret).Routes())
 	r.Mount("/api/v1/actions", followups.NewHandler(pool, cfg.JWTSecret, notifier).Routes())
 	r.Mount("/api/v1/deal-tasks", dealtasks.NewHandler(pool, cfg.JWTSecret, notifier).Routes())
+	r.Mount("/api/v1/implementation", implementation.NewHandler(pool, cfg.JWTSecret, notifier, implementation.StorageConfig{
+		BaseURL:   cfg.SupabaseURL,
+		SecretKey: cfg.SupabaseSecretKey,
+		Bucket:    cfg.SupabaseStorageBucket,
+	}).Routes())
 
 	srv := &http.Server{
 		Addr:              cfg.GatewayAddr,

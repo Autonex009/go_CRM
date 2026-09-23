@@ -101,6 +101,16 @@ type Config struct {
 	// unauthenticated sends, so this stays empty unless the project has enhanced
 	// security enabled — then it comes from expo.dev > Account > Access tokens.
 	ExpoAccessToken string
+
+	// Supabase Storage, for Implementation ask attachments. With either the URL
+	// or the key missing, attachments are refused and everything else works.
+	//
+	// SupabaseSecretKey is an sb_secret_... key, or a legacy service_role JWT.
+	// Never a publishable key: the bucket is private with no policies, so only
+	// a key that bypasses RLS can read or write it.
+	SupabaseURL           string
+	SupabaseSecretKey     string
+	SupabaseStorageBucket string
 }
 
 // knownProviders is the set of OIDC providers whose endpoints the auth module
@@ -140,6 +150,13 @@ func Load() Config {
 		SMTPFromName: getenv("SMTP_FROM_NAME", "go-CRM"),
 
 		ExpoAccessToken: getenv("EXPO_ACCESS_TOKEN", ""),
+
+		SupabaseURL: getenv("SUPABASE_URL", ""),
+		// SUPABASE_SECRET_KEY is the current name; SUPABASE_SERVICE_KEY is read
+		// as a fallback so an existing deployment keeps working across the
+		// rename.
+		SupabaseSecretKey:     getenv("SUPABASE_SECRET_KEY", getenv("SUPABASE_SERVICE_KEY", "")),
+		SupabaseStorageBucket: getenv("SUPABASE_STORAGE_BUCKET", "implementation-attachments"),
 	}
 }
 
