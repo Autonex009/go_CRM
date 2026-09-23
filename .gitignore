@@ -18,7 +18,7 @@ vendor/
 # Env & secrets
 .env
 .env.*
-!.env.example
+.env.example
 
 # Logs & OS
 *.log
@@ -39,3 +39,5 @@ Autonex_VIGIL_Technocommercial.pdf
 Copy of Autonex Client Tracker .xlsx
 backups/
 *.xlsx
+*.pdf
+*.env

@@ -124,19 +124,18 @@ func (h *Handler) attention(ctx context.Context, orgID string) ([]Attention, err
 
 		  UNION ALL
 
-		  -- Actions the Actions board is already reporting as due or overdue.
-		  -- Without this arm the two surfaces disagreed: an action three days
-		  -- late was red on its own dashboard and invisible on this one.
-		  SELECT 'action', f.id::text,
-		         f.title,
+		  -- Implementation asks the board is already reporting as due or overdue,
+		  -- so the two surfaces cannot disagree about what is late.
+		  SELECT 'ask', k.id::text,
+		         k.title,
 		         coalesce(ac.name, ''),
-		         (f.due_at::date - CURRENT_DATE)::int,
+		         (k.due_at::date - CURRENT_DATE)::int,
 		         0::float8
-		    FROM follow_ups f
-		    LEFT JOIN accounts ac ON ac.id = f.account_id
-		   WHERE f.org_id = $2::uuid
-		     AND f.status <> 'done'
-		     AND f.due_at::date <= CURRENT_DATE + 2
+		    FROM implementation_asks k
+		    LEFT JOIN accounts ac ON ac.id = k.account_id
+		   WHERE k.org_id = $2::uuid
+		     AND k.status NOT IN ('verified', 'wont_do')
+		     AND k.due_at::date <= CURRENT_DATE + 2
 
 		  UNION ALL
 
@@ -200,12 +199,15 @@ func (h *Handler) recent(ctx context.Context, orgID string) ([]Recent, error) {
 		       END                                            AS action_url,
 		       a.occurred_at
 		  FROM activities a
+		  -- Scoped through the author, since activities has no org column of its
+		  -- own. author_id is NOT NULL, so nothing is lost.
+		  JOIN users au ON au.id = a.author_id AND au.org_id = $2::uuid
 		  LEFT JOIN profiles p  ON p.id = a.author_id
 		  LEFT JOIN deals    d  ON a.entity_type = 'deal'    AND d.id = a.entity_id
 		  LEFT JOIN leads    l  ON a.entity_type = 'lead'    AND l.id = a.entity_id
 		  LEFT JOIN accounts ac ON a.entity_type = 'account' AND ac.id = a.entity_id
 		 ORDER BY a.occurred_at DESC, a.created_at DESC
-		 LIMIT $1`, recentLimit)
+		 LIMIT $1`, recentLimit, orgID)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,6 @@
 import { Badge, Modal } from "../ui";
 import type { Deal } from "./api";
-import { DealActionsPanel } from "./DealActionsPanel";
+import { DealImplementationPanel } from "../implementation/DealImplementationPanel";
 import { getStageMeta, stageLabel } from "./stages";
 import { DealTasksPanel } from "./TasksDialog";
 
@@ -40,7 +40,7 @@ export function DealWorkDialog({ deal, onClose }: DealWorkDialogProps) {
       {/* Stacked and scrolling as one below `lg`; two independently scrolling
           halves above it. `basis-0` with `flex-1` is what makes the halves even
           rather than a share of the leftover space — without it the denser
-          actions panel would claim more of the dialog than the checklist. */}
+          implementation panel would claim more of the dialog than the checklist. */}
       <div className="h-full overflow-y-auto overscroll-contain lg:flex lg:overflow-hidden">
         <section
           aria-label="Tasks"
@@ -53,11 +53,11 @@ export function DealWorkDialog({ deal, onClose }: DealWorkDialogProps) {
         </section>
 
         <section
-          aria-label="Actions"
+          aria-label="Implementation"
           className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col"
         >
-          <PanelHeading>Actions</PanelHeading>
-          <DealActionsPanel deal={deal} />
+          <PanelHeading>Implementation</PanelHeading>
+          <DealImplementationPanel deal={deal} />
         </section>
       </div>
     </Modal>

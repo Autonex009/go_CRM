@@ -40,7 +40,8 @@ interface KanbanBoardProps<T extends KanbanItem> {
   /** Commit a drop: target column and index within it. */
   onMove: (id: string, stage: string, index: number) => void;
   onOpen: (item: T) => void;
-  onAdd: (stage: string) => void;
+  /** Omitted when items cannot be created from a column. */
+  onAdd?: (stage: string) => void;
   /** Right-aligned summary in a column header, e.g. total value. */
   columnSummary?: (items: T[]) => ReactNode;
   addLabel?: string;

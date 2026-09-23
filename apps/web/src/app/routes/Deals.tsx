@@ -8,9 +8,9 @@ import { DealDialog } from "../deals/DealDialog";
 import { DealWorkDialog } from "../deals/DealWorkDialog";
 import { dealsApi, type Deal, type DealInput } from "../deals/api";
 import { dealTasksApi, type DealTask } from "../deals/tasks";
-import { actionsApi, type Action } from "../actions/api";
-import { MANAGER_ROLES } from "../auth/roles";
-import { useAuthStore } from "../auth/store";
+import { implementationApi, type Ask, type AskInput } from "../implementation/api";
+import { AskDialog } from "../implementation/AskDialog";
+import { useDeleteAsk } from "../implementation/useDeleteAsk";
 import { memberLabel, orgApi } from "../org/api";
 import { buildQuoteStateFromDeal } from "../deals/quote-utils";
 import { DEAL_COLUMNS, type DealStage } from "../deals/stages";
@@ -65,18 +65,12 @@ export default function Deals() {
   const currency = useCurrency();
   const query = useQuery({ queryKey: ["deals"], queryFn: dealsApi.board });
 
-  // Actions are manager-only server-side, so reps never see the card's Actions
-  // view and never fire this request.
-  const userRole = useAuthStore((s) => s.user?.role);
-  const canSeeActions = !!userRole && MANAGER_ROLES.includes(userRole);
-
-  // One org-wide fetch for the whole board, sharing the Actions dashboard's
-  // cache key — the cards are views onto the same data, not separate copies.
-  const actionsQuery = useQuery({
-    queryKey: ["actions", {}],
-    queryFn: () => actionsApi.list({}),
+  // One org-wide fetch of the implementation asks for the whole board, grouped
+  // per card below. Open by default, since a card only shows outstanding work.
+  const asksQuery = useQuery({
+    queryKey: ["dealAsks"],
+    queryFn: () => implementationApi.board({ openOnly: true }),
     staleTime: 60_000,
-    enabled: canSeeActions,
   });
 
   // Tasks are rep-facing, so unlike actions this loads for everyone. One
@@ -103,17 +97,16 @@ export default function Deals() {
     staleTime: 5 * 60_000,
   });
 
-  const actionsByDeal = useMemo(() => {
-    const map = new Map<string, Action[]>();
-    const actions = actionsQuery.data ?? [];
-    for (const action of actions) {
-      if (!action.dealId) continue;
-      const list = map.get(action.dealId);
-      if (list) list.push(action);
-      else map.set(action.dealId, [action]);
+  const asksByDeal = useMemo(() => {
+    const map = new Map<string, Ask[]>();
+    for (const ask of asksQuery.data?.asks ?? []) {
+      if (!ask.dealId) continue;
+      const list = map.get(ask.dealId);
+      if (list) list.push(ask);
+      else map.set(ask.dealId, [ask]);
     }
     return map;
-  }, [actionsQuery.data]);
+  }, [asksQuery.data]);
 
   const memberName = useCallback(
     (id: string | null) => {
@@ -336,6 +329,32 @@ export default function Deals() {
     },
     [navigate],
   );
+  const [askDialog, setAskDialog] = useState<
+    { deal: Deal; ask: Ask | null } | null
+  >(null);
+
+  const onAddAsk = useCallback(
+    (deal: Deal) => setAskDialog({ deal, ask: null }),
+    [],
+  );
+  const onOpenAsk = useCallback(
+    (deal: Deal, ask: Ask) => setAskDialog({ deal, ask }),
+    [],
+  );
+
+  const deleteAsk = useDeleteAsk((id) =>
+    setAskDialog((d) => (d?.ask?.id === id ? null : d)),
+  );
+
+  const saveAsk = useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: AskInput }) =>
+      id ? implementationApi.update(id, input) : implementationApi.create(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["dealAsks"] });
+      void queryClient.invalidateQueries({ queryKey: ["implementation"] });
+    },
+  });
+
   const renderCard = useCallback(
     (deal: Deal, overlay: boolean) => (
       <DealCard
@@ -343,19 +362,23 @@ export default function Deals() {
         overlay={overlay}
         onOpenWork={onOpenWork}
         onGenerateQuote={onGenerateQuote}
-        actions={actionsByDeal.get(deal.id)}
+        asks={asksByDeal.get(deal.id)}
         tasks={tasksByDeal.get(deal.id)}
-        canSeeActions={canSeeActions}
         onToggleTask={onToggleTask}
+        onAddAsk={onAddAsk}
+        onOpenAsk={onOpenAsk}
+        onDeleteAsk={deleteAsk}
       />
     ),
     [
       onOpenWork,
       onGenerateQuote,
-      actionsByDeal,
+      asksByDeal,
       tasksByDeal,
-      canSeeActions,
       onToggleTask,
+      onAddAsk,
+      onOpenAsk,
+      deleteAsk,
     ],
   );
   const columnSummary = useCallback(
@@ -528,6 +551,24 @@ export default function Deals() {
       )}
 
       {work && <DealWorkDialog deal={work} onClose={() => setWork(null)} />}
+
+      {askDialog && (
+        <AskDialog
+          ask={askDialog.ask}
+          parent={{
+            dealId: askDialog.deal.id,
+            company: askDialog.deal.accountName ?? askDialog.deal.title,
+            label: [askDialog.deal.accountName, askDialog.deal.title, askDialog.deal.products]
+              .filter(Boolean)
+              .join(" · "),
+          }}
+          onClose={() => setAskDialog(null)}
+          onSubmit={(input) =>
+            saveAsk.mutateAsync({ id: askDialog.ask?.id, input })
+          }
+          onDelete={askDialog.ask ? () => deleteAsk(askDialog.ask!) : undefined}
+        />
+      )}
     </section>
   );
 }

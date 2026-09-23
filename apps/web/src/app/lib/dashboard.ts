@@ -18,7 +18,7 @@ export interface Pipeline {
 
 /** Mirrors dashboard.Attention — one thing going wrong, or about to. */
 export interface Attention {
-  kind: "lead" | "quote" | "invoice" | "deal" | "action" | "task";
+  kind: "lead" | "quote" | "invoice" | "deal" | "ask" | "task";
   id: string;
   label: string;
   detail: string;
@@ -55,6 +55,44 @@ export interface Summary {
   recent: Recent[];
 }
 
+/**
+ * Which feed the activity card is showing: the whole timeline, one kind of
+ * record in it, or the implementation asks' own history.
+ */
+export type ActivitySource =
+  | "all"
+  | "lead"
+  | "deal"
+  | "account"
+  | "quote"
+  | "implementation";
+
+/**
+ * Mirrors dashboard.ActivityItem.
+ *
+ * An ordinary timeline entry fills subject and body. An implementation event
+ * also fills field/fromValue/toValue, so the row can say which field moved and
+ * between what, instead of a sentence the server had to guess at.
+ */
+export interface ActivityItem extends Recent {
+  field?: string;
+  fromValue?: string;
+  toValue?: string;
+  /** The company or deal the ask belongs to. */
+  context?: string;
+}
+
+export interface ActivityPage {
+  items: ActivityItem[];
+  total: number;
+  hasMore: boolean;
+}
+
 export const dashboardApi = {
   summary: () => apiFetch<Summary>("/api/v1/dashboard"),
+
+  activity: (source: ActivitySource, limit: number, offset: number) =>
+    apiFetch<ActivityPage>(
+      `/api/v1/dashboard/activity?source=${source}&limit=${limit}&offset=${offset}`,
+    ),
 };
