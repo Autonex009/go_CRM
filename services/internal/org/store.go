@@ -66,7 +66,6 @@ type TeamStructure struct {
 	Unassigned []TeamMember `json:"unassigned"`
 }
 
-
 // Workspace is the organization itself — the settings every surface needs.
 type Workspace struct {
 	ID   string `json:"id"`
@@ -514,5 +513,3 @@ func (s *store) isOnboarded(ctx context.Context, userID string) (bool, error) {
 	}
 	return onboarded, err
 }
-
-

@@ -73,5 +73,3 @@ func TestInviteRejectsInvalidRole(t *testing.T) {
 		}
 	}
 }
-
-
