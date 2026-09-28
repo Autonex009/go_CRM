@@ -92,19 +92,41 @@ func objectPath(orgID, askID, unique, fileName string) string {
 	return fmt.Sprintf("%s/%s/%s-%s", orgID, askID, unique, sanitize(fileName))
 }
 
-// sanitize keeps a recognisable file name while removing anything that would
-// change the meaning of the path.
+// sanitize keeps a recognisable file name while ensuring all characters are safe
+// for Supabase/S3 object keys (only alphanumeric, '.', '_', and '-').
+// Punctuation like em-dashes, spaces, ampersands, etc. are converted to hyphens.
 func sanitize(name string) string {
 	name = path.Base(strings.TrimSpace(name))
-	name = strings.ReplaceAll(name, "/", "-")
-	name = strings.ReplaceAll(name, "\\", "-")
-	if name == "" || name == "." || name == ".." {
-		return "file"
+	ext := path.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+
+	var b strings.Builder
+	lastDash := false
+	for _, r := range base {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
+			b.WriteRune(r)
+			lastDash = false
+		} else {
+			if !lastDash {
+				b.WriteRune('-')
+				lastDash = true
+			}
+		}
 	}
-	if len(name) > 120 {
-		name = name[len(name)-120:]
+	cleanBase := strings.Trim(b.String(), "-")
+	if cleanBase == "" {
+		cleanBase = "file"
 	}
-	return name
+	if len(cleanBase) > 100 {
+		cleanBase = cleanBase[:100]
+	}
+	var extB strings.Builder
+	for _, r := range strings.ToLower(ext) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' {
+			extB.WriteRune(r)
+		}
+	}
+	return cleanBase + extB.String()
 }
 
 // Allowed reports whether a file may be attached.
