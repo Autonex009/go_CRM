@@ -169,22 +169,48 @@ func (s *Service) Invite(ctx context.Context, orgID, invitedBy, email, role stri
 			roleDisplay = r
 		}
 
+		// Look up inviter's name & email so the email is dispatched from their identity
+		inviterName, inviterEmail, _ := s.store.userSenderInfo(ctx, invitedBy)
+		ws, _ := s.store.workspace(ctx, orgID)
+		orgName := ws.Name
+		if orgName == "" {
+			orgName = "DealBridge"
+		}
+
 		go func() {
 			sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
-			subject := "You've been invited to join DealBridge CRM"
+			var subject string
+			var fromName string
+			if inviterName != "" {
+				subject = fmt.Sprintf("%s invited you to join %s", inviterName, orgName)
+				fromName = fmt.Sprintf("%s via %s", inviterName, orgName)
+			} else {
+				subject = fmt.Sprintf("You've been invited to join %s", orgName)
+				fromName = orgName
+			}
+
 			body := fmt.Sprintf(
-				"Hello,\n\nYou have been invited to join the DealBridge CRM workspace as %s.\n\nClick the link below to accept your invitation, set your password, and access your workspace:\n%s\n\nThis invitation link expires in 7 days.\n\nBest regards,\nThe DealBridge Team\n",
+				"Hello,\n\n%s (%s) has invited you to join %s as %s.\n\nClick the link below to accept your invitation, set your password, and access your workspace:\n%s\n\nThis invitation link expires in 7 days.\n\nIf you have any questions, feel free to reply directly to this email.\n\nBest regards,\n%s Team\n",
+				inviterName,
+				inviterEmail,
+				orgName,
 				roleDisplay,
 				inviteURL,
+				orgName,
 			)
 
-			if err := s.mail.Send(sendCtx, mailer.Message{
-				To:      []string{email},
-				Subject: subject,
-				Body:    body,
-			}); err != nil {
+			msg := mailer.Message{
+				From:     inviterEmail,
+				FromName: fromName,
+				ReplyTo:  inviterEmail,
+				To:       []string{email},
+				Subject:  subject,
+				Body:     body,
+			}
+
+			if err := s.mail.Send(sendCtx, msg); err != nil {
 				log.Printf("org: failed to send invitation email to %s: %v", email, err)
 			}
 		}()

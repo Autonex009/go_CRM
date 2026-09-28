@@ -138,6 +138,14 @@ func (s *store) userExists(ctx context.Context, email string) (bool, error) {
 	return exists, err
 }
 
+// userSenderInfo retrieves the name and email of the user sending an invitation.
+func (s *store) userSenderInfo(ctx context.Context, userID string) (name, email string, err error) {
+	err = s.pool.QueryRow(ctx,
+		`SELECT coalesce(nullif(u.name, ''), split_part(u.email, '@', 1)), u.email
+		 FROM users u WHERE u.id = $1::uuid`, userID).Scan(&name, &email)
+	return
+}
+
 func (s *store) createInvitation(
 	ctx context.Context, orgID, email, tokenHash, invitedBy, role string, managerID *string, expiresAt time.Time,
 ) (Invitation, error) {
