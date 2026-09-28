@@ -173,7 +173,11 @@ export function AskDialog({
 
         <div className="flex flex-col gap-xs">
           <span className="text-xs font-medium text-fg-muted">
-            {parent.leadId ? "Lead · pre-filled" : "Deal · pre-filled"}
+            {isEngineer || user?.role === "manager"
+              ? "Client Project · Context"
+              : parent.leadId
+              ? "Lead · pre-filled"
+              : "Deal · pre-filled"}
           </span>
           <div className="flex items-center gap-sm rounded-md border border-line bg-surface-muted px-md py-sm">
             <Avatar name={parent.company || parent.label} size="sm" />

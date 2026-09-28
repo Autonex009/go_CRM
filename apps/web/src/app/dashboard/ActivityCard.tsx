@@ -10,6 +10,7 @@ import {
   type ActivityItem,
   type ActivitySource,
 } from "../lib/dashboard";
+import { useAuthStore } from "../auth/store";
 import { Button, Card, CardHeader, EmptyState, Icon, Skeleton } from "../ui";
 
 const PAGE_SIZE = 8;
@@ -43,7 +44,12 @@ const SUBTITLES: Record<ActivitySource, string> = {
  * mix into the first.
  */
 export function ActivityCard({ className = "" }: { className?: string }) {
-  const [source, setSource] = useState<ActivitySource>("all");
+  const user = useAuthStore((s) => s.user);
+  const isConfidential = user?.role === "engineer" || user?.role === "manager";
+
+  const [source, setSource] = useState<ActivitySource>(
+    isConfidential ? "implementation" : "all",
+  );
   const [page, setPage] = useState(0);
 
   const query = useQuery({
@@ -80,22 +86,24 @@ export function ActivityCard({ className = "" }: { className?: string }) {
         subtitle={SUBTITLES[source]}
       />
 
-      <div
-        role="group"
-        aria-label="Filter activity"
-        className="flex gap-1 overflow-x-auto px-lg pb-md [scrollbar-width:none]"
-      >
-        {FILTERS.map((f) => (
-          <FilterChip
-            key={f.source}
-            active={source === f.source}
-            onClick={() => show(f.source)}
-          >
-            {f.source === "implementation" && <Wrench className="h-3 w-3" />}
-            {f.label}
-          </FilterChip>
-        ))}
-      </div>
+      {!isConfidential && (
+        <div
+          role="group"
+          aria-label="Filter activity"
+          className="flex gap-1 overflow-x-auto px-lg pb-md [scrollbar-width:none]"
+        >
+          {FILTERS.map((f) => (
+            <FilterChip
+              key={f.source}
+              active={source === f.source}
+              onClick={() => show(f.source)}
+            >
+              {f.source === "implementation" && <Wrench className="h-3 w-3" />}
+              {f.label}
+            </FilterChip>
+          ))}
+        </div>
+      )}
 
       {query.isPending ? (
         <div className="flex flex-col gap-sm px-lg pb-lg">
@@ -291,8 +299,17 @@ function Row({
 
   const shell = "flex items-start gap-md border-t border-line px-lg py-sm transition-colors";
 
-  return item.actionUrl ? (
-    <Link to={item.actionUrl} className={`${shell} hover:bg-surface-hover`}>
+  const user = useAuthStore((s) => s.user);
+  const isConfidential = user?.role === "engineer" || user?.role === "manager";
+  const targetUrl =
+    isConfidential &&
+    item.actionUrl &&
+    !item.actionUrl.startsWith("/implementation")
+      ? undefined
+      : item.actionUrl;
+
+  return targetUrl ? (
+    <Link to={targetUrl} className={`${shell} hover:bg-surface-hover`}>
       {inner}
     </Link>
   ) : (

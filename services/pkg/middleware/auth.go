@@ -92,3 +92,15 @@ func Role(ctx context.Context) string {
 	role, _ := ctx.Value(roleKey).(string)
 	return role
 }
+
+// WithRole injects a role into the context. Useful for unit testing role-gated routes.
+func WithRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, roleKey, role)
+}
+
+// WithAuth injects userID, orgID, and role into the context for testing.
+func WithAuth(ctx context.Context, userID, orgID, role string) context.Context {
+	ctx = context.WithValue(ctx, userIDKey, userID)
+	ctx = context.WithValue(ctx, orgIDKey, orgID)
+	return context.WithValue(ctx, roleKey, role)
+}

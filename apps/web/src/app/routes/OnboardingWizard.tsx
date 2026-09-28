@@ -189,7 +189,7 @@ export function OnboardingWizard({ role, userName, onClose }: OnboardingWizardPr
                 <div className="space-y-4">
                   <h3 className="text-lg font-bold text-fg">Team Leadership & Delivery</h3>
                   <p className="text-xs text-fg-muted leading-relaxed">
-                    You manage technical delivery, bridging deals won by sales with engineer execution.
+                    You manage technical delivery, bridging client requirements with engineer execution.
                   </p>
 
                   <div className="space-y-2.5 pt-1">
@@ -200,7 +200,7 @@ export function OnboardingWizard({ role, userName, onClose }: OnboardingWizardPr
                       <div>
                         <div className="text-xs font-bold text-fg">Manager Implementation View</div>
                         <div className="text-[11px] text-fg-muted">
-                          View all implementation asks connected to deals assigned to your engineering team.
+                          View all implementation asks connected to client projects assigned to your engineering team.
                         </div>
                       </div>
                     </div>
