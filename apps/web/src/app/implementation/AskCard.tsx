@@ -52,6 +52,13 @@ export function AskCard({
         {onDelete && !overlay && <DeleteAskButton ask={ask} onDelete={onDelete} />}
       </header>
 
+      {ask.parentAskId && (
+        <div className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium truncate">
+          <span className="shrink-0">↳ Sub-task of:</span>
+          <span className="truncate text-fg-muted font-normal">{ask.parentTitle || "Parent Ask"}</span>
+        </div>
+      )}
+
       <p className="whitespace-pre-wrap break-words text-[13px] font-medium leading-snug text-fg">
         {ask.title}
       </p>
@@ -71,6 +78,15 @@ export function AskCard({
         >
           {PRIORITY_META[ask.priority].label}
         </span>
+
+        {(ask.subtaskCount ?? 0) > 0 && (
+          <span
+            className="inline-flex items-center gap-1 rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400"
+            title={`${ask.subtaskDoneCount ?? 0} of ${ask.subtaskCount} sub-tasks completed`}
+          >
+            ✓ {ask.subtaskDoneCount ?? 0}/{ask.subtaskCount}
+          </span>
+        )}
 
         <span
           className={`inline-flex items-center gap-1 text-[11px] tabular-nums ${

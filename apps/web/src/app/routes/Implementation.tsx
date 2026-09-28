@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Users } from "lucide-react";
 
 import { useAuthStore } from "../auth/store";
 import { AskDialog, type AskParent } from "../implementation/AskDialog";
@@ -29,7 +31,11 @@ type View = "all" | "mine" | "blocked" | "overdue" | string;
  */
 export default function Implementation() {
   const queryClient = useQueryClient();
-  const viewerId = useAuthStore((s) => s.user?.id);
+  const user = useAuthStore((s) => s.user);
+  const viewerId = user?.id;
+  const isEngineer = user?.role === "engineer";
+  const isManager = user?.role === "manager";
+  const isAdmin = user?.role === "owner" || user?.role === "admin";
   const [view, setView] = useState<View>("all");
   const [dealFilter, setDealFilter] = useState("");
   const [dialog, setDialog] = useState<Ask | null>(null);
@@ -113,36 +119,50 @@ export default function Implementation() {
 
   return (
     <section className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-baseline gap-sm pb-1">
-        <h1 className="text-lg font-semibold tracking-[-0.01em] text-fg">
-          Implementation
-        </h1>
-        {counts && (
-          <p className="flex items-center gap-1.5 text-sm tabular-nums text-fg-muted">
-            <span className="font-medium text-fg">{counts.open}</span> open
-            <span className="text-fg-subtle">·</span>
-            <span
-              className={counts.blocked > 0 ? "font-medium text-bad-fg" : undefined}
-            >
-              {counts.blocked} blocked
-            </span>
-            <span className="text-fg-subtle">·</span>
-            <span
-              className={counts.overdue > 0 ? "font-medium text-warn-fg" : undefined}
-            >
-              {counts.overdue} overdue
-            </span>
-          </p>
+      <header className="flex flex-wrap items-center justify-between gap-sm pb-1">
+        <div className="flex flex-wrap items-baseline gap-sm">
+          <h1 className="text-lg font-semibold tracking-[-0.01em] text-fg">
+            {isEngineer ? "My Tasks" : "Implementation"}
+          </h1>
+          {counts && (
+            <p className="flex items-center gap-1.5 text-sm tabular-nums text-fg-muted">
+              <span className="font-medium text-fg">{counts.open}</span> open
+              <span className="text-fg-subtle">·</span>
+              <span
+                className={counts.blocked > 0 ? "font-medium text-bad-fg" : undefined}
+              >
+                {counts.blocked} blocked
+              </span>
+              <span className="text-fg-subtle">·</span>
+              <span
+                className={counts.overdue > 0 ? "font-medium text-warn-fg" : undefined}
+              >
+                {counts.overdue} overdue
+              </span>
+            </p>
+          )}
+        </div>
+
+        {(isManager || isAdmin) && (
+          <Link
+            to="/implementation/team-tasks"
+            className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1 text-xs font-semibold text-fg shadow-sm hover:border-accent/40 hover:bg-surface-hover"
+          >
+            <Users className="h-3.5 w-3.5 text-indigo-500" />
+            <span>Engineer Tasks Matrix</span>
+          </Link>
         )}
       </header>
 
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <Chip active={view === "all"} onClick={() => setView("all")}>
-          All
+          {isEngineer ? "All My Tasks" : "All"}
         </Chip>
-        <Chip active={view === "mine"} onClick={() => setView("mine")}>
-          My asks {counts?.mine ? `· ${counts.mine}` : ""}
-        </Chip>
+        {!isEngineer && (
+          <Chip active={view === "mine"} onClick={() => setView("mine")}>
+            My asks {counts?.mine ? `· ${counts.mine}` : ""}
+          </Chip>
+        )}
 
         {(board?.types ?? []).length > 0 && (
           <span aria-hidden="true" className="mx-1 h-4 w-px bg-line" />
@@ -169,25 +189,26 @@ export default function Implementation() {
           Overdue {counts?.overdue ? `· ${counts.overdue}` : ""}
         </Chip>
 
-        {/* "By deal" narrows the board to one deal's asks, for a stand-up that
-            is about a single client rather than the queue as a whole. */}
-        <select
-          value={dealFilter}
-          onChange={(e) => setDealFilter(e.target.value)}
-          aria-label="Filter by deal"
-          className={`rounded-full border px-md py-1 text-xs font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
-            dealFilter
-              ? "border-accent/40 bg-accent-soft text-accent-on"
-              : "border-line bg-surface text-fg-muted hover:text-fg"
-          }`}
-        >
-          <option value="">By deal</option>
-          {deals.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.label}
-            </option>
-          ))}
-        </select>
+        {/* "By deal" narrows the board to one deal's asks. Hidden for engineers (commercial data shielding) */}
+        {!isEngineer && (
+          <select
+            value={dealFilter}
+            onChange={(e) => setDealFilter(e.target.value)}
+            aria-label="Filter by deal"
+            className={`rounded-full border px-md py-1 text-xs font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+              dealFilter
+                ? "border-accent/40 bg-accent-soft text-accent-on"
+                : "border-line bg-surface text-fg-muted hover:text-fg"
+            }`}
+          >
+            <option value="">By deal</option>
+            {deals.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {query.isError && (
@@ -203,15 +224,23 @@ export default function Implementation() {
       ) : (board?.asks ?? []).length === 0 ? (
         <EmptyState
           icon="check"
-          title="No implementation asks yet"
-          description="Raise one from a deal card — the deal and company fill themselves in."
+          title={isEngineer ? "No tasks assigned to you" : "No implementation asks yet"}
+          description={
+            isEngineer
+              ? "Tasks and sub-tasks assigned to you by your manager will show up here."
+              : "Raise one from a deal card — the deal and company fill themselves in."
+          }
         />
       ) : (
         <KanbanBoard
           columns={IMPLEMENTATION_COLUMNS}
           items={items}
           renderCard={(item, overlay) => (
-            <AskCard ask={item} overlay={overlay} onDelete={deleteAsk} />
+            <AskCard
+              ask={item}
+              overlay={overlay}
+              onDelete={isEngineer ? undefined : deleteAsk}
+            />
           )}
           onMove={(id, stage) => {
             const status = stage as AskStatus;
@@ -231,6 +260,7 @@ export default function Implementation() {
 
       {dialog && (
         <AskDialog
+          key={dialog.id}
           ask={dialog}
           parent={parentOf(dialog)}
           onClose={() => setDialog(null)}
@@ -240,6 +270,7 @@ export default function Implementation() {
             setDialog(null);
           }}
           onDelete={() => deleteAsk(dialog)}
+          onSelectSubtask={(st) => setDialog(st)}
         />
       )}
     </section>

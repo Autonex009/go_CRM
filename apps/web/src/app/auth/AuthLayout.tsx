@@ -1,22 +1,79 @@
 import type { ReactNode } from "react";
 import { Sparkles, ShieldCheck, Zap, BarChart3 } from "lucide-react";
 
+export type AuthPortalVariant = "admin" | "manager" | "engineer";
+
 interface AuthLayoutProps {
   title: string;
   subtitle?: string;
+  variant?: AuthPortalVariant;
   children: ReactNode;
 }
 
-export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
+const variantConfig: Record<
+  AuthPortalVariant,
+  {
+    gradient: string;
+    badge: string;
+    heading: string;
+    description: string;
+    pills: { icon: typeof ShieldCheck; text: string; color: string }[];
+  }
+> = {
+  admin: {
+    gradient: "from-indigo-600 via-indigo-700 to-purple-800",
+    badge: "Next-Gen CRM Pipeline Engine",
+    heading: "Manage deals, quotes & leads with precision.",
+    description:
+      "Real-time pipeline analytics, automated tax invoice generation, and unified lead tracking built for modern sales teams.",
+    pills: [
+      { icon: ShieldCheck, text: "Role & Audit Security", color: "text-emerald-300" },
+      { icon: Zap, text: "NATS Task Engine", color: "text-amber-300" },
+      { icon: BarChart3, text: "Real-time GST Invoicing & Quotes", color: "text-indigo-300" },
+    ],
+  },
+  manager: {
+    gradient: "from-purple-700 via-indigo-800 to-blue-900",
+    badge: "Engineering & Delivery Management",
+    heading: "Plan, delegate & track your engineering team.",
+    description:
+      "Break down deal implementation into high-velocity asks, assign engineers, and monitor execution across your roster.",
+    pills: [
+      { icon: ShieldCheck, text: "Team Allocation Matrix", color: "text-purple-300" },
+      { icon: Zap, text: "Sub-task Delegation", color: "text-amber-300" },
+      { icon: BarChart3, text: "Progress Kanban & Velocity", color: "text-blue-300" },
+    ],
+  },
+  engineer: {
+    gradient: "from-emerald-700 via-teal-800 to-cyan-900",
+    badge: "Engineer Focus Portal",
+    heading: "Focus on what matters — your tasks, your progress.",
+    description:
+      "Distraction-free personal task queue, direct status updates, blocker flagging, and seamless delivery coordination.",
+    pills: [
+      { icon: ShieldCheck, text: "Dedicated 'My Tasks' Queue", color: "text-emerald-300" },
+      { icon: Zap, text: "Instant Blocker Alerts", color: "text-amber-300" },
+      { icon: BarChart3, text: "Shielded Distraction-Free UI", color: "text-teal-300" },
+    ],
+  },
+};
+
+export function AuthLayout({ title, subtitle, variant = "admin", children }: AuthLayoutProps) {
+  const current = variantConfig[variant] || variantConfig.admin;
+
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-canvas p-4 sm:p-6 lg:p-8 overflow-hidden select-none">
       {/* Dynamic Background Glows */}
-      <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-indigo-500/15 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-purple-500/15 blur-3xl" />
+      <div className={`pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full blur-3xl transition-colors duration-500 ${
+        variant === "engineer" ? "bg-emerald-500/15" : variant === "manager" ? "bg-purple-500/15" : "bg-indigo-500/15"
+      }`} />
+      <div className={`pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full blur-3xl transition-colors duration-500 ${
+        variant === "engineer" ? "bg-teal-500/15" : variant === "manager" ? "bg-blue-500/15" : "bg-purple-500/15"
+      }`} />
 
       <div className="relative flex w-full max-w-4xl overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
         {/* Left Side: Brand & Feature Highlights (Visible on md+) */}
-        <div className="hidden md:flex flex-1 flex-col justify-between bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 p-10 text-white relative overflow-hidden">
+        <div className={`hidden md:flex flex-1 flex-col justify-between bg-gradient-to-br ${current.gradient} p-10 text-white relative overflow-hidden transition-all duration-500`}>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-black/30" />
           
           {/* Header Logo */}
@@ -34,29 +91,31 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
           <div className="relative z-10 my-auto space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold backdrop-blur-md">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span>Next-Gen CRM Pipeline Engine</span>
+              <span>{current.badge}</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight leading-tight">
-              Manage deals, quotes & leads with precision.
+              {current.heading}
             </h1>
             <p className="text-sm text-white/80 leading-relaxed max-w-md">
-              Real-time pipeline analytics, automated tax invoice generation, and unified lead tracking built for modern sales teams.
+              {current.description}
             </p>
 
             {/* Feature Pills */}
             <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 backdrop-blur-xs text-xs">
-                <ShieldCheck className="h-4 w-4 text-emerald-300 shrink-0" />
-                <span className="font-medium text-white/90">Role & Audit Security</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 backdrop-blur-xs text-xs">
-                <Zap className="h-4 w-4 text-amber-300 shrink-0" />
-                <span className="font-medium text-white/90">NATS Task Engine</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 backdrop-blur-xs text-xs col-span-2">
-                <BarChart3 className="h-4 w-4 text-indigo-300 shrink-0" />
-                <span className="font-medium text-white/90">Real-time GST Invoicing & Quotes</span>
-              </div>
+              {current.pills.map((pill, i) => {
+                const IconComp = pill.icon;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 backdrop-blur-xs text-xs ${
+                      i === 2 ? "col-span-2" : ""
+                    }`}
+                  >
+                    <IconComp className={`h-4 w-4 ${pill.color} shrink-0`} />
+                    <span className="font-medium text-white/90">{pill.text}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

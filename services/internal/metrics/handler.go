@@ -13,7 +13,7 @@ import (
 
 // managerRoles may see the whole pipeline. Everyone else reaches the page too,
 // but only ever sees their own deals — see scope below.
-var managerRoles = map[string]bool{"owner": true, "admin": true, "account_manager": true}
+var managerRoles = map[string]bool{"owner": true, "admin": true, "account_manager": true, "manager": true}
 
 // Handler exposes GET /api/v1/metrics.
 type Handler struct {

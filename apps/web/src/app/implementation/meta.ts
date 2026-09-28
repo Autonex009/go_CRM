@@ -7,16 +7,18 @@ interface StatusMeta {
   bar: string;
   /** The coloured dot the board header draws beside a column name. */
   dot: string;
+  /** Compact badge styling for inline status chips (e.g. in sub-task lists). */
+  pill: string;
 }
 
 export const STATUS_META: Record<AskStatus, StatusMeta> = {
-  requested: { label: "Requested", tone: "neutral", bar: "bg-slate-400", dot: "bg-slate-400" },
-  acknowledged: { label: "Acknowledged", tone: "info", bar: "bg-indigo-400", dot: "bg-indigo-400" },
-  in_progress: { label: "In progress", tone: "brand", bar: "bg-violet-500", dot: "bg-violet-500" },
-  blocked: { label: "Blocked", tone: "danger", bar: "bg-rose-500", dot: "bg-rose-500" },
-  delivered: { label: "Delivered", tone: "success", bar: "bg-emerald-500", dot: "bg-emerald-500" },
-  verified: { label: "Verified", tone: "success", bar: "bg-teal-500", dot: "bg-teal-500" },
-  wont_do: { label: "Won't do", tone: "neutral", bar: "bg-zinc-400", dot: "bg-zinc-400" },
+  requested: { label: "Requested", tone: "neutral", bar: "bg-slate-400", dot: "bg-slate-400", pill: "bg-slate-500/10 text-slate-600 dark:text-slate-400" },
+  acknowledged: { label: "Acknowledged", tone: "info", bar: "bg-indigo-400", dot: "bg-indigo-400", pill: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" },
+  in_progress: { label: "In progress", tone: "brand", bar: "bg-violet-500", dot: "bg-violet-500", pill: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+  blocked: { label: "Blocked", tone: "danger", bar: "bg-rose-500", dot: "bg-rose-500", pill: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
+  delivered: { label: "Delivered", tone: "success", bar: "bg-emerald-500", dot: "bg-emerald-500", pill: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  verified: { label: "Verified", tone: "success", bar: "bg-teal-500", dot: "bg-teal-500", pill: "bg-teal-500/10 text-teal-600 dark:text-teal-400" },
+  wont_do: { label: "Won't do", tone: "neutral", bar: "bg-zinc-400", dot: "bg-zinc-400", pill: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400" },
 };
 
 /**

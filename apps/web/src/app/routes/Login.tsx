@@ -3,9 +3,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { loginSchema, type LoginInput } from "@go-crm/schemas";
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Shield, Briefcase, Terminal } from "lucide-react";
 
-import { AuthLayout } from "../auth/AuthLayout";
+import { AuthLayout, type AuthPortalVariant } from "../auth/AuthLayout";
 import { SsoButtons } from "../auth/SsoButtons";
 import { useAuthStore, useIsAuthenticated } from "../auth/store";
 import { ApiError, authApi } from "../lib/api";
@@ -14,7 +14,12 @@ import { Divider } from "../ui";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlPortal = searchParams.get("portal") as AuthPortalVariant | null;
+  const initialPortal: AuthPortalVariant =
+    urlPortal === "engineer" || urlPortal === "manager" ? urlPortal : "admin";
+
+  const [portal, setPortal] = useState<AuthPortalVariant>(initialPortal);
   const urlError = searchParams.get("error");
   const setSession = useAuthStore((s) => s.setSession);
   const authenticated = useIsAuthenticated();
@@ -22,6 +27,16 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   const displayError = formError || urlError;
+
+  const handlePortalChange = (newPortal: AuthPortalVariant) => {
+    setPortal(newPortal);
+    if (newPortal === "admin") {
+      searchParams.delete("portal");
+    } else {
+      searchParams.set("portal", newPortal);
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
 
   // Fails closed, so a failed lookup hides the link rather than dangling it.
   const methods = useQuery({
@@ -51,8 +66,75 @@ export default function Login() {
     }
   });
 
+  const titles: Record<AuthPortalVariant, { title: string; subtitle: string; btn: string; btnColor: string }> = {
+    admin: {
+      title: "Sign In to Dashboard",
+      subtitle: "Welcome back! Enter your credentials to access CRM operations.",
+      btn: "Sign In to Dashboard",
+      btnColor: "bg-indigo-600 hover:bg-indigo-500",
+    },
+    manager: {
+      title: "Manager Sign In",
+      subtitle: "Manage your engineering roster, asks, and delivery progress.",
+      btn: "Sign In as Manager",
+      btnColor: "bg-purple-600 hover:bg-purple-500",
+    },
+    engineer: {
+      title: "Engineer Focus Portal",
+      subtitle: "Access your assigned tasks, update statuses, and log blockers.",
+      btn: "Enter Engineer Portal",
+      btnColor: "bg-emerald-600 hover:bg-emerald-500",
+    },
+  };
+
+  const portalConfig = titles[portal];
+
   return (
-    <AuthLayout title="Sign In" subtitle="Welcome back! Please enter your credentials.">
+    <AuthLayout
+      title={portalConfig.title}
+      subtitle={portalConfig.subtitle}
+      variant={portal}
+    >
+      {/* Role / Portal Selector Tabs */}
+      <div className="mb-6 flex rounded-2xl bg-surface-muted/80 p-1 border border-line">
+        <button
+          type="button"
+          onClick={() => handlePortalChange("admin")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
+            portal === "admin"
+              ? "bg-surface text-indigo-600 dark:text-indigo-400 shadow-sm"
+              : "text-fg-muted hover:text-fg"
+          }`}
+        >
+          <Shield className="h-3.5 w-3.5" />
+          <span>Leadership</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handlePortalChange("manager")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
+            portal === "manager"
+              ? "bg-surface text-purple-600 dark:text-purple-400 shadow-sm"
+              : "text-fg-muted hover:text-fg"
+          }`}
+        >
+          <Briefcase className="h-3.5 w-3.5" />
+          <span>Manager</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handlePortalChange("engineer")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
+            portal === "engineer"
+              ? "bg-surface text-emerald-600 dark:text-emerald-400 shadow-sm"
+              : "text-fg-muted hover:text-fg"
+          }`}
+        >
+          <Terminal className="h-3.5 w-3.5" />
+          <span>Engineer</span>
+        </button>
+      </div>
+
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {/* Email Input */}
         <div className="space-y-1.5">
@@ -121,7 +203,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-indigo-500 hover:shadow-lg transition-all disabled:opacity-50"
+          className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50 ${portalConfig.btnColor}`}
         >
           {isSubmitting ? (
             <>
@@ -129,7 +211,7 @@ export default function Login() {
               <span>Signing in…</span>
             </>
           ) : (
-            <span>Sign In to Dashboard</span>
+            <span>{portalConfig.btn}</span>
           )}
         </button>
       </form>

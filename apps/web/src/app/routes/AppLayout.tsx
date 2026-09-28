@@ -10,6 +10,7 @@ import {
   FileText,
   Receipt,
   Wrench,
+  Users,
   ChartColumnBig,
   Settings,
   Search,
@@ -51,27 +52,33 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    group: "Engineering",
+    items: [
+      { to: "/implementation", label: "My Tasks", icon: Wrench, end: true, roles: ["engineer"] },
+    ],
+  },
+  {
     group: "CRM & Pipeline",
     items: [
-      { to: "/accounts", label: "Companies", icon: Building2 },
-
-      { to: "/leads", label: "Leads", icon: TrendingUp },
-      { to: "/deals", label: "Deals", icon: Handshake },
-      { to: "/implementation", label: "Implementation", icon: Wrench },
+      { to: "/accounts", label: "Companies", icon: Building2, roles: ["owner", "admin", "sales", "account_manager"] },
+      { to: "/leads", label: "Leads", icon: TrendingUp, roles: ["owner", "admin", "sales", "account_manager"] },
+      { to: "/deals", label: "Deals", icon: Handshake, roles: ["owner", "admin", "sales", "account_manager"] },
+      { to: "/implementation", label: "Implementation", icon: Wrench, end: true, roles: ["owner", "admin", "sales", "account_manager", "manager"] },
+      { to: "/implementation/team-tasks", label: "Engineer Tasks", icon: Users, end: true, roles: ["owner", "admin", "manager"] },
     ],
   },
   {
     group: "Sales & Billing",
     items: [
-      { to: "/quotes", label: "Quotes", icon: FileText },
-      { to: "/invoices", label: "Invoices", icon: Receipt },
-      { to: "/metrics", label: "Analytics", icon: ChartColumnBig },
+      { to: "/quotes", label: "Quotes", icon: FileText, roles: ["owner", "admin", "sales", "account_manager"] },
+      { to: "/invoices", label: "Invoices", icon: Receipt, roles: ["owner", "admin", "sales", "account_manager"] },
+      { to: "/metrics", label: "Analytics", icon: ChartColumnBig, roles: ["owner", "admin", "sales", "account_manager"] },
     ],
   },
   {
     group: "System",
     items: [
-      { to: "/team", label: "Team & Settings", icon: Settings },
+      { to: "/team", label: "Team & Settings", icon: Settings, roles: ["owner", "admin", "manager", "sales", "account_manager"] },
     ],
   },
 ];
@@ -79,10 +86,10 @@ const NAV_GROUPS: NavGroup[] = [
 const TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/accounts": "Companies",
-
   "/leads": "Leads",
   "/deals": "Deals",
   "/implementation": "Implementation",
+  "/implementation/team-tasks": "Engineer Task Allocations",
   "/quotes": "Quotes Workbench",
   "/invoices": "Tax Invoices",
   "/metrics": "Sales Analytics",
@@ -229,9 +236,9 @@ const Sidebar = memo(function Sidebar({
             {items.map((item) => {
               const IconComp = item.icon;
               const isActive =
-                item.to === "/"
-                  ? location.pathname === "/"
-                  : location.pathname.startsWith(item.to);
+                item.end || item.to === "/"
+                  ? location.pathname === item.to
+                  : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
 
               return (
                 <NavLink
@@ -380,57 +387,59 @@ const Topbar = memo(function Topbar({
           </kbd>
         </button>
 
-        {/* Quick Actions Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setQuickMenuOpen(!quickMenuOpen)}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-opacity hover:opacity-90"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>New</span>
-            <ChevronDown className="h-3 w-3 opacity-80" />
-          </button>
-
-          {quickMenuOpen && (
-            <div
-              className="absolute right-0 mt-2 w-48 rounded-xl border border-line bg-surface p-1 shadow-xl z-50 animate-in fade-in-0 zoom-in-95"
-              onClick={() => setQuickMenuOpen(false)}
+        {/* Quick Actions Dropdown (shielded from engineers) */}
+        {user?.role !== "engineer" && (
+          <div className="relative">
+            <button
+              onClick={() => setQuickMenuOpen(!quickMenuOpen)}
+              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-opacity hover:opacity-90"
             >
-              <div className="px-3 py-1.5 text-[11px] font-bold text-fg-subtle uppercase">
-                Quick Actions
+              <Plus className="h-3.5 w-3.5" />
+              <span>New</span>
+              <ChevronDown className="h-3 w-3 opacity-80" />
+            </button>
+
+            {quickMenuOpen && (
+              <div
+                className="absolute right-0 mt-2 w-48 rounded-xl border border-line bg-surface p-1 shadow-xl z-50 animate-in fade-in-0 zoom-in-95"
+                onClick={() => setQuickMenuOpen(false)}
+              >
+                <div className="px-3 py-1.5 text-[11px] font-bold text-fg-subtle uppercase">
+                  Quick Actions
+                </div>
+                <div className="h-px bg-line my-1" />
+                <button
+                  onClick={() => { setQuickMenuOpen(false); navigate("/leads", { state: { new: true } }); }}
+                  className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
+                >
+                  <TrendingUp className="h-4 w-4 text-purple-500" />
+                  <span>New Lead</span>
+                </button>
+                <button
+                  onClick={() => { setQuickMenuOpen(false); navigate("/deals", { state: { new: true } }); }}
+                  className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
+                >
+                  <Handshake className="h-4 w-4 text-emerald-500" />
+                  <span>New Deal</span>
+                </button>
+                <button
+                  onClick={() => { setQuickMenuOpen(false); navigate("/quotes/new"); }}
+                  className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
+                >
+                  <FileText className="h-4 w-4 text-amber-500" />
+                  <span>New Quote</span>
+                </button>
+                <button
+                  onClick={() => { setQuickMenuOpen(false); navigate("/accounts", { state: { new: true } }); }}
+                  className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
+                >
+                  <Building2 className="h-4 w-4 text-blue-500" />
+                  <span>New Company</span>
+                </button>
               </div>
-              <div className="h-px bg-line my-1" />
-              <button
-                onClick={() => { setQuickMenuOpen(false); navigate("/leads", { state: { new: true } }); }}
-                className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
-              >
-                <TrendingUp className="h-4 w-4 text-purple-500" />
-                <span>New Lead</span>
-              </button>
-              <button
-                onClick={() => { setQuickMenuOpen(false); navigate("/deals", { state: { new: true } }); }}
-                className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
-              >
-                <Handshake className="h-4 w-4 text-emerald-500" />
-                <span>New Deal</span>
-              </button>
-              <button
-                onClick={() => { setQuickMenuOpen(false); navigate("/quotes/new"); }}
-                className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
-              >
-                <FileText className="h-4 w-4 text-amber-500" />
-                <span>New Quote</span>
-              </button>
-              <button
-                onClick={() => { setQuickMenuOpen(false); navigate("/accounts", { state: { new: true } }); }}
-                className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-fg hover:bg-surface-hover transition"
-              >
-                <Building2 className="h-4 w-4 text-blue-500" />
-                <span>New Company</span>
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
         <div className="h-4 w-px bg-line my-auto mx-0.5" />
 
         {/* Notifications */}
@@ -451,7 +460,9 @@ const Topbar = memo(function Topbar({
             <Avatar name={fullName} size="sm" />
             <div className="hidden text-left md:block">
               <p className="text-xs font-semibold leading-tight text-fg">{fullName}</p>
-              <p className="text-[10px] capitalize text-fg-muted">Admin</p>
+              <p className="text-[10px] capitalize text-fg-muted">
+                {user?.role ? user.role.replace("_", " ") : "Member"}
+              </p>
             </div>
             <ChevronDown className="h-3.5 w-3.5 text-fg-muted" />
           </button>

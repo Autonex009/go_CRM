@@ -8,9 +8,14 @@ export interface Ask {
   dealId: string | null;
   leadId: string | null;
   accountId: string | null;
+  parentAskId: string | null;
   dealTitle: string | null;
   leadTitle: string | null;
   accountName: string | null;
+  parentTitle?: string | null;
+
+  subtaskCount?: number;
+  subtaskDoneCount?: number;
 
   title: string;
   type: string;
@@ -111,6 +116,7 @@ export interface Board {
 export interface AskInput {
   dealId?: string;
   leadId?: string;
+  parentAskId?: string | null;
   title: string;
   type: string;
   detail: string;
@@ -124,11 +130,28 @@ export interface AskFilter {
   dealId?: string;
   leadId?: string;
   accountId?: string;
+  parentAskId?: string;
+  topLevelOnly?: boolean;
   status?: AskStatus;
   type?: string;
   assignedTo?: string;
   openOnly?: boolean;
   overdue?: boolean;
+}
+
+export interface EngineerWorkload {
+  engineerId: string;
+  engineerName: string;
+  engineerEmail: string;
+  activeTasks: Ask[];
+  activeCount: number;
+  blockedCount: number;
+  doneCount: number;
+}
+
+export interface ManagerRoster {
+  engineers: EngineerWorkload[];
+  unassignedSubtasks: Ask[];
 }
 
 const BASE = "/api/v1/implementation";
@@ -138,6 +161,8 @@ function query(filter: AskFilter): string {
   if (filter.dealId) params.set("dealId", filter.dealId);
   if (filter.leadId) params.set("leadId", filter.leadId);
   if (filter.accountId) params.set("accountId", filter.accountId);
+  if (filter.parentAskId) params.set("parentAskId", filter.parentAskId);
+  if (filter.topLevelOnly) params.set("topLevelOnly", "true");
   if (filter.status) params.set("status", filter.status);
   if (filter.type) params.set("type", filter.type);
   if (filter.assignedTo) params.set("assignedTo", filter.assignedTo);
@@ -150,6 +175,12 @@ function query(filter: AskFilter): string {
 export const implementationApi = {
   board: (filter: AskFilter = {}) =>
     apiFetch<Board>(`${BASE}${query(filter)}`),
+
+  subtasks: (parentId: string) =>
+    apiFetch<Ask[]>(`${BASE}/${parentId}/subtasks`),
+
+  managerRoster: (managerId?: string) =>
+    apiFetch<ManagerRoster>(`${BASE}/manager/roster${managerId ? `?managerId=${managerId}` : ""}`),
 
   get: (id: string) => apiFetch<Ask>(`${BASE}/${id}`),
 

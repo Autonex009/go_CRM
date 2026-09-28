@@ -28,6 +28,8 @@ import {
   StagedAttachments,
   uploadAttachment,
 } from "./Attachments";
+import { useAuthStore } from "../auth/store";
+import { SubTaskList } from "./SubTaskList";
 import { PRIORITY_META, STATUS_META } from "./meta";
 
 /** What the deal or lead already knows, shown read-only at the top. */
@@ -47,6 +49,7 @@ export function AskDialog({
   onSubmit,
   onStatusChange,
   onDelete,
+  onSelectSubtask,
 }: {
   parent: AskParent;
   /** Null when raising a new ask. */
@@ -59,7 +62,11 @@ export function AskDialog({
    *  draws the five open columns. */
   onStatusChange?: (status: AskStatus, reason: string) => Promise<unknown>;
   onDelete?: () => void;
+  onSelectSubtask?: (subtask: Ask) => void;
 }) {
+  const user = useAuthStore((s) => s.user);
+  const isEngineer = user?.role === "engineer";
+
   const [title, setTitle] = useState(ask?.title ?? "");
   const [type, setType] = useState(ask?.type ?? "");
   const [priority, setPriority] = useState<AskPriority>(ask?.priority ?? "p0");
@@ -79,6 +86,7 @@ export function AskDialog({
   const values = (): AskInput => ({
     dealId: parent.dealId,
     leadId: parent.leadId,
+    parentAskId: ask?.parentAskId ?? undefined,
     title: title.trim(),
     type: type.trim(),
     detail: detail.trim(),
@@ -263,12 +271,16 @@ export function AskDialog({
           placeholder="Scope, what the client actually asked for, links…"
         />
 
+        {ask && !ask.parentAskId && (
+          <SubTaskList parentAsk={ask} onSelectSubtask={onSelectSubtask} />
+        )}
+
         {error && <Alert>{error}</Alert>}
 
         {ask && <AskHistory askId={ask.id} />}
 
         <div className="flex items-center justify-between gap-md border-t border-line pt-md">
-          {onDelete ? (
+          {onDelete && !isEngineer ? (
             <Button type="button" variant="ghost" size="sm" onClick={onDelete}>
               Delete
             </Button>

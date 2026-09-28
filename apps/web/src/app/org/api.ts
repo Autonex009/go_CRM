@@ -8,6 +8,8 @@ export interface Member {
   name: string | null;
   authProvider: string;
   role?: string;
+  managerId?: string | null;
+  managerName?: string | null;
   createdAt: string;
 }
 
@@ -15,9 +17,26 @@ export interface Member {
 export interface Invitation {
   id: string;
   email: string;
+  role?: string;
+  managerId?: string | null;
   expiresAt: string;
   createdAt: string;
   acceptedAt: string | null;
+}
+
+/** An engineer or teammate with active tasks count for team structure hierarchy. */
+export interface TeamMember extends Member {
+  activeTasks: number;
+}
+
+export interface TeamGroup {
+  manager: Member;
+  engineers: TeamMember[];
+}
+
+export interface TeamStructure {
+  groups: TeamGroup[];
+  unassigned: TeamMember[];
 }
 
 /** Mirrors org.NewInvitation — the one and only time the link is available. */
@@ -43,13 +62,25 @@ export const orgApi = {
 
   members: () => apiFetch<Member[]>(`${BASE}/members`),
 
+  teamEngineers: (managerId?: string) =>
+    apiFetch<Member[]>(`${BASE}/team/engineers${managerId ? `?managerId=${managerId}` : ""}`),
+
+  teamStructure: () => apiFetch<TeamStructure>(`${BASE}/team/structure`),
+
+  getOnboardingStatus: () => apiFetch<{ onboarded: boolean }>(`${BASE}/me/onboarding`),
+
+  completeOnboarding: () =>
+    apiFetch<{ onboarded: boolean }>(`${BASE}/me/onboarded`, { method: "POST" }),
+
   invitations: () => apiFetch<Invitation[]>(`${BASE}/invitations`),
 
-  invite: (email: string) =>
-    apiFetch<NewInvitation>(`${BASE}/invitations`, {
+  invite: (input: string | { email: string; role?: string; managerId?: string | null }) => {
+    const payload = typeof input === "string" ? { email: input } : input;
+    return apiFetch<NewInvitation>(`${BASE}/invitations`, {
       method: "POST",
-      body: JSON.stringify({ email }),
-    }),
+      body: JSON.stringify(payload),
+    });
+  },
 
   revoke: (id: string) =>
     apiFetch<void>(`${BASE}/invitations/${id}`, { method: "DELETE" }),
@@ -58,6 +89,12 @@ export const orgApi = {
     apiFetch<Member>(`${BASE}/members/${id}/role`, {
       method: "PATCH",
       body: JSON.stringify({ role }),
+    }),
+
+  updateMemberManager: (id: string, managerId: string | null) =>
+    apiFetch<Member>(`${BASE}/members/${id}/manager`, {
+      method: "PATCH",
+      body: JSON.stringify({ managerId }),
     }),
 
   /** Public: the invite token in the link is the credential. */

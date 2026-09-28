@@ -52,15 +52,20 @@ type Ask struct {
 	ID    string `json:"id"`
 	OrgID string `json:"orgId"`
 
-	// One of DealID or LeadID is required. AccountID is derived from it.
-	DealID    *string `json:"dealId"`
-	LeadID    *string `json:"leadId"`
-	AccountID *string `json:"accountId"`
+	// One of DealID or LeadID or ParentAskID is required. AccountID is derived from it.
+	DealID      *string `json:"dealId"`
+	LeadID      *string `json:"leadId"`
+	AccountID   *string `json:"accountId"`
+	ParentAskID *string `json:"parentAskId"`
 
 	// Denormalized so a card renders without a second request.
 	DealTitle   *string `json:"dealTitle"`
 	LeadTitle   *string `json:"leadTitle"`
 	AccountName *string `json:"accountName"`
+	ParentTitle *string `json:"parentTitle,omitempty"`
+
+	SubtaskCount     int `json:"subtaskCount"`
+	SubtaskDoneCount int `json:"subtaskDoneCount"`
 
 	Title    string `json:"title"`
 	Type     string `json:"type"`
@@ -87,8 +92,9 @@ type Ask struct {
 // Input is the writable shape. Status is absent: a new ask starts "requested",
 // and moves go through Move, which records them.
 type Input struct {
-	DealID *string `json:"dealId"`
-	LeadID *string `json:"leadId"`
+	DealID      *string `json:"dealId"`
+	LeadID      *string `json:"leadId"`
+	ParentAskID *string `json:"parentAskId"`
 
 	Title      string  `json:"title"`
 	Type       string  `json:"type"`
@@ -109,16 +115,36 @@ type Move struct {
 
 // Filter narrows the board. An empty filter returns the whole board.
 type Filter struct {
-	DealID     string
-	LeadID     string
-	AccountID  string
-	Status     string
-	Type       string
-	AssignedTo string
+	DealID       string
+	LeadID       string
+	AccountID    string
+	ParentAskID  string
+	TopLevelOnly bool
+	Status       string
+	Type         string
+	AssignedTo   string
+	AssigneeIDs  []string
 	// OpenOnly drops the terminal states.
 	OpenOnly bool
 	// Overdue keeps asks past their due date and not closed.
 	Overdue bool
+}
+
+// EngineerWorkload represents an engineer and their assigned tasks on the Manager page.
+type EngineerWorkload struct {
+	EngineerID    string `json:"engineerId"`
+	EngineerName  string `json:"engineerName"`
+	EngineerEmail string `json:"engineerEmail"`
+	ActiveTasks   []Ask  `json:"activeTasks"`
+	ActiveCount   int    `json:"activeCount"`
+	BlockedCount  int    `json:"blockedCount"`
+	DoneCount     int    `json:"doneCount"`
+}
+
+// ManagerRoster is the payload for the Manager Engineer Assignment page.
+type ManagerRoster struct {
+	Engineers          []EngineerWorkload `json:"engineers"`
+	UnassignedSubtasks []Ask              `json:"unassignedSubtasks"`
 }
 
 // Event is one line of an ask's history: who changed what, and when.

@@ -109,10 +109,27 @@ func (s *Service) PendingInvitations(ctx context.Context, orgID string) ([]Invit
 }
 
 // Invite creates an invitation and returns the link to hand to the invitee.
-func (s *Service) Invite(ctx context.Context, orgID, invitedBy, email string) (NewInvitation, error) {
+func (s *Service) Invite(ctx context.Context, orgID, invitedBy, email, role string, managerID *string) (NewInvitation, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" || !strings.Contains(email, "@") || strings.ContainsAny(email, " \t") {
 		return NewInvitation{}, apperr.Invalid("a valid email is required")
+	}
+
+	role = strings.TrimSpace(role)
+	if role == "" {
+		role = "sales"
+	}
+	if !validRoles[role] {
+		return NewInvitation{}, apperr.Invalid("invalid role: must be owner, admin, account_manager, sales, client, manager, or engineer")
+	}
+
+	if managerID != nil {
+		trimmed := strings.TrimSpace(*managerID)
+		if trimmed == "" {
+			managerID = nil
+		} else {
+			managerID = &trimmed
+		}
 	}
 
 	// Users are globally unique by email, so this would fail at acceptance time
@@ -130,7 +147,7 @@ func (s *Service) Invite(ctx context.Context, orgID, invitedBy, email string) (N
 		return NewInvitation{}, err
 	}
 	inv, err := s.store.createInvitation(
-		ctx, orgID, email, hashToken(token), invitedBy, time.Now().Add(inviteTTL))
+		ctx, orgID, email, hashToken(token), invitedBy, role, managerID, time.Now().Add(inviteTTL))
 	if err != nil {
 		return NewInvitation{}, err
 	}
@@ -187,6 +204,8 @@ var validRoles = map[string]bool{
 	"sales":           true,
 	"account_manager": true,
 	"client":          true,
+	"manager":         true,
+	"engineer":        true,
 }
 
 // UpdateMemberRole sets the profile role of a member in the organization.
@@ -199,7 +218,7 @@ var validRoles = map[string]bool{
 func (s *Service) UpdateMemberRole(ctx context.Context, orgID, actorID, actorRole, memberID, role string) (Member, error) {
 	role = strings.TrimSpace(role)
 	if !validRoles[role] {
-		return Member{}, apperr.Invalid("invalid role: must be owner, admin, account_manager, sales, or client")
+		return Member{}, apperr.Invalid("invalid role: must be owner, admin, account_manager, sales, client, manager, or engineer")
 	}
 	if memberID == actorID {
 		return Member{}, ErrSelfRoleChange
@@ -208,6 +227,45 @@ func (s *Service) UpdateMemberRole(ctx context.Context, orgID, actorID, actorRol
 		return Member{}, ErrOwnerOnly
 	}
 	return s.store.updateMemberRole(ctx, orgID, actorRole, memberID, role)
+}
+
+// UpdateMemberManager assigns a manager to a member (e.g. an engineer reporting to Jay).
+func (s *Service) UpdateMemberManager(ctx context.Context, orgID, actorRole, memberID string, managerID *string) (Member, error) {
+	if actorRole != "owner" && actorRole != "admin" {
+		return Member{}, apperr.Invalid("only owner and admin can assign managers")
+	}
+	if managerID != nil {
+		trimmed := strings.TrimSpace(*managerID)
+		if trimmed == "" {
+			managerID = nil
+		} else {
+			managerID = &trimmed
+		}
+	}
+	if managerID != nil && *managerID == memberID {
+		return Member{}, apperr.Invalid("a member cannot be their own manager")
+	}
+	return s.store.updateMemberManager(ctx, orgID, memberID, managerID)
+}
+
+// TeamEngineers returns the engineers reporting to a manager, or all engineers if managerID is empty.
+func (s *Service) TeamEngineers(ctx context.Context, orgID, managerID string) ([]Member, error) {
+	return s.store.teamEngineers(ctx, orgID, managerID)
+}
+
+// TeamStructure returns the organizational hierarchy for the Team tab.
+func (s *Service) TeamStructure(ctx context.Context, orgID string) (TeamStructure, error) {
+	return s.store.teamStructure(ctx, orgID)
+}
+
+// CompleteOnboarding records that a user has finished the guided onboarding tour.
+func (s *Service) CompleteOnboarding(ctx context.Context, userID string) error {
+	return s.store.completeOnboarding(ctx, userID)
+}
+
+// IsOnboarded checks if a user has completed the guided onboarding tour.
+func (s *Service) IsOnboarded(ctx context.Context, userID string) (bool, error) {
+	return s.store.isOnboarded(ctx, userID)
 }
 
 // inviteURL points at the SPA page that collects a name and password. The token

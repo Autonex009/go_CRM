@@ -18,8 +18,9 @@ type store struct {
 
 const askColumns = `
 	a.id::text, a.org_id::text,
-	a.deal_id::text, a.lead_id::text, a.account_id::text,
-	d.title, l.title, ac.name,
+	a.deal_id::text, a.lead_id::text, a.account_id::text, a.parent_ask_id::text,
+	d.title, l.title, ac.name, parent.title,
+	COALESCE(sub.cnt, 0), COALESCE(sub.done_cnt, 0),
 	a.title, a.type, a.detail, a.priority, a.status, a.blocked_reason,
 	a.assigned_to::text, pa.full_name,
 	a.created_by::text, pc.full_name,
@@ -31,8 +32,15 @@ const askFrom = `
 	LEFT JOIN deals    d  ON d.id  = a.deal_id
 	LEFT JOIN leads    l  ON l.id  = a.lead_id
 	LEFT JOIN accounts ac ON ac.id = a.account_id
+	LEFT JOIN implementation_asks parent ON parent.id = a.parent_ask_id
 	LEFT JOIN profiles pa ON pa.id = a.assigned_to
-	LEFT JOIN profiles pc ON pc.id = a.created_by `
+	LEFT JOIN profiles pc ON pc.id = a.created_by
+	LEFT JOIN LATERAL (
+		SELECT count(*) as cnt,
+		       count(*) FILTER (WHERE status IN ('delivered', 'verified')) as done_cnt
+		FROM implementation_asks
+		WHERE parent_ask_id = a.id
+	) sub ON true `
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -40,8 +48,9 @@ func scanAsk(row rowScanner) (Ask, error) {
 	var a Ask
 	err := row.Scan(
 		&a.ID, &a.OrgID,
-		&a.DealID, &a.LeadID, &a.AccountID,
-		&a.DealTitle, &a.LeadTitle, &a.AccountName,
+		&a.DealID, &a.LeadID, &a.AccountID, &a.ParentAskID,
+		&a.DealTitle, &a.LeadTitle, &a.AccountName, &a.ParentTitle,
+		&a.SubtaskCount, &a.SubtaskDoneCount,
 		&a.Title, &a.Type, &a.Detail, &a.Priority, &a.Status, &a.BlockedReason,
 		&a.AssignedTo, &a.AssignedToName,
 		&a.CreatedBy, &a.CreatedByName,
@@ -71,6 +80,12 @@ func where(orgID string, f Filter) (string, []any) {
 	if f.AccountID != "" {
 		add(" AND a.account_id = ", f.AccountID, "::uuid")
 	}
+	if f.ParentAskID != "" {
+		add(" AND a.parent_ask_id = ", f.ParentAskID, "::uuid")
+	}
+	if f.TopLevelOnly {
+		sql += ` AND a.parent_ask_id IS NULL`
+	}
 	if f.Status != "" {
 		add(" AND a.status = ", f.Status, "")
 	}
@@ -79,6 +94,10 @@ func where(orgID string, f Filter) (string, []any) {
 	}
 	if f.AssignedTo != "" {
 		add(" AND a.assigned_to = ", f.AssignedTo, "::uuid")
+	}
+	if len(f.AssigneeIDs) > 0 {
+		args = append(args, f.AssigneeIDs)
+		sql += " AND a.assigned_to::text = ANY($" + strconv.Itoa(len(args)) + "::text[])"
 	}
 	if f.OpenOnly {
 		sql += ` AND a.status NOT IN ('verified', 'wont_do')`
@@ -127,18 +146,20 @@ func (s *store) create(ctx context.Context, orgID, actorID string, in Input) (As
 	var id string
 	err := s.pool.QueryRow(ctx,
 		`INSERT INTO implementation_asks (
-		     org_id, deal_id, lead_id, account_id,
+		     org_id, deal_id, lead_id, account_id, parent_ask_id,
 		     title, type, detail, priority, assigned_to, created_by, due_at, position)
 		 VALUES (
 		     $1::uuid, $2::uuid, $3::uuid,
 		     COALESCE(
 		         (SELECT account_id FROM deals WHERE id = $2::uuid),
-		         (SELECT account_id FROM leads WHERE id = $3::uuid)),
-		     $4, $5, $6, $7, $8::uuid, $9::uuid, $10,
+		         (SELECT account_id FROM leads WHERE id = $3::uuid),
+		         (SELECT account_id FROM implementation_asks WHERE id = $4::uuid)),
+		     $4::uuid,
+		     $5, $6, $7, $8, $9::uuid, $10::uuid, $11,
 		     COALESCE((SELECT max(position) + 1 FROM implementation_asks
 		                WHERE org_id = $1::uuid AND status = 'requested'), 0))
 		 RETURNING id::text`,
-		orgID, in.DealID, in.LeadID,
+		orgID, in.DealID, in.LeadID, in.ParentAskID,
 		in.Title, in.Type, in.Detail, in.Priority, in.AssignedTo,
 		nilIfEmpty(actorID), in.DueAt).Scan(&id)
 	if err != nil {
@@ -227,6 +248,49 @@ func (s *store) dealExists(ctx context.Context, id string) (bool, error) {
 
 func (s *store) leadExists(ctx context.Context, id string) (bool, error) {
 	return s.exists(ctx, `SELECT EXISTS (SELECT 1 FROM leads WHERE id = $1::uuid AND deleted_at IS NULL)`, id)
+}
+
+func (s *store) askExists(ctx context.Context, orgID, id string) (bool, error) {
+	var ok bool
+	err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM implementation_asks WHERE id = $1::uuid AND org_id = $2::uuid)`,
+		id, orgID).Scan(&ok)
+	if err != nil && database.IsInvalidTextRepr(err) {
+		return false, nil
+	}
+	return ok, err
+}
+
+func (s *store) getParentRefs(ctx context.Context, orgID, parentID string) (dealID, leadID *string, err error) {
+	var d, l *string
+	err = s.pool.QueryRow(ctx,
+		`SELECT deal_id::text, lead_id::text FROM implementation_asks WHERE id = $1::uuid AND org_id = $2::uuid`,
+		parentID, orgID).Scan(&d, &l)
+	if errors.Is(err, pgx.ErrNoRows) || database.IsInvalidTextRepr(err) {
+		return nil, nil, ErrNotFound
+	}
+	return d, l, err
+}
+
+func (s *store) managerTeamUserIDs(ctx context.Context, orgID, managerID string) ([]string, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT u.id::text FROM users u
+		 JOIN profiles p ON p.id = u.id
+		 WHERE u.org_id = $1::uuid AND p.manager_id = $2::uuid`,
+		orgID, managerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (s *store) assigneeInOrg(ctx context.Context, orgID, userID string) (bool, error) {

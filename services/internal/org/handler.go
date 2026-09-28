@@ -36,9 +36,14 @@ func (h *Handler) Routes() chi.Router {
 		pr.Get("/", h.workspace)
 		pr.Patch("/", h.updateWorkspace)
 		pr.Get("/members", h.members)
+		pr.Get("/team/engineers", h.teamEngineers)
+		pr.Get("/team/structure", h.teamStructure)
+		pr.Get("/me/onboarding", h.getOnboarding)
+		pr.Post("/me/onboarded", h.completeOnboarding)
 		pr.Group(func(adminRouter chi.Router) {
 			adminRouter.Use(middleware.RequireRole("owner", "admin"))
 			adminRouter.Patch("/members/{id}/role", h.updateMemberRole)
+			adminRouter.Patch("/members/{id}/manager", h.updateMemberManager)
 		})
 		pr.Get("/invitations", h.invitations)
 		pr.Post("/invitations", h.invite)
@@ -94,14 +99,16 @@ func (h *Handler) invitations(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) invite(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Email string `json:"email"`
+		Email     string  `json:"email"`
+		Role      string  `json:"role"`
+		ManagerID *string `json:"managerId"`
 	}
 	if !httpx.DecodeJSON(w, r, &in) {
 		return
 	}
 
 	ctx := r.Context()
-	inv, err := h.svc.Invite(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), in.Email)
+	inv, err := h.svc.Invite(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), in.Email, in.Role, in.ManagerID)
 	if err != nil {
 		writeErr(w, err, "could not create invitation")
 		return
@@ -155,6 +162,70 @@ func (h *Handler) updateMemberRole(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, m)
 }
 
+func (h *Handler) updateMemberManager(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ManagerID *string `json:"managerId"`
+	}
+	if !httpx.DecodeJSON(w, r, &in) {
+		return
+	}
+	ctx := r.Context()
+	m, err := h.svc.UpdateMemberManager(ctx, middleware.OrgID(ctx), middleware.Role(ctx),
+		chi.URLParam(r, "id"), in.ManagerID)
+	if err != nil {
+		writeErr(w, err, "could not update member manager")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, m)
+}
+
+func (h *Handler) teamEngineers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	role := middleware.Role(ctx)
+	managerID := r.URL.Query().Get("managerId")
+
+	// If caller is a manager, restrict to their own team
+	if role == "manager" {
+		managerID = middleware.UserID(ctx)
+	}
+
+	engineers, err := h.svc.TeamEngineers(ctx, middleware.OrgID(ctx), managerID)
+	if err != nil {
+		writeErr(w, err, "could not load team engineers")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, engineers)
+}
+
+func (h *Handler) teamStructure(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	structure, err := h.svc.TeamStructure(ctx, middleware.OrgID(ctx))
+	if err != nil {
+		writeErr(w, err, "could not load team structure")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, structure)
+}
+
+func (h *Handler) getOnboarding(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	onboarded, err := h.svc.IsOnboarded(ctx, middleware.UserID(ctx))
+	if err != nil {
+		writeErr(w, err, "could not check onboarding status")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"onboarded": onboarded})
+}
+
+func (h *Handler) completeOnboarding(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := h.svc.CompleteOnboarding(ctx, middleware.UserID(ctx)); err != nil {
+		writeErr(w, err, "could not mark onboarding complete")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"onboarded": true})
+}
+
 func writeErr(w http.ResponseWriter, err error, fallback string) {
 	httpx.WriteDomainError(w, err, fallback,
 		httpx.Rule{Err: ErrNotFound, Status: http.StatusNotFound,
@@ -175,5 +246,7 @@ func writeErr(w http.ResponseWriter, err error, fallback string) {
 		// so the endpoint can't be used to probe for live invitations.
 		httpx.Rule{Err: ErrInviteInvalid, Status: http.StatusBadRequest,
 			Message: "this invitation is invalid or has expired"},
+		httpx.Rule{Err: ErrInvalidManager, Status: http.StatusBadRequest,
+			Message: "designated manager not found or does not have manager privileges"},
 	)
 }
