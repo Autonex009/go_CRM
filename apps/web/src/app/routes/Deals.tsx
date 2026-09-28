@@ -554,6 +554,7 @@ export default function Deals() {
 
       {askDialog && (
         <AskDialog
+          key={askDialog.ask?.id ?? "new"}
           ask={askDialog.ask}
           parent={{
             dealId: askDialog.deal.id,
@@ -567,6 +568,7 @@ export default function Deals() {
             saveAsk.mutateAsync({ id: askDialog.ask?.id, input })
           }
           onDelete={askDialog.ask ? () => deleteAsk(askDialog.ask!) : undefined}
+          onSelectSubtask={(st) => setAskDialog({ deal: askDialog.deal, ask: st })}
         />
       )}
     </section>

@@ -31,7 +31,9 @@ func (h *Handler) Routes() chi.Router {
 
 	r.Get("/", h.board)
 	r.Post("/", h.create)
+	r.Get("/manager/roster", h.managerRoster)
 	r.Get("/{id}", h.get)
+	r.Get("/{id}/subtasks", h.subtasks)
 	r.Patch("/{id}", h.update)
 	r.Post("/{id}/move", h.move)
 	r.Get("/{id}/events", h.events)
@@ -58,7 +60,7 @@ func (h *Handler) board(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	b, err := h.svc.Board(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), f)
+	b, err := h.svc.Board(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), middleware.Role(ctx), f)
 	if err != nil {
 		httpx.WriteServerError(w, "could not load the implementation board", err)
 		return
@@ -69,14 +71,16 @@ func (h *Handler) board(w http.ResponseWriter, r *http.Request) {
 func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	q := r.URL.Query()
 	f := Filter{
-		DealID:     q.Get("dealId"),
-		LeadID:     q.Get("leadId"),
-		AccountID:  q.Get("accountId"),
-		Status:     q.Get("status"),
-		Type:       q.Get("type"),
-		AssignedTo: q.Get("assignedTo"),
-		OpenOnly:   q.Get("openOnly") == "true",
-		Overdue:    q.Get("overdue") == "true",
+		DealID:       q.Get("dealId"),
+		LeadID:       q.Get("leadId"),
+		AccountID:    q.Get("accountId"),
+		ParentAskID:  q.Get("parentAskId"),
+		TopLevelOnly: q.Get("topLevelOnly") == "true",
+		Status:       q.Get("status"),
+		Type:         q.Get("type"),
+		AssignedTo:   q.Get("assignedTo"),
+		OpenOnly:     q.Get("openOnly") == "true",
+		Overdue:      q.Get("overdue") == "true",
 	}
 
 	// Filters are cast to uuid in SQL, where a malformed value would surface as
@@ -84,6 +88,7 @@ func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	for name, value := range map[string]string{
 		"dealId": f.DealID, "leadId": f.LeadID,
 		"accountId": f.AccountID, "assignedTo": f.AssignedTo,
+		"parentAskId": f.ParentAskID,
 	} {
 		if value != "" && !httpx.IsUUID(value) {
 			httpx.WriteError(w, http.StatusBadRequest, name+" must be a UUID")
@@ -161,8 +166,42 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, items)
 }
 
+func (h *Handler) subtasks(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	items, err := h.svc.Subtasks(ctx, middleware.OrgID(ctx), chi.URLParam(r, "id"))
+	if err != nil {
+		h.writeErr(w, err, "could not load sub-tasks")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) managerRoster(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	role := middleware.Role(ctx)
+	if role != "owner" && role != "admin" && role != "manager" {
+		httpx.WriteError(w, http.StatusForbidden, "you don't have permission to view the team roster")
+		return
+	}
+	managerID := r.URL.Query().Get("managerId")
+	if role == "manager" {
+		managerID = middleware.UserID(ctx)
+	}
+
+	roster, err := h.svc.ManagerRoster(ctx, middleware.OrgID(ctx), managerID)
+	if err != nil {
+		httpx.WriteServerError(w, "could not load manager team roster", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, roster)
+}
+
 func (h *Handler) remove(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	if middleware.Role(ctx) == "engineer" {
+		httpx.WriteError(w, http.StatusForbidden, "engineers cannot delete asks")
+		return
+	}
 	if err := h.svc.Delete(ctx, middleware.OrgID(ctx), chi.URLParam(r, "id")); err != nil {
 		h.writeErr(w, err, "could not delete that ask")
 		return

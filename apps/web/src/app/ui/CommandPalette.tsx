@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Command, X, ArrowRight } from 'lucide-react';
+import { useAuthStore } from '../auth/store';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -9,15 +10,17 @@ interface CommandPaletteProps {
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, onNavigate }) => {
   const [query, setQuery] = useState('');
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role || 'sales';
+  const isEngineer = role === 'engineer';
+  const isManager = role === 'manager';
+  const isAdmin = role === 'owner' || role === 'admin';
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         if (isOpen) onClose();
-        else {
-          // Open handled by parent state
-        }
       }
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -27,17 +30,42 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const rawActions = useMemo(() => {
+    if (isEngineer) {
+      return [
+        { title: 'Engineer Dashboard', category: 'Overview', path: '/' },
+        { title: 'My Tasks Kanban', category: 'Engineering', path: '/implementation' },
+      ];
+    }
+    if (isManager) {
+      return [
+        { title: 'Dashboard Overview', category: 'Overview', path: '/' },
+        { title: 'Implementation Board', category: 'Engineering', path: '/implementation' },
+        { title: 'Engineer Tasks Matrix', category: 'Management', path: '/implementation/team-tasks' },
+        { title: 'Team & Settings', category: 'Settings', path: '/team' },
+      ];
+    }
+    return [
+      { title: 'Dashboard Overview', category: 'Overview', path: '/' },
+      { title: 'View All Deals Kanban', category: 'Pipeline', path: '/deals' },
+      { title: 'View Leads Pipeline', category: 'Leads', path: '/leads' },
+      { title: 'Companies & Accounts', category: 'CRM', path: '/accounts' },
+      { title: 'Implementation Board', category: 'Engineering', path: '/implementation' },
+      ...(isAdmin ? [{ title: 'Engineer Tasks Matrix', category: 'Management', path: '/implementation/team-tasks' }] : []),
+      { title: 'Quotes Workbench', category: 'Sales', path: '/quotes' },
+      { title: 'GST Tax Invoices', category: 'Finance', path: '/invoices' },
+      { title: 'Sales Analytics', category: 'Metrics', path: '/metrics' },
+      { title: 'Team & Settings', category: 'Settings', path: '/team' },
+    ];
+  }, [isEngineer, isManager, isAdmin]);
+
   if (!isOpen) return null;
 
-  const actions = [
-    { title: 'Create New Lead', category: 'Leads', path: '/app/leads/new' },
-    { title: 'View All Deals Kanban', category: 'Deals', path: '/app/deals' },
-    { title: 'Create Sales Quote', category: 'Quotes', path: '/app/quotes/new' },
-    { title: 'GST Tax Invoices', category: 'Finance', path: '/app/invoices' },
-    { title: 'Products & Price Book', category: 'Catalog', path: '/app/products' },
-    { title: 'Audit Trail & Logs', category: 'Security', path: '/app/audit' },
-    { title: 'Organization Integrations', category: 'Settings', path: '/app/org/integrations' },
-  ].filter(a => a.title.toLowerCase().includes(query.toLowerCase()) || a.category.toLowerCase().includes(query.toLowerCase()));
+  const actions = rawActions.filter(
+    (a) =>
+      a.title.toLowerCase().includes(query.toLowerCase()) ||
+      a.category.toLowerCase().includes(query.toLowerCase()),
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-slate-900/60 backdrop-blur-sm">

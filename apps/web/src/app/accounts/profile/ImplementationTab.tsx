@@ -94,6 +94,7 @@ export function ImplementationTab({ accountId }: { accountId: string }) {
 
       {dialog && (
         <AskDialog
+          key={dialog.id}
           ask={dialog}
           parent={{
             dealId: dialog.dealId ?? undefined,
@@ -109,6 +110,7 @@ export function ImplementationTab({ accountId }: { accountId: string }) {
             await move.mutateAsync({ id: dialog.id, status, reason });
             setDialog(null);
           }}
+          onSelectSubtask={(st) => setDialog(st)}
         />
       )}
     </Card>

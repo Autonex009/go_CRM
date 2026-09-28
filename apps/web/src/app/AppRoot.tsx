@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./auth/ProtectedRoute";
 import AcceptInvite from "./routes/AcceptInvite";
 import Accounts from "./routes/Accounts";
 import Implementation from "./routes/Implementation";
+import ManagerTeamTasks from "./routes/ManagerTeamTasks";
 import Metrics from "./routes/Metrics";
 import CompanyProfilePage from "./routes/CompanyProfile";
 import AppLayout from "./routes/AppLayout";
@@ -25,6 +26,8 @@ import Register from "./routes/Register";
 import Team from "./routes/Team";
 import VigilProposalEditor from "./routes/VigilProposalEditor";
 import { useSystemThemeSync } from "./ui";
+
+import { RequireRole } from "./auth/RoleRoute";
 
 // SSO returns with the token in the URL fragment; capture it before the first
 // render so an authenticated return doesn't flash the login screen.
@@ -65,30 +68,53 @@ export default function AppRoot() {
 
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/leads" element={<Leads />} />
-              <Route path="/deals" element={<Deals />} />
-              <Route path="/quotes" element={<Quotes />} />
-              {/* new + :id share one editor; the route decides which */}
-              <Route path="/quotes/new" element={<QuoteEditor />} />
-              {/* The VIGIL proposal is the same quote record under a document
-                  template, so it sits under /quotes and keeps its own editor:
-                  twenty narrative sections and a price grid is not the same
-                  screen as a price grid. */}
-              <Route path="/quotes/new/proposal" element={<VigilProposalEditor />} />
-              <Route path="/quotes/:id/proposal" element={<VigilProposalEditor />} />
-              <Route path="/quotes/:id" element={<QuoteEditor />} />
-              <Route path="/invoices" element={<Invoices />} />
-              <Route path="/invoices/new" element={<InvoiceEditor />} />
-              <Route path="/invoices/:id" element={<InvoiceEditor />} />
-              <Route path="/accounts" element={<Accounts />} />
-              <Route path="/accounts/:id" element={<CompanyProfilePage />} />
-
-
               <Route path="/implementation" element={<Implementation />} />
 
-              <Route path="/metrics" element={<Metrics />} />
+              {/* Commercial CRM & Billing routes - shielded from engineers */}
+              <Route
+                element={
+                  <RequireRole
+                    allowedRoles={["owner", "admin", "sales", "account_manager"]}
+                  />
+                }
+              >
+                <Route path="/leads" element={<Leads />} />
+                <Route path="/deals" element={<Deals />} />
+                <Route path="/quotes" element={<Quotes />} />
+                {/* new + :id share one editor; the route decides which */}
+                <Route path="/quotes/new" element={<QuoteEditor />} />
+                {/* The VIGIL proposal is the same quote record under a document
+                    template, so it sits under /quotes and keeps its own editor */}
+                <Route path="/quotes/new/proposal" element={<VigilProposalEditor />} />
+                <Route path="/quotes/:id/proposal" element={<VigilProposalEditor />} />
+                <Route path="/quotes/:id" element={<QuoteEditor />} />
+                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/invoices/new" element={<InvoiceEditor />} />
+                <Route path="/invoices/:id" element={<InvoiceEditor />} />
+                <Route path="/accounts" element={<Accounts />} />
+                <Route path="/accounts/:id" element={<CompanyProfilePage />} />
+                <Route path="/metrics" element={<Metrics />} />
+              </Route>
 
-              <Route path="/team" element={<Team />} />
+              {/* Manager & Admin engineering team workflows */}
+              <Route
+                element={
+                  <RequireRole allowedRoles={["owner", "admin", "manager"]} />
+                }
+              >
+                <Route path="/implementation/team-tasks" element={<ManagerTeamTasks />} />
+              </Route>
+
+              {/* Team & Organization Settings */}
+              <Route
+                element={
+                  <RequireRole
+                    allowedRoles={["owner", "admin", "manager", "sales", "account_manager", "engineer"]}
+                  />
+                }
+              >
+                <Route path="/team" element={<Team />} />
+              </Route>
             </Route>
           </Route>
 

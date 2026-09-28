@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAuthStore } from "../auth/store";
 import { integrationsApi } from "../integrations/api";
@@ -27,13 +27,16 @@ export default function Team() {
   const isOwner = currentUserRole === "owner";
   const canManageRoles = isOwner || currentUserRole === "admin";
 
+  const [activeTab, setActiveTab] = useState<"members" | "structure" | "settings">("members");
+
   const members = useQuery({ queryKey: ["members"], queryFn: orgApi.members, staleTime: 5 * 60_000 });
   const invitations = useQuery({ queryKey: ["invitations"], queryFn: orgApi.invitations });
+  const teamStructure = useQuery({ queryKey: ["teamStructure"], queryFn: orgApi.teamStructure });
 
-  const [email, setEmail] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("sales");
+  const [inviteManagerId, setInviteManagerId] = useState("");
   const [error, setError] = useState<string | null>(null);
-  // Shown once, after a successful invite: there is no mail sender, so the
-  // inviter copies this link and sends it themselves.
   const [created, setCreated] = useState<NewInvitation | null>(null);
 
   const changeRole = useMutation({
@@ -41,19 +44,30 @@ export default function Team() {
     onSuccess: () => {
       setError(null);
       void queryClient.invalidateQueries({ queryKey: ["members"] });
+      void queryClient.invalidateQueries({ queryKey: ["teamStructure"] });
     },
     onError: (err) => {
       setError(err instanceof ApiError ? err.message : "Could not change role");
     },
   });
 
-  // Mirrors the server's guards so the UI never offers a change that will be
-  // refused: nobody edits their own role, and only an owner touches an owner.
   const canEditRole = (m: Member) =>
     canManageRoles && m.id !== currentUserId && (isOwner || m.role !== "owner");
 
-  // A role change takes effect the moment the member's session refreshes, so it
-  // gets the same confirmation as a delete.
+  const assignManager = useMutation({
+    mutationFn: ({ memberId, managerId }: { memberId: string; managerId: string | null }) =>
+      orgApi.updateMemberManager(memberId, managerId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["members"] });
+      void queryClient.invalidateQueries({ queryKey: ["teamStructure"] });
+    },
+  });
+
+  const managers = useMemo(
+    () => (members.data ?? []).filter((m) => m.role === "manager" || m.role === "admin" || m.role === "owner"),
+    [members.data],
+  );
+
   const requestRoleChange = (m: Member, role: string) => {
     if (role === (m.role || "sales")) return;
     const confirmed = window.confirm(
@@ -65,10 +79,13 @@ export default function Team() {
   };
 
   const invite = useMutation({
-    mutationFn: (address: string) => orgApi.invite(address),
+    mutationFn: (payload: { email: string; role: string; managerId: string | null }) =>
+      orgApi.invite(payload),
     onSuccess: (inv) => {
       setCreated(inv);
-      setEmail("");
+      setInviteEmail("");
+      setInviteRole("sales");
+      setInviteManagerId("");
       setError(null);
       void queryClient.invalidateQueries({ queryKey: ["invitations"] });
     },
@@ -86,143 +103,471 @@ export default function Team() {
 
   return (
     <section className="flex flex-col gap-lg">
-      <PageHeader
-        title="Team"
-        subtitle="People in your workspace. Anyone here can be assigned leads."
-      />
-
-      <WorkspaceSettings />
-
-      <GoogleCalendarCard />
-
-      <div className="grid gap-md lg:grid-cols-2">
-        <Card padded={false}>
-          <div className="px-lg py-md">
-            <CardHeader
-              title="Members"
-              subtitle={members.data ? `${members.data.length} in this workspace` : undefined}
-            />
-          </div>
-          <ul className="border-t border-line">
-            {members.isPending &&
-              Array.from({ length: 2 }).map((_, i) => (
-                <li key={i} className="px-lg py-md">
-                  <Skeleton className="h-[28px] w-full" />
-                </li>
-              ))}
-            {(members.data ?? []).map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between gap-md border-b border-line px-lg py-md last:border-0"
-              >
-                <div className="flex items-center gap-md min-w-0">
-                  <Avatar name={memberLabel(m)} title={m.email} />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-xs">
-                      <p className="truncate text-sm font-medium text-fg">{memberLabel(m)}</p>
-                      {m.id === currentUserId && <Badge tone="brand">You</Badge>}
-                    </div>
-                    {m.name && <p className="truncate text-xs text-fg-muted">{m.email}</p>}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-sm">
-                  {canEditRole(m) ? (
-                    <select
-                      value={m.role || "sales"}
-                      disabled={changeRole.isPending}
-                      onChange={(e) => requestRoleChange(m, e.target.value)}
-                      aria-label={`Role for ${memberLabel(m)}`}
-                      className="h-8 rounded-md border border-line bg-surface px-2 text-xs font-medium text-fg focus:border-accent focus:outline-none disabled:opacity-60"
-                    >
-                      {/* Only an owner can create another owner, and the server
-                          enforces the same rule. */}
-                      {isOwner && <option value="owner">Owner</option>}
-                      <option value="admin">Admin</option>
-                      <option value="account_manager">Account Manager</option>
-                      <option value="sales">Sales</option>
-                      <option value="client">Client</option>
-                    </select>
-                  ) : (
-                    <Badge tone={ROLE_TONE[m.role ?? "sales"] ?? "neutral"}>
-                      {ROLE_LABEL[m.role ?? "sales"] ?? "Sales"}
-                    </Badge>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <div className="flex flex-col gap-md">
-          <Card>
-            <CardHeader
-              title="Invite a teammate"
-              subtitle="Single-use link, valid for 7 days. Email delivery isn't wired up yet — copy the link and send it yourself."
-            />
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                invite.mutate(email);
-              }}
-              className="mt-md flex flex-col gap-md sm:flex-row sm:items-end"
-            >
-              <div className="flex-1">
-                <Field
-                  label="Email"
-                  type="email"
-                  name="inviteEmail"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="teammate@company.com"
-                />
-              </div>
-              <Button type="submit" disabled={invite.isPending || !email}>
-                {invite.isPending ? "Creating…" : "Create invite"}
-              </Button>
-            </form>
-
-            {error && (
-              <div className="mt-md">
-                <Alert>{error}</Alert>
-              </div>
-            )}
-            {created && <InviteLink invitation={created} onDismiss={() => setCreated(null)} />}
-          </Card>
-
-          {pending.length > 0 && (
-            <Card padded={false}>
-              <div className="px-lg py-md">
-                <CardHeader title="Pending invitations" />
-              </div>
-              <ul className="border-t border-line">
-                {pending.map((inv) => (
-                  <li
-                    key={inv.id}
-                    className="flex items-center justify-between gap-md border-b border-line px-lg py-md last:border-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-fg">{inv.email}</p>
-                      <p className="text-xs text-fg-muted">
-                        Expires {new Date(inv.expiresAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => revoke.mutate(inv.id)}
-                      disabled={revoke.isPending}
-                    >
-                      <span className="text-bad-fg">Revoke</span>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <PageHeader
+          title="Team & Organization"
+          subtitle="Manage team members, roles, reporting hierarchies, and workspace settings."
+        />
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-1 rounded-xl bg-surface-muted/70 p-1 border border-line shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab("members")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              activeTab === "members"
+                ? "bg-surface text-fg shadow-xs border border-line/60"
+                : "text-fg-muted hover:text-fg"
+            }`}
+          >
+            Members &amp; Roles
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("structure")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              activeTab === "structure"
+                ? "bg-surface text-fg shadow-xs border border-line/60"
+                : "text-fg-muted hover:text-fg"
+            }`}
+          >
+            Team Structure
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("settings")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              activeTab === "settings"
+                ? "bg-surface text-fg shadow-xs border border-line/60"
+                : "text-fg-muted hover:text-fg"
+            }`}
+          >
+            Settings
+          </button>
         </div>
       </div>
+
+      {activeTab === "settings" && (
+        <div className="flex flex-col gap-lg">
+          <WorkspaceSettings canManageRoles={canManageRoles} />
+          <GoogleCalendarCard />
+        </div>
+      )}
+
+      {activeTab === "structure" && (
+        <div className="flex flex-col gap-lg">
+          {/* Structure Overview Cards */}
+          <div className="grid gap-md sm:grid-cols-3">
+            <Card className="p-4">
+              <div className="text-xs font-bold text-fg-muted uppercase tracking-wider">Managers</div>
+              <div className="mt-2 text-2xl font-bold text-fg">
+                {teamStructure.data?.groups.length ?? 0}
+              </div>
+              <div className="mt-1 text-xs text-fg-subtle">Designated team heads</div>
+            </Card>
+            <Card className="p-4">
+              <div className="text-xs font-bold text-fg-muted uppercase tracking-wider">Assigned Engineers</div>
+              <div className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {(teamStructure.data?.groups ?? []).reduce((acc, g) => acc + g.engineers.length, 0)}
+              </div>
+              <div className="mt-1 text-xs text-fg-subtle">Engineers reporting to a manager</div>
+            </Card>
+            <Card className="p-4">
+              <div className="text-xs font-bold text-fg-muted uppercase tracking-wider">Unassigned Engineers</div>
+              <div className={`mt-2 text-2xl font-bold ${
+                (teamStructure.data?.unassigned.length ?? 0) > 0 ? "text-amber-500" : "text-fg"
+              }`}>
+                {teamStructure.data?.unassigned.length ?? 0}
+              </div>
+              <div className="mt-1 text-xs text-fg-subtle">Pending manager assignment</div>
+            </Card>
+          </div>
+
+          {teamStructure.isLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-36 w-full rounded-2xl" />
+              <Skeleton className="h-36 w-full rounded-2xl" />
+            </div>
+          ) : (
+            <>
+              {/* Groups by Manager */}
+              <div className="space-y-4">
+                {(teamStructure.data?.groups ?? []).map((group) => (
+                  <Card key={group.manager.id} padded={false}>
+                    <div className="flex flex-col gap-2 p-5 border-b border-line bg-surface-muted/30 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={memberLabel(group.manager)} title={group.manager.email} />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-fg">{memberLabel(group.manager)}</span>
+                            <Badge tone={ROLE_TONE[group.manager.role ?? "manager"] ?? "info"}>
+                              {ROLE_LABEL[group.manager.role ?? "manager"] ?? group.manager.role}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-fg-muted">{group.manager.email}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs font-medium text-fg-muted">
+                        <span className="font-bold text-fg">{group.engineers.length}</span> engineer
+                        {group.engineers.length === 1 ? "" : "s"} reporting
+                      </div>
+                    </div>
+
+                    {group.engineers.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-fg-muted">
+                        No engineers assigned to {memberLabel(group.manager)} yet.
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-line">
+                        {group.engineers.map((eng) => (
+                          <li
+                            key={eng.id}
+                            className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between hover:bg-surface-hover/40 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar name={memberLabel(eng)} title={eng.email} />
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-fg truncate">
+                                  {memberLabel(eng)}
+                                </div>
+                                <div className="text-xs text-fg-muted truncate">{eng.email}</div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 self-end sm:self-center">
+                              {/* Active Tasks Badge */}
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                  eng.activeTasks > 4
+                                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                    : eng.activeTasks > 0
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                    : "bg-surface-muted text-fg-subtle border border-line"
+                                }`}
+                              >
+                                {eng.activeTasks} active task{eng.activeTasks === 1 ? "" : "s"}
+                              </span>
+
+                              {canManageRoles && (
+                                <select
+                                  value={eng.managerId ?? ""}
+                                  disabled={assignManager.isPending}
+                                  onChange={(e) =>
+                                    assignManager.mutate({
+                                      memberId: eng.id,
+                                      managerId: e.target.value || null,
+                                    })
+                                  }
+                                  aria-label={`Reassign manager for ${memberLabel(eng)}`}
+                                  className="h-8 rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-fg focus:border-accent focus:outline-none"
+                                >
+                                  <option value="">Unassign</option>
+                                  {managers
+                                    .filter((m) => m.id !== eng.id)
+                                    .map((m) => (
+                                      <option key={m.id} value={m.id}>
+                                        Move to: {memberLabel(m)}
+                                      </option>
+                                    ))}
+                                </select>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Card>
+                ))}
+
+                {/* Unassigned Engineers Section */}
+                {(teamStructure.data?.unassigned ?? []).length > 0 && (
+                  <Card padded={false} className="border-amber-500/30">
+                    <div className="flex items-center justify-between p-5 border-b border-line bg-amber-500/5">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-amber-500" />
+                          <h3 className="text-sm font-bold text-fg">Unassigned Engineers</h3>
+                        </div>
+                        <p className="text-xs text-fg-muted mt-0.5">
+                          These engineers do not have a reporting manager assigned yet.
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        {teamStructure.data?.unassigned.length} Pending
+                      </span>
+                    </div>
+
+                    <ul className="divide-y divide-line">
+                      {teamStructure.data?.unassigned.map((eng) => (
+                        <li
+                          key={eng.id}
+                          className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between hover:bg-surface-hover/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar name={memberLabel(eng)} title={eng.email} />
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-fg truncate">
+                                {memberLabel(eng)}
+                              </div>
+                              <div className="text-xs text-fg-muted truncate">{eng.email}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold bg-surface-muted text-fg-subtle border border-line">
+                              {eng.activeTasks} active task{eng.activeTasks === 1 ? "" : "s"}
+                            </span>
+
+                            {canManageRoles && (
+                              <select
+                                defaultValue=""
+                                disabled={assignManager.isPending}
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    assignManager.mutate({
+                                      memberId: eng.id,
+                                      managerId: e.target.value,
+                                    });
+                                  }
+                                }}
+                                aria-label={`Assign manager for ${memberLabel(eng)}`}
+                                className="h-8 rounded-lg border border-amber-500/40 bg-surface px-2.5 text-xs font-bold text-fg focus:border-accent focus:outline-none"
+                              >
+                                <option value="" disabled>
+                                  Assign to Manager…
+                                </option>
+                                {managers
+                                  .filter((m) => m.id !== eng.id)
+                                  .map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                      {memberLabel(m)} ({ROLE_LABEL[m.role ?? "manager"] ?? m.role})
+                                    </option>
+                                  ))}
+                              </select>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {activeTab === "members" && (
+        <div className={`grid gap-md ${canManageRoles ? "lg:grid-cols-2" : "max-w-4xl"}`}>
+          <Card padded={false}>
+            <div className="px-lg py-md">
+              <CardHeader
+                title="Members"
+                subtitle={members.data ? `${members.data.length} in this workspace` : undefined}
+              />
+            </div>
+            <ul className="border-t border-line">
+              {members.isPending &&
+                Array.from({ length: 2 }).map((_, i) => (
+                  <li key={i} className="px-lg py-md">
+                    <Skeleton className="h-[28px] w-full" />
+                  </li>
+                ))}
+              {(members.data ?? []).map((m) => (
+                <li
+                  key={m.id}
+                  className="flex items-center justify-between gap-md border-b border-line px-lg py-md last:border-0"
+                >
+                  <div className="flex items-center gap-md min-w-0">
+                    <Avatar name={memberLabel(m)} title={m.email} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-xs">
+                        <p className="truncate text-sm font-medium text-fg">{memberLabel(m)}</p>
+                        {m.id === currentUserId && <Badge tone="brand">You</Badge>}
+                      </div>
+                      {m.name && <p className="truncate text-xs text-fg-muted">{m.email}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-sm">
+                    {m.role === "engineer" && (
+                      canManageRoles ? (
+                        <select
+                          value={m.managerId ?? ""}
+                          disabled={assignManager.isPending}
+                          onChange={(e) =>
+                            assignManager.mutate({
+                              memberId: m.id,
+                              managerId: e.target.value || null,
+                            })
+                          }
+                          title="Assigned Manager"
+                          aria-label={`Assigned Manager for ${memberLabel(m)}`}
+                          className="h-8 rounded-md border border-line bg-surface px-2 text-xs font-medium text-fg focus:border-accent focus:outline-none disabled:opacity-60"
+                        >
+                          <option value="">No Manager</option>
+                          {managers
+                            .filter((mgr) => mgr.id !== m.id)
+                            .map((mgr) => (
+                              <option key={mgr.id} value={mgr.id}>
+                                Mgr: {memberLabel(mgr)}
+                              </option>
+                            ))}
+                        </select>
+                      ) : (
+                        m.managerName && (
+                          <span className="text-[11px] text-fg-subtle">
+                            Mgr: {m.managerName}
+                          </span>
+                        )
+                      )
+                    )}
+
+                    {canEditRole(m) ? (
+                      <select
+                        value={m.role || "sales"}
+                        disabled={changeRole.isPending}
+                        onChange={(e) => requestRoleChange(m, e.target.value)}
+                        aria-label={`Role for ${memberLabel(m)}`}
+                        className="h-8 rounded-md border border-line bg-surface px-2 text-xs font-medium text-fg focus:border-accent focus:outline-none disabled:opacity-60"
+                      >
+                        {isOwner && <option value="owner">Owner</option>}
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="engineer">Engineer</option>
+                        <option value="account_manager">Account Manager</option>
+                        <option value="sales">Sales</option>
+                        <option value="client">Client</option>
+                      </select>
+                    ) : (
+                      <Badge tone={ROLE_TONE[m.role ?? "sales"] ?? "neutral"}>
+                        {ROLE_LABEL[m.role ?? "sales"] ?? "Sales"}
+                      </Badge>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {canManageRoles && (
+            <div className="flex flex-col gap-md">
+              <Card>
+                <CardHeader
+                  title="Invite a teammate"
+                  subtitle="Assign their role upfront. If inviting an engineer, designate their reporting manager."
+                />
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    invite.mutate({
+                      email: inviteEmail,
+                      role: inviteRole,
+                      managerId: inviteRole === "engineer" && inviteManagerId ? inviteManagerId : null,
+                    });
+                  }}
+                  className="mt-md flex flex-col gap-3"
+                >
+                  <Field
+                    label="Email Address"
+                    type="email"
+                    name="inviteEmail"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="teammate@company.com"
+                    required
+                  />
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <SelectField
+                      label="Role"
+                      name="inviteRole"
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value)}
+                    >
+                      <option value="engineer">Engineer</option>
+                      <option value="manager">Manager</option>
+                      <option value="sales">Sales</option>
+                      <option value="account_manager">Account Manager</option>
+                      <option value="admin">Admin</option>
+                      {isOwner && <option value="owner">Owner</option>}
+                    </SelectField>
+
+                    {inviteRole === "engineer" ? (
+                      <SelectField
+                        label="Assign Manager (Optional)"
+                        name="inviteManager"
+                        value={inviteManagerId}
+                        onChange={(e) => setInviteManagerId(e.target.value)}
+                      >
+                        <option value="">No manager pre-assigned</option>
+                        {managers.map((mgr) => (
+                          <option key={mgr.id} value={mgr.id}>
+                            {memberLabel(mgr)} ({ROLE_LABEL[mgr.role ?? "manager"] ?? mgr.role})
+                          </option>
+                        ))}
+                      </SelectField>
+                    ) : (
+                      <div className="flex flex-col justify-end pb-1 text-xs text-fg-subtle">
+                        Full access to pipeline &amp; commercial deals
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2">
+                    <Button type="submit" disabled={invite.isPending || !inviteEmail}>
+                      {invite.isPending ? "Generating invite…" : "Send Invitation"}
+                    </Button>
+                  </div>
+                </form>
+
+                {error && (
+                  <div className="mt-md">
+                    <Alert>{error}</Alert>
+                  </div>
+                )}
+                {created && <InviteLink invitation={created} onDismiss={() => setCreated(null)} />}
+              </Card>
+
+              {pending.length > 0 && (
+                <Card padded={false}>
+                  <div className="px-lg py-md">
+                    <CardHeader title="Pending invitations" />
+                  </div>
+                  <ul className="border-t border-line">
+                    {pending.map((inv) => (
+                      <li
+                        key={inv.id}
+                        className="flex items-center justify-between gap-md border-b border-line px-lg py-md last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-fg">{inv.email}</p>
+                            <Badge tone={ROLE_TONE[inv.role ?? "sales"] ?? "neutral"}>
+                              {ROLE_LABEL[inv.role ?? "sales"] ?? "Sales"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-fg-muted mt-0.5">
+                            Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => revoke.mutate(inv.id)}
+                          disabled={revoke.isPending}
+                        >
+                          <span className="text-bad-fg">Revoke</span>
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -231,7 +576,7 @@ export default function Team() {
  * Workspace name and currency. Currency lives here because it is org-wide: every
  * amount on every board is denominated in it, so it isn't a per-record choice.
  */
-function WorkspaceSettings() {
+function WorkspaceSettings({ canManageRoles }: { canManageRoles: boolean }) {
   const queryClient = useQueryClient();
   const workspace = useQuery({
     queryKey: ["workspace"],
@@ -281,6 +626,7 @@ function WorkspaceSettings() {
           label="Name"
           name="workspaceName"
           value={nameValue}
+          disabled={!canManageRoles}
           onChange={(e) => {
             setName(e.target.value);
             setSaved(false);
@@ -290,7 +636,7 @@ function WorkspaceSettings() {
           label="Currency"
           name="workspaceCurrency"
           value={current?.currency ?? "USD"}
-          disabled={!current || save.isPending}
+          disabled={!current || !canManageRoles || save.isPending}
           onChange={(e) => save.mutate({ currency: e.target.value })}
         >
           {/* Any 3-letter code is accepted by the API; these are the shortcuts. */}
@@ -303,12 +649,14 @@ function WorkspaceSettings() {
             <option value={current.currency}>{current.currency}</option>
           )}
         </SelectField>
-        <Button
-          disabled={save.isPending || !current || nameValue.trim() === current.name}
-          onClick={() => save.mutate({ name: nameValue.trim() })}
-        >
-          {save.isPending ? "Saving…" : saved ? "Saved" : "Save"}
-        </Button>
+        {canManageRoles && (
+          <Button
+            disabled={save.isPending || !current || nameValue.trim() === current.name}
+            onClick={() => save.mutate({ name: nameValue.trim() })}
+          >
+            {save.isPending ? "Saving…" : saved ? "Saved" : "Save"}
+          </Button>
+        )}
       </div>
     </Card>
   );
@@ -440,6 +788,8 @@ function GoogleCalendarCard() {
 const ROLE_LABEL: Record<string, string> = {
   owner: "Owner",
   admin: "Admin",
+  manager: "Manager",
+  engineer: "Engineer",
   account_manager: "Account Manager",
   sales: "Sales",
   client: "Client",
@@ -448,6 +798,8 @@ const ROLE_LABEL: Record<string, string> = {
 const ROLE_TONE: Record<string, "brand" | "info" | "neutral"> = {
   owner: "brand",
   admin: "brand",
+  manager: "info",
+  engineer: "neutral",
   account_manager: "info",
   sales: "neutral",
   client: "neutral",

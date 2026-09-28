@@ -19,6 +19,8 @@ var (
 	ErrAlreadyInvited = errors.New("already invited")
 	// ErrInviteInvalid covers an unknown, expired, or already-accepted token.
 	ErrInviteInvalid = errors.New("invitation is invalid or has expired")
+	// ErrInvalidManager means the manager is not found or has invalid role.
+	ErrInvalidManager = errors.New("designated manager not found or does not have manager privileges")
 )
 
 // Member is one user of an organization, as shown in the team list and the
@@ -29,6 +31,8 @@ type Member struct {
 	Name         *string   `json:"name"`
 	AuthProvider string    `json:"authProvider"`
 	Role         string    `json:"role"`
+	ManagerID    *string   `json:"managerId,omitempty"`
+	ManagerName  *string   `json:"managerName,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
@@ -37,10 +41,31 @@ type Member struct {
 type Invitation struct {
 	ID         string     `json:"id"`
 	Email      string     `json:"email"`
+	Role       string     `json:"role"`
+	ManagerID  *string    `json:"managerId,omitempty"`
 	ExpiresAt  time.Time  `json:"expiresAt"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	AcceptedAt *time.Time `json:"acceptedAt"`
 }
+
+// TeamMember extends Member with operational metrics like active tasks count.
+type TeamMember struct {
+	Member
+	ActiveTasks int `json:"activeTasks"`
+}
+
+// TeamGroup groups engineers under a specific manager.
+type TeamGroup struct {
+	Manager   Member       `json:"manager"`
+	Engineers []TeamMember `json:"engineers"`
+}
+
+// TeamStructure provides the full organizational hierarchy for the team tab.
+type TeamStructure struct {
+	Groups     []TeamGroup  `json:"groups"`
+	Unassigned []TeamMember `json:"unassigned"`
+}
+
 
 // Workspace is the organization itself — the settings every surface needs.
 type Workspace struct {
@@ -84,9 +109,11 @@ func (s *store) updateWorkspace(ctx context.Context, orgID string, name, currenc
 
 func (s *store) members(ctx context.Context, orgID string) ([]Member, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'sales'), u.created_at
+		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'sales'),
+		        p.manager_id::text, pm.full_name, u.created_at
 		 FROM users u
 		 LEFT JOIN profiles p ON p.id = u.id
+		 LEFT JOIN profiles pm ON pm.id = p.manager_id
 		 WHERE u.org_id = $1 ORDER BY u.created_at`, orgID)
 	if err != nil {
 		return nil, err
@@ -96,7 +123,7 @@ func (s *store) members(ctx context.Context, orgID string) ([]Member, error) {
 	out := make([]Member, 0, 8)
 	for rows.Next() {
 		var m Member
-		if err := rows.Scan(&m.ID, &m.Email, &m.Name, &m.AuthProvider, &m.Role, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Email, &m.Name, &m.AuthProvider, &m.Role, &m.ManagerID, &m.ManagerName, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -113,15 +140,15 @@ func (s *store) userExists(ctx context.Context, email string) (bool, error) {
 }
 
 func (s *store) createInvitation(
-	ctx context.Context, orgID, email, tokenHash, invitedBy string, expiresAt time.Time,
+	ctx context.Context, orgID, email, tokenHash, invitedBy, role string, managerID *string, expiresAt time.Time,
 ) (Invitation, error) {
 	var inv Invitation
 	err := s.pool.QueryRow(ctx,
-		`INSERT INTO invitations (org_id, email, token_hash, invited_by, expires_at)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id::text, email, expires_at, created_at, accepted_at`,
-		orgID, email, tokenHash, invitedBy, expiresAt,
-	).Scan(&inv.ID, &inv.Email, &inv.ExpiresAt, &inv.CreatedAt, &inv.AcceptedAt)
+		`INSERT INTO invitations (org_id, email, token_hash, invited_by, role, manager_id, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id::text, email, coalesce(role, 'sales'), manager_id::text, expires_at, created_at, accepted_at`,
+		orgID, email, tokenHash, invitedBy, role, managerID, expiresAt,
+	).Scan(&inv.ID, &inv.Email, &inv.Role, &inv.ManagerID, &inv.ExpiresAt, &inv.CreatedAt, &inv.AcceptedAt)
 
 	if database.IsUniqueViolation(err) {
 		return Invitation{}, ErrAlreadyInvited
@@ -131,7 +158,7 @@ func (s *store) createInvitation(
 
 func (s *store) pendingInvitations(ctx context.Context, orgID string) ([]Invitation, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT id::text, email, expires_at, created_at, accepted_at
+		`SELECT id::text, email, coalesce(role, 'sales'), manager_id::text, expires_at, created_at, accepted_at
 		 FROM invitations
 		 WHERE org_id = $1 AND accepted_at IS NULL
 		 ORDER BY created_at DESC`, orgID)
@@ -143,7 +170,7 @@ func (s *store) pendingInvitations(ctx context.Context, orgID string) ([]Invitat
 	out := make([]Invitation, 0, 4)
 	for rows.Next() {
 		var inv Invitation
-		if err := rows.Scan(&inv.ID, &inv.Email, &inv.ExpiresAt, &inv.CreatedAt, &inv.AcceptedAt); err != nil {
+		if err := rows.Scan(&inv.ID, &inv.Email, &inv.Role, &inv.ManagerID, &inv.ExpiresAt, &inv.CreatedAt, &inv.AcceptedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, inv)
@@ -195,12 +222,13 @@ func (s *store) acceptInvitation(ctx context.Context, tokenHash, name, passwordH
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var orgID, email string
+	var orgID, email, role string
+	var managerID *string
 	err = tx.QueryRow(ctx,
 		`UPDATE invitations
 		 SET accepted_at = now()
 		 WHERE token_hash = $1 AND accepted_at IS NULL AND expires_at > now()
-		 RETURNING org_id::text, email`, tokenHash).Scan(&orgID, &email)
+		 RETURNING org_id::text, email, coalesce(role, 'sales'), manager_id::text`, tokenHash).Scan(&orgID, &email, &role, &managerID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return acceptedUser{}, ErrInviteInvalid
 	}
@@ -227,12 +255,11 @@ func (s *store) acceptInvitation(ctx context.Context, tokenHash, name, passwordH
 	if fullName == "" {
 		fullName = email
 	}
-	const role = "sales"
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO profiles (id, full_name, role)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name`,
-		userID, fullName, role,
+		`INSERT INTO profiles (id, full_name, role, manager_id)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, manager_id = coalesce(EXCLUDED.manager_id, profiles.manager_id)`,
+		userID, fullName, role, managerID,
 	); err != nil {
 		return acceptedUser{}, err
 	}
@@ -297,11 +324,13 @@ func (s *store) updateMemberRole(ctx context.Context, orgID, actorRole, memberID
 
 	var m Member
 	if err := tx.QueryRow(ctx,
-		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'sales'), u.created_at
+		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'sales'),
+		        p.manager_id::text, pm.full_name, u.created_at
 		 FROM users u
 		 LEFT JOIN profiles p ON p.id = u.id
+		 LEFT JOIN profiles pm ON pm.id = p.manager_id
 		 WHERE u.org_id = $1::uuid AND u.id = $2::uuid`, orgID, memberID,
-	).Scan(&m.ID, &m.Email, &m.Name, &m.AuthProvider, &m.Role, &m.CreatedAt); err != nil {
+	).Scan(&m.ID, &m.Email, &m.Name, &m.AuthProvider, &m.Role, &m.ManagerID, &m.ManagerName, &m.CreatedAt); err != nil {
 		return Member{}, err
 	}
 
@@ -311,9 +340,179 @@ func (s *store) updateMemberRole(ctx context.Context, orgID, actorRole, memberID
 	return m, nil
 }
 
+func (s *store) updateMemberManager(ctx context.Context, orgID, memberID string, managerID *string) (Member, error) {
+	if managerID != nil {
+		var validMgr bool
+		err := s.pool.QueryRow(ctx,
+			`SELECT EXISTS (
+				SELECT 1 FROM users u
+				JOIN profiles p ON p.id = u.id
+				WHERE u.org_id = $1::uuid AND u.id = $2::uuid AND p.role IN ('manager', 'owner', 'admin')
+			)`, orgID, *managerID).Scan(&validMgr)
+		if err != nil {
+			return Member{}, err
+		}
+		if !validMgr {
+			return Member{}, ErrInvalidManager
+		}
+	}
+
+	res, err := s.pool.Exec(ctx,
+		`INSERT INTO profiles (id, full_name, role, manager_id)
+		 SELECT u.id, coalesce(u.name, split_part(u.email, '@', 1)), 'engineer', $3::uuid
+		 FROM users u WHERE u.id = $2::uuid AND u.org_id = $1::uuid
+		 ON CONFLICT (id) DO UPDATE SET manager_id = EXCLUDED.manager_id, updated_at = now()`,
+		orgID, memberID, managerID,
+	)
+	if err != nil {
+		if database.IsInvalidTextRepr(err) {
+			return Member{}, ErrMemberNotFound
+		}
+		return Member{}, err
+	}
+	if res.RowsAffected() == 0 {
+		return Member{}, ErrMemberNotFound
+	}
+
+	var m Member
+	err = s.pool.QueryRow(ctx,
+		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'sales'),
+		        p.manager_id::text, pm.full_name, u.created_at
+		 FROM users u
+		 LEFT JOIN profiles p ON p.id = u.id
+		 LEFT JOIN profiles pm ON pm.id = p.manager_id
+		 WHERE u.org_id = $1::uuid AND u.id = $2::uuid`,
+		orgID, memberID,
+	).Scan(&m.ID, &m.Email, &m.Name, &m.AuthProvider, &m.Role, &m.ManagerID, &m.ManagerName, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) || database.IsInvalidTextRepr(err) {
+		return Member{}, ErrMemberNotFound
+	}
+	return m, err
+}
+
+func (s *store) teamEngineers(ctx context.Context, orgID, managerID string) ([]Member, error) {
+	query := `SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'engineer'),
+	                 p.manager_id::text, pm.full_name, u.created_at
+	          FROM users u
+	          LEFT JOIN profiles p ON p.id = u.id
+	          LEFT JOIN profiles pm ON pm.id = p.manager_id
+	          WHERE u.org_id = $1::uuid AND p.role = 'engineer'`
+	args := []any{orgID}
+	if managerID != "" {
+		query += ` AND p.manager_id = $2::uuid`
+		args = append(args, managerID)
+	}
+	query += ` ORDER BY u.name, u.email`
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]Member, 0, 8)
+	for rows.Next() {
+		var m Member
+		if err := rows.Scan(&m.ID, &m.Email, &m.Name, &m.AuthProvider, &m.Role, &m.ManagerID, &m.ManagerName, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 func nilIfEmpty(s string) *string {
 	if s == "" {
 		return nil
 	}
 	return &s
 }
+
+func (s *store) teamStructure(ctx context.Context, orgID string) (TeamStructure, error) {
+	// 1. Fetch all managers, admins, and owners who can head teams
+	mgrRows, err := s.pool.Query(ctx,
+		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'manager'),
+		        p.manager_id::text, pm.full_name, u.created_at
+		 FROM users u
+		 LEFT JOIN profiles p ON p.id = u.id
+		 LEFT JOIN profiles pm ON pm.id = p.manager_id
+		 WHERE u.org_id = $1::uuid AND p.role IN ('manager', 'admin', 'owner')
+		 ORDER BY CASE WHEN p.role = 'manager' THEN 1 WHEN p.role = 'admin' THEN 2 ELSE 3 END, u.name, u.email`,
+		orgID)
+	if err != nil {
+		return TeamStructure{}, err
+	}
+	defer mgrRows.Close()
+
+	mgrMap := make(map[string]int) // managerID -> index in groups
+	var groups []TeamGroup
+	for mgrRows.Next() {
+		var m Member
+		if err := mgrRows.Scan(&m.ID, &m.Email, &m.Name, &m.AuthProvider, &m.Role, &m.ManagerID, &m.ManagerName, &m.CreatedAt); err != nil {
+			return TeamStructure{}, err
+		}
+		mgrMap[m.ID] = len(groups)
+		groups = append(groups, TeamGroup{
+			Manager:   m,
+			Engineers: []TeamMember{},
+		})
+	}
+	mgrRows.Close()
+
+	// 2. Fetch all engineers with their active task counts
+	engRows, err := s.pool.Query(ctx,
+		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'engineer'),
+		        p.manager_id::text, pm.full_name, u.created_at,
+		        coalesce((SELECT count(*) FROM implementation_asks a WHERE a.assigned_to = u.id AND a.status NOT IN ('delivered', 'verified', 'wont_do')), 0)::int AS active_tasks
+		 FROM users u
+		 LEFT JOIN profiles p ON p.id = u.id
+		 LEFT JOIN profiles pm ON pm.id = p.manager_id
+		 WHERE u.org_id = $1::uuid AND p.role = 'engineer'
+		 ORDER BY u.name, u.email`,
+		orgID)
+	if err != nil {
+		return TeamStructure{}, err
+	}
+	defer engRows.Close()
+
+	unassigned := make([]TeamMember, 0)
+	for engRows.Next() {
+		var tm TeamMember
+		if err := engRows.Scan(&tm.ID, &tm.Email, &tm.Name, &tm.AuthProvider, &tm.Role, &tm.ManagerID, &tm.ManagerName, &tm.CreatedAt, &tm.ActiveTasks); err != nil {
+			return TeamStructure{}, err
+		}
+		if tm.ManagerID != nil && *tm.ManagerID != "" {
+			if idx, ok := mgrMap[*tm.ManagerID]; ok {
+				groups[idx].Engineers = append(groups[idx].Engineers, tm)
+				continue
+			}
+		}
+		unassigned = append(unassigned, tm)
+	}
+
+	if groups == nil {
+		groups = []TeamGroup{}
+	}
+	return TeamStructure{
+		Groups:     groups,
+		Unassigned: unassigned,
+	}, nil
+}
+
+func (s *store) completeOnboarding(ctx context.Context, userID string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE profiles SET onboarded_at = now() WHERE id = $1::uuid`, userID)
+	return err
+}
+
+func (s *store) isOnboarded(ctx context.Context, userID string) (bool, error) {
+	var onboarded bool
+	err := s.pool.QueryRow(ctx,
+		`SELECT onboarded_at IS NOT NULL FROM profiles WHERE id = $1::uuid`, userID).Scan(&onboarded)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return onboarded, err
+}
+
+

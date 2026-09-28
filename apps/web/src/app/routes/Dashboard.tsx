@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -10,13 +10,13 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { KIND_META, relativeTime, type ActivityKind } from "../activities/api";
 import { useAuthStore } from "../auth/store";
 import { STAGE_META as DEAL_META, stageLabel as dealStageLabel } from "../deals/stages";
 import { ApiError } from "../lib/api";
 import { ActivityCard } from "../dashboard/ActivityCard";
 import { dashboardApi, type Attention, type Pipeline, type Summary } from "../lib/dashboard";
 import { formatMoney, formatMoneyCompact } from "../lib/money";
+import { orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
 import {
   Alert,
@@ -29,14 +29,47 @@ import {
   type IconName,
   type Tone,
 } from "../ui";
+import { EngineerDashboard } from "./EngineerDashboard";
+import { OnboardingWizard } from "./OnboardingWizard";
 
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  const onboardingQuery = useQuery({
+    queryKey: ["onboardingStatus"],
+    queryFn: orgApi.getOnboardingStatus,
+    enabled: user?.role === "engineer" || user?.role === "manager",
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (onboardingQuery.data && !onboardingQuery.data.onboarded) {
+      setShowOnboarding(true);
+    }
+  }, [onboardingQuery.data]);
+
+  if (user?.role === "engineer") {
+    return (
+      <>
+        <EngineerDashboard />
+        {showOnboarding && (
+          <OnboardingWizard
+            role="engineer"
+            userName={user?.name}
+            onClose={() => setShowOnboarding(false)}
+          />
+        )}
+      </>
+    );
+  }
+
   const currency = useCurrency();
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: dashboardApi.summary,
     staleTime: 30_000,
+    enabled: user?.role !== "engineer",
   });
   const data = query.data;
 
@@ -163,6 +196,13 @@ export default function Dashboard() {
             </div>
           </>
         )
+      )}
+      {showOnboarding && user?.role === "manager" && (
+        <OnboardingWizard
+          role="manager"
+          userName={user?.name}
+          onClose={() => setShowOnboarding(false)}
+        />
       )}
     </motion.section>
   );

@@ -54,11 +54,33 @@ func NewService(pool *pgxpool.Pool, notifier *notify.Notifier, storage StorageCo
 }
 
 // Board returns the asks a filter admits plus the counts, in one response.
-func (s *Service) Board(ctx context.Context, orgID, viewerID string, f Filter) (Board, error) {
+func (s *Service) Board(ctx context.Context, orgID, viewerID, viewerRole string, f Filter) (Board, error) {
+	// Role-based scoping:
+	if viewerRole == "engineer" {
+		// Engineers strictly see ONLY their own assigned tasks
+		f.AssignedTo = viewerID
+		f.AssigneeIDs = nil
+	} else if viewerRole == "manager" && f.AssignedTo == "" {
+		// Managers see asks assigned to them + tasks assigned to engineers reporting to them
+		teamIDs, err := s.store.managerTeamUserIDs(ctx, orgID, viewerID)
+		if err == nil {
+			f.AssigneeIDs = append(teamIDs, viewerID)
+		}
+	}
+
 	asks, err := s.store.list(ctx, orgID, f)
 	if err != nil {
 		return Board{}, err
 	}
+
+	// Commercial data shielding: if viewer is engineer, hide deal commercial linkage
+	if viewerRole == "engineer" {
+		for i := range asks {
+			asks[i].DealID = nil
+			asks[i].LeadID = nil
+		}
+	}
+
 	types, err := s.store.askTypes(ctx, orgID)
 	if err != nil {
 		return Board{}, err
@@ -74,6 +96,99 @@ func (s *Service) Board(ctx context.Context, orgID, viewerID string, f Filter) (
 		Counts:   tally(asks, viewerID, time.Now()),
 		Types:    names,
 	}, nil
+}
+
+// Subtasks returns child asks connected to a parent ask.
+func (s *Service) Subtasks(ctx context.Context, orgID, parentAskID string) ([]Ask, error) {
+	return s.store.list(ctx, orgID, Filter{ParentAskID: parentAskID})
+}
+
+// ManagerRoster returns engineers and their assigned tasks for the Manager view.
+func (s *Service) ManagerRoster(ctx context.Context, orgID, managerID string) (ManagerRoster, error) {
+	query := `SELECT u.id::text, coalesce(u.name, split_part(u.email, '@', 1)), u.email
+	          FROM users u
+	          JOIN profiles p ON p.id = u.id
+	          WHERE u.org_id = $1::uuid AND p.role = 'engineer'`
+	args := []any{orgID}
+	if managerID != "" {
+		query += ` AND p.manager_id = $2::uuid`
+		args = append(args, managerID)
+	}
+	query += ` ORDER BY u.name, u.email`
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return ManagerRoster{}, err
+	}
+	defer rows.Close()
+
+	type engInfo struct {
+		id, name, email string
+	}
+	var engList []engInfo
+	for rows.Next() {
+		var e engInfo
+		if err := rows.Scan(&e.id, &e.name, &e.email); err != nil {
+			return ManagerRoster{}, err
+		}
+		engList = append(engList, e)
+	}
+
+	roster := ManagerRoster{
+		Engineers:          make([]EngineerWorkload, 0, len(engList)),
+		UnassignedSubtasks: make([]Ask, 0),
+	}
+
+	for _, eng := range engList {
+		tasks, err := s.store.list(ctx, orgID, Filter{
+			AssignedTo: eng.id,
+		})
+		if err != nil {
+			return ManagerRoster{}, err
+		}
+
+		w := EngineerWorkload{
+			EngineerID:    eng.id,
+			EngineerName:  eng.name,
+			EngineerEmail: eng.email,
+			ActiveTasks:   make([]Ask, 0, len(tasks)),
+		}
+		for _, t := range tasks {
+			if !IsClosed(t.Status) {
+				w.ActiveCount++
+				if t.Status == "blocked" {
+					w.BlockedCount++
+				}
+				w.ActiveTasks = append(w.ActiveTasks, t)
+			} else {
+				w.DoneCount++
+			}
+		}
+		roster.Engineers = append(roster.Engineers, w)
+	}
+
+	// Fetch unassigned subtasks
+	allOpen, err := s.store.list(ctx, orgID, Filter{OpenOnly: true})
+	if err == nil {
+		for _, a := range allOpen {
+			if a.ParentAskID != nil && a.AssignedTo == nil {
+				if managerID == "" {
+					roster.UnassignedSubtasks = append(roster.UnassignedSubtasks, a)
+					continue
+				}
+				if a.CreatedBy != nil && *a.CreatedBy == managerID {
+					roster.UnassignedSubtasks = append(roster.UnassignedSubtasks, a)
+					continue
+				}
+				p, err := s.store.get(ctx, orgID, *a.ParentAskID)
+				if err == nil && ((p.AssignedTo != nil && *p.AssignedTo == managerID) || (p.CreatedBy != nil && *p.CreatedBy == managerID)) {
+					roster.UnassignedSubtasks = append(roster.UnassignedSubtasks, a)
+				}
+			}
+		}
+	}
+
+	return roster, nil
 }
 
 // List is the per-deal and per-lead read the deal card uses.
@@ -210,6 +325,7 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 	in.Priority = strings.TrimSpace(strings.ToLower(in.Priority))
 	in.DealID = trimPtr(in.DealID)
 	in.LeadID = trimPtr(in.LeadID)
+	in.ParentAskID = trimPtr(in.ParentAskID)
 	in.AssignedTo = trimPtr(in.AssignedTo)
 
 	if in.Title == "" {
@@ -232,8 +348,25 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 	}
 
 	if requireParent {
-		if in.DealID == nil && in.LeadID == nil {
+		if in.DealID == nil && in.LeadID == nil && in.ParentAskID == nil {
 			return Input{}, ErrNoParent
+		}
+		if in.ParentAskID != nil {
+			ok, err := s.store.askExists(ctx, orgID, *in.ParentAskID)
+			if err != nil {
+				return Input{}, err
+			}
+			if !ok {
+				return Input{}, apperr.Invalid("parent ask not found")
+			}
+			// If child subtask does not specify deal/lead, inherit from parent ask
+			if in.DealID == nil && in.LeadID == nil {
+				dID, lID, err := s.store.getParentRefs(ctx, orgID, *in.ParentAskID)
+				if err == nil {
+					in.DealID = dID
+					in.LeadID = lID
+				}
+			}
 		}
 		if in.DealID != nil {
 			ok, err := s.store.dealExists(ctx, *in.DealID)

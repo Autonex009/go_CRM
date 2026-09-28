@@ -13,7 +13,7 @@ import (
 
 // managerRoles is who may reach any route here — this module is the backend
 // for the admin/manager-only Actions dashboard, not a rep-facing surface.
-var managerRoles = []string{"owner", "admin", "account_manager"}
+var managerRoles = []string{"owner", "admin", "account_manager", "manager"}
 
 // Handler exposes the Actions module's HTTP API.
 type Handler struct {

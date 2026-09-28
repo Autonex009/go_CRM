@@ -116,6 +116,7 @@ export function DealImplementationPanel({ deal }: { deal: Deal }) {
 
       {dialog && (
         <AskDialog
+          key={dialog.ask?.id ?? "new"}
           ask={dialog.ask}
           parent={parent}
           onClose={() => setDialog(null)}
@@ -129,6 +130,7 @@ export function DealImplementationPanel({ deal }: { deal: Deal }) {
               : undefined
           }
           onDelete={dialog.ask ? () => deleteAsk(dialog.ask!) : undefined}
+          onSelectSubtask={(st) => setDialog({ ask: st })}
         />
       )}
     </div>
