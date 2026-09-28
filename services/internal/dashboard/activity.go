@@ -62,21 +62,35 @@ func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	orgID := middleware.OrgID(ctx)
+	role := middleware.Role(ctx)
+	isConfidentialRole := role == "engineer" || role == "manager"
 
 	var (
 		page ActivityPage
 		err  error
 	)
-	switch source := r.URL.Query().Get("source"); {
-	case source == "implementation":
-		page, err = h.implementationActivity(ctx, orgID, limit, offset)
-	case source == "" || source == "all":
-		page, err = h.timelineActivity(ctx, orgID, "", limit, offset)
-	case activityEntities[source]:
-		page, err = h.timelineActivity(ctx, orgID, source, limit, offset)
-	default:
-		httpx.WriteError(w, http.StatusBadRequest, "unknown activity source")
-		return
+	source := r.URL.Query().Get("source")
+	if isConfidentialRole {
+		// Engineers and managers are restricted to technical implementation activity;
+		// commercial activity (deals, leads, quotes, invoices) is confidential.
+		if source == "" || source == "all" || source == "implementation" {
+			page, err = h.implementationActivity(ctx, orgID, limit, offset)
+		} else {
+			httpx.WriteError(w, http.StatusForbidden, "commercial activity is confidential")
+			return
+		}
+	} else {
+		switch {
+		case source == "implementation":
+			page, err = h.implementationActivity(ctx, orgID, limit, offset)
+		case source == "" || source == "all":
+			page, err = h.timelineActivity(ctx, orgID, "", limit, offset)
+		case activityEntities[source]:
+			page, err = h.timelineActivity(ctx, orgID, source, limit, offset)
+		default:
+			httpx.WriteError(w, http.StatusBadRequest, "unknown activity source")
+			return
+		}
 	}
 	if err != nil {
 		httpx.WriteServerError(w, "could not load activity", err)

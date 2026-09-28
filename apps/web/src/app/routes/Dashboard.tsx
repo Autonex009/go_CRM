@@ -30,6 +30,7 @@ import {
   type Tone,
 } from "../ui";
 import { EngineerDashboard } from "./EngineerDashboard";
+import { ManagerDashboard } from "./ManagerDashboard";
 import { OnboardingWizard } from "./OnboardingWizard";
 
 export default function Dashboard() {
@@ -64,12 +65,27 @@ export default function Dashboard() {
     );
   }
 
+  if (user?.role === "manager") {
+    return (
+      <>
+        <ManagerDashboard />
+        {showOnboarding && (
+          <OnboardingWizard
+            role="manager"
+            userName={user?.name}
+            onClose={() => setShowOnboarding(false)}
+          />
+        )}
+      </>
+    );
+  }
+
   const currency = useCurrency();
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: dashboardApi.summary,
     staleTime: 30_000,
-    enabled: user?.role !== "engineer",
+    enabled: user?.role !== "engineer" && user?.role !== "manager",
   });
   const data = query.data;
 
@@ -196,13 +212,6 @@ export default function Dashboard() {
             </div>
           </>
         )
-      )}
-      {showOnboarding && user?.role === "manager" && (
-        <OnboardingWizard
-          role="manager"
-          userName={user?.name}
-          onClose={() => setShowOnboarding(false)}
-        />
       )}
     </motion.section>
   );

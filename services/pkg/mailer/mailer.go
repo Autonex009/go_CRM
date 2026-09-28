@@ -35,9 +35,14 @@ type Config struct {
 	FromName string
 }
 
-// Message is a plain-text email. HTML is deliberately not supported: these are
-// short internal notifications, and plain text renders everywhere.
+// Message is an email to be sent.
 type Message struct {
+	// From overrides the default sender address if set and allowed by relay.
+	From string
+	// FromName overrides the display name shown to recipients.
+	FromName string
+	// ReplyTo sets the Reply-To header for direct responses.
+	ReplyTo string
 	To      []string
 	Subject string
 	Body    string
@@ -119,8 +124,16 @@ func (s *smtpSender) Send(ctx context.Context, m Message) error {
 		}
 	}
 
-	if err := client.Mail(s.cfg.From); err != nil {
-		return fmt.Errorf("smtp from: %w", err)
+	// Envelope From: For authenticated SMTP relays (e.g. smtp.gmail.com), the envelope
+	// sender must match the authenticated account (s.cfg.From / s.cfg.User) to avoid
+	// "553 5.7.1 The user is not allowed to send from this address" errors and DMARC drops.
+	envelopeFrom := s.cfg.From
+	if envelopeFrom == "" {
+		envelopeFrom = m.From
+	}
+
+	if err := client.Mail(envelopeFrom); err != nil {
+		return fmt.Errorf("smtp from %s: %w", envelopeFrom, err)
 	}
 	for _, to := range m.To {
 		if err := client.Rcpt(to); err != nil {
@@ -145,13 +158,35 @@ func (s *smtpSender) Send(ctx context.Context, m Message) error {
 // render builds the RFC 5322 message. The subject is Q-encoded so a non-ASCII
 // company or person's name survives the trip.
 func (s *smtpSender) render(m Message) string {
-	from := s.cfg.From
-	if s.cfg.FromName != "" {
-		from = fmt.Sprintf("%s <%s>", mime.QEncoding.Encode("utf-8", s.cfg.FromName), s.cfg.From)
+	// The From email address must be the authenticated SMTP sender (s.cfg.From)
+	// so that SPF, DKIM, and DMARC alignments match the authenticated SMTP provider.
+	fromAddr := s.cfg.From
+	if fromAddr == "" {
+		fromAddr = m.From
+	}
+
+	fromName := s.cfg.FromName
+	if m.FromName != "" {
+		fromName = m.FromName
+	}
+
+	var from string
+	if fromName != "" {
+		from = fmt.Sprintf("%s <%s>", mime.QEncoding.Encode("utf-8", fromName), fromAddr)
+	} else {
+		from = fromAddr
 	}
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "From: %s\r\n", from)
+
+	replyTo := m.ReplyTo
+	if replyTo == "" && m.From != "" {
+		replyTo = m.From
+	}
+	if replyTo != "" {
+		fmt.Fprintf(&b, "Reply-To: %s\r\n", replyTo)
+	}
 	fmt.Fprintf(&b, "To: %s\r\n", strings.Join(m.To, ", "))
 	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", m.Subject))
 	fmt.Fprintf(&b, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))

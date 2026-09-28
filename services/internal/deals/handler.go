@@ -33,6 +33,7 @@ func NewHandler(pool *pgxpool.Pool, secret string, notifier *notify.Notifier) *H
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireJWT(h.secret))
+	r.Use(middleware.RequireRole("owner", "admin", "sales", "account_manager"))
 
 	r.Get("/", h.board)
 	r.Post("/", h.create)

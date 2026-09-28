@@ -337,11 +337,8 @@ export function EngineerDashboard() {
 
 function parentOf(ask: Ask): AskParent {
   const company = ask.accountName ?? "";
-  const where = ask.dealTitle ?? ask.leadTitle ?? "";
   return {
-    dealId: ask.dealId ?? undefined,
-    leadId: ask.leadId ?? undefined,
-    company: company || where,
-    label: [company, where].filter(Boolean).join(" — ") || "Technical Task",
+    company: company || "Technical Delivery",
+    label: company ? `${company} Implementation` : "Technical Task",
   };
 }
