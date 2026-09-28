@@ -124,21 +124,16 @@ func (s *smtpSender) Send(ctx context.Context, m Message) error {
 		}
 	}
 
-	// Envelope From: Try custom From if specified, but fall back to s.cfg.From
-	// if the SMTP server restricts envelope sender to authenticated account (e.g. Gmail / SendGrid / SES).
+	// Envelope From: For authenticated SMTP relays (e.g. smtp.gmail.com), the envelope
+	// sender must match the authenticated account (s.cfg.From / s.cfg.User) to avoid
+	// "553 5.7.1 The user is not allowed to send from this address" errors and DMARC drops.
 	envelopeFrom := s.cfg.From
-	if m.From != "" {
+	if envelopeFrom == "" {
 		envelopeFrom = m.From
 	}
 
 	if err := client.Mail(envelopeFrom); err != nil {
-		if envelopeFrom != s.cfg.From {
-			if retryErr := client.Mail(s.cfg.From); retryErr != nil {
-				return fmt.Errorf("smtp from %s (fallback %s): %w", envelopeFrom, s.cfg.From, err)
-			}
-		} else {
-			return fmt.Errorf("smtp from: %w", err)
-		}
+		return fmt.Errorf("smtp from %s: %w", envelopeFrom, err)
 	}
 	for _, to := range m.To {
 		if err := client.Rcpt(to); err != nil {
@@ -163,8 +158,10 @@ func (s *smtpSender) Send(ctx context.Context, m Message) error {
 // render builds the RFC 5322 message. The subject is Q-encoded so a non-ASCII
 // company or person's name survives the trip.
 func (s *smtpSender) render(m Message) string {
+	// The From email address must be the authenticated SMTP sender (s.cfg.From)
+	// so that SPF, DKIM, and DMARC alignments match the authenticated SMTP provider.
 	fromAddr := s.cfg.From
-	if m.From != "" {
+	if fromAddr == "" {
 		fromAddr = m.From
 	}
 
@@ -182,8 +179,13 @@ func (s *smtpSender) render(m Message) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "From: %s\r\n", from)
-	if m.ReplyTo != "" {
-		fmt.Fprintf(&b, "Reply-To: %s\r\n", m.ReplyTo)
+
+	replyTo := m.ReplyTo
+	if replyTo == "" && m.From != "" {
+		replyTo = m.From
+	}
+	if replyTo != "" {
+		fmt.Fprintf(&b, "Reply-To: %s\r\n", replyTo)
 	}
 	fmt.Fprintf(&b, "To: %s\r\n", strings.Join(m.To, ", "))
 	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", m.Subject))
