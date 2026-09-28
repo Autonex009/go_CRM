@@ -111,7 +111,7 @@ func (s *store) members(ctx context.Context, orgID string) ([]Member, error) {
 		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'sales'),
 		        p.manager_id::text, pm.full_name, u.created_at
 		 FROM users u
-		 LEFT JOIN profiles p ON p.id = u.id
+		 INNER JOIN profiles p ON p.id = u.id
 		 LEFT JOIN profiles pm ON pm.id = p.manager_id
 		 WHERE u.org_id = $1 ORDER BY u.created_at`, orgID)
 	if err != nil {
@@ -441,7 +441,7 @@ func (s *store) teamStructure(ctx context.Context, orgID string) (TeamStructure,
 		`SELECT u.id::text, u.email, u.name, u.auth_provider, coalesce(p.role, 'manager'),
 		        p.manager_id::text, pm.full_name, u.created_at
 		 FROM users u
-		 LEFT JOIN profiles p ON p.id = u.id
+		 INNER JOIN profiles p ON p.id = u.id
 		 LEFT JOIN profiles pm ON pm.id = p.manager_id
 		 WHERE u.org_id = $1::uuid AND p.role IN ('manager', 'admin', 'owner')
 		 ORDER BY CASE WHEN p.role = 'manager' THEN 1 WHEN p.role = 'admin' THEN 2 ELSE 3 END, u.name, u.email`,
@@ -472,7 +472,7 @@ func (s *store) teamStructure(ctx context.Context, orgID string) (TeamStructure,
 		        p.manager_id::text, pm.full_name, u.created_at,
 		        coalesce((SELECT count(*) FROM implementation_asks a WHERE a.assigned_to = u.id AND a.status NOT IN ('delivered', 'verified', 'wont_do')), 0)::int AS active_tasks
 		 FROM users u
-		 LEFT JOIN profiles p ON p.id = u.id
+		 INNER JOIN profiles p ON p.id = u.id
 		 LEFT JOIN profiles pm ON pm.id = p.manager_id
 		 WHERE u.org_id = $1::uuid AND p.role = 'engineer'
 		 ORDER BY u.name, u.email`,
