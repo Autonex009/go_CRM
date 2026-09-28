@@ -9,6 +9,7 @@ import (
 	"github.com/go-crm/services/internal/auth"
 	"github.com/go-crm/services/pkg/config"
 	"github.com/go-crm/services/pkg/httpx"
+	"github.com/go-crm/services/pkg/mailer"
 	"github.com/go-crm/services/pkg/middleware"
 )
 
@@ -18,9 +19,9 @@ type Handler struct {
 	cfg config.Config
 }
 
-// NewHandler wires the org service to the pgx pool and config.
-func NewHandler(pool *pgxpool.Pool, cfg config.Config) *Handler {
-	return &Handler{svc: newService(pool, cfg), cfg: cfg}
+// NewHandler wires the org service to the pgx pool, config, and mailer.
+func NewHandler(pool *pgxpool.Pool, cfg config.Config, mail mailer.Sender) *Handler {
+	return &Handler{svc: newService(pool, cfg, mail), cfg: cfg}
 }
 
 // Routes returns the org sub-router, mounted at /api/v1/org.

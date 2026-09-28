@@ -48,16 +48,17 @@ func main() {
 	}
 	defer pool.Close()
 
-	// Notification email. With no SMTP host configured this is a no-op sender,
+	// Notification and transactional email sender. With no SMTP host configured this is a no-op sender,
 	// so the gateway behaves identically minus the mail.
-	notifier := notify.New(pool, mailer.New(mailer.Config{
+	mailSender := mailer.New(mailer.Config{
 		Host:     cfg.SMTPHost,
 		Port:     cfg.SMTPPort,
 		User:     cfg.SMTPUser,
 		Password: cfg.SMTPPassword,
 		From:     cfg.SMTPFrom,
 		FromName: cfg.SMTPFromName,
-	}), cfg.WebAppURL, cfg.ExpoAccessToken)
+	})
+	notifier := notify.New(pool, mailSender, cfg.WebAppURL, cfg.ExpoAccessToken)
 
 	// Third-party connections (Google Calendar) and the meeting booking they enable.
 	meetings := integrations.NewService(pool, cfg)
@@ -81,7 +82,7 @@ func main() {
 
 	// Domain modules register their sub-routers here.
 	r.Mount("/api/v1/auth", auth.NewHandler(pool, cfg).Routes())
-	r.Mount("/api/v1/org", org.NewHandler(pool, cfg).Routes())
+	r.Mount("/api/v1/org", org.NewHandler(pool, cfg, mailSender).Routes())
 	r.Mount("/api/v1/integrations", integrations.NewHandler(pool, cfg).Routes())
 	r.Mount("/api/v1/leads", leads.NewHandler(pool, cfg.JWTSecret, meetings).Routes())
 	r.Mount("/api/v1/deals", deals.NewHandler(pool, cfg.JWTSecret, notifier).Routes())
