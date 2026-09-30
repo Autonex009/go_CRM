@@ -74,7 +74,7 @@ func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
 		// Engineers and managers are restricted to technical implementation activity;
 		// commercial activity (deals, leads, quotes, invoices) is confidential.
 		if source == "" || source == "all" || source == "implementation" {
-			page, err = h.implementationActivity(ctx, orgID, limit, offset)
+			page, err = h.implementationActivity(ctx, orgID, true, limit, offset)
 		} else {
 			httpx.WriteError(w, http.StatusForbidden, "commercial activity is confidential")
 			return
@@ -82,7 +82,7 @@ func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
 	} else {
 		switch {
 		case source == "implementation":
-			page, err = h.implementationActivity(ctx, orgID, limit, offset)
+			page, err = h.implementationActivity(ctx, orgID, false, limit, offset)
 		case source == "" || source == "all":
 			page, err = h.timelineActivity(ctx, orgID, "", limit, offset)
 		case activityEntities[source]:
@@ -173,7 +173,7 @@ func (h *Handler) timelineActivity(ctx context.Context, orgID, entity string, li
 // so a reader sees which field and what it moved between. The org's timeline
 // only carries the headlines — raised, delivered, verified, dropped — which is
 // what keeps a deal's story readable; the whole trail lives here instead.
-func (h *Handler) implementationActivity(ctx context.Context, orgID string, limit, offset int) (ActivityPage, error) {
+func (h *Handler) implementationActivity(ctx context.Context, orgID string, confidential bool, limit, offset int) (ActivityPage, error) {
 	var page ActivityPage
 	if err := h.pool.QueryRow(ctx,
 		`SELECT count(*) FROM ask_events WHERE org_id = $1::uuid`, orgID).Scan(&page.Total); err != nil {
@@ -183,7 +183,7 @@ func (h *Handler) implementationActivity(ctx context.Context, orgID string, limi
 	rows, err := h.pool.Query(ctx, `
 		SELECT e.kind,
 		       a.title,
-		       coalesce(ac.name, d.title, l.title, ''),
+		       CASE WHEN $4 THEN coalesce(ac.name, '') ELSE coalesce(ac.name, d.title, l.title, '') END,
 		       coalesce(p.full_name, ''),
 		       e.field, e.from_value, e.to_value, coalesce(e.note, ''),
 		       e.occurred_at
@@ -195,7 +195,7 @@ func (h *Handler) implementationActivity(ctx context.Context, orgID string, limi
 		  LEFT JOIN profiles p  ON p.id  = e.actor_id
 		 WHERE e.org_id = $1::uuid
 		 ORDER BY e.occurred_at DESC
-		 LIMIT $2 OFFSET $3`, orgID, limit, offset)
+		 LIMIT $2 OFFSET $3`, orgID, limit, offset, confidential)
 	if err != nil {
 		return ActivityPage{}, err
 	}

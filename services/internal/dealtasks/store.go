@@ -86,12 +86,17 @@ func scanTask(row rowScanner) (Task, error) {
 
 // list returns a deal's tasks, or every live deal's tasks when dealID is empty
 // — the board loads the whole set in one request and groups them per card.
-func (s *store) list(ctx context.Context, dealID string) ([]Task, error) {
+func (s *store) list(ctx context.Context, orgID, dealID string) ([]Task, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+taskColumns+taskFrom+`
 		 JOIN deals d ON d.id = t.deal_id AND d.deleted_at IS NULL
 		 WHERE ($1 = '' OR t.deal_id = NULLIF($1, '')::uuid)
-		 ORDER BY t.done, t.position, t.created_at`, dealID)
+		   AND ($2 = '' OR EXISTS (
+		       SELECT 1 FROM users u
+		       WHERE (u.id = t.created_by OR u.id = t.assigned_to OR u.id = d.owner_id)
+		         AND u.org_id = NULLIF($2, '')::uuid
+		   ))
+		 ORDER BY t.done, t.position, t.created_at`, dealID, orgID)
 	if err != nil {
 		if database.IsInvalidTextRepr(err) {
 			return []Task{}, nil // a malformed id names no deal
@@ -137,7 +142,7 @@ func (s *store) create(ctx context.Context, in Input, createdBy string) (Task, e
 // update rewrites a task's editable fields. Completion is bookkeeping the
 // caller does not get to set: ticking a task stamps who did it and when, and
 // un-ticking clears both, so the audit trail always matches the state.
-func (s *store) update(ctx context.Context, id string, in Input, actor string) (Task, error) {
+func (s *store) update(ctx context.Context, orgID, id string, in Input, actor string) (Task, error) {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE deal_tasks SET
 		     text = $2,
@@ -146,8 +151,14 @@ func (s *store) update(ctx context.Context, id string, in Input, actor string) (
 		     done = $5,
 		     completed_by = CASE WHEN $5 THEN coalesce(completed_by, $6::uuid) END,
 		     completed_at = CASE WHEN $5 THEN coalesce(completed_at, now()) END
-		 WHERE id = $1::uuid`,
-		id, in.Text, in.Priority, in.AssignedTo, in.Done, nilIfEmpty(actor))
+		 WHERE id = $1::uuid
+		   AND ($7 = '' OR EXISTS (
+		       SELECT 1 FROM deal_tasks dt
+		       JOIN deals d ON d.id = dt.deal_id
+		       JOIN users u ON (u.id = dt.created_by OR u.id = dt.assigned_to OR u.id = d.owner_id)
+		       WHERE dt.id = $1::uuid AND u.org_id = NULLIF($7, '')::uuid
+		   ))`,
+		id, in.Text, in.Priority, in.AssignedTo, in.Done, nilIfEmpty(actor), orgID)
 	if err != nil {
 		if database.IsInvalidTextRepr(err) {
 			return Task{}, ErrNotFound
@@ -160,8 +171,16 @@ func (s *store) update(ctx context.Context, id string, in Input, actor string) (
 	return s.get(ctx, id)
 }
 
-func (s *store) delete(ctx context.Context, id string) error {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM deal_tasks WHERE id = $1::uuid`, id)
+func (s *store) delete(ctx context.Context, orgID, id string) error {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM deal_tasks
+		 WHERE id = $1::uuid
+		   AND ($2 = '' OR EXISTS (
+		       SELECT 1 FROM deal_tasks dt
+		       JOIN deals d ON d.id = dt.deal_id
+		       JOIN users u ON (u.id = dt.created_by OR u.id = dt.assigned_to OR u.id = d.owner_id)
+		       WHERE dt.id = $1::uuid AND u.org_id = NULLIF($2, '')::uuid
+		   ))`, id, orgID)
 	if err != nil {
 		if database.IsInvalidTextRepr(err) {
 			return ErrNotFound
@@ -174,11 +193,18 @@ func (s *store) delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *store) dealExists(ctx context.Context, dealID string) (bool, error) {
+func (s *store) dealExists(ctx context.Context, orgID, dealID string) (bool, error) {
 	var exists bool
 	err := s.pool.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM deals WHERE id = $1::uuid AND deleted_at IS NULL)`,
-		dealID).Scan(&exists)
+		`SELECT EXISTS (
+			SELECT 1 FROM deals d
+			WHERE d.id = $1::uuid AND d.deleted_at IS NULL
+			  AND ($2 = '' OR EXISTS (
+			      SELECT 1 FROM users u
+			      WHERE u.id = d.owner_id AND u.org_id = NULLIF($2, '')::uuid
+			  ))
+		)`,
+		dealID, orgID).Scan(&exists)
 	if err != nil {
 		if database.IsInvalidTextRepr(err) {
 			return false, nil

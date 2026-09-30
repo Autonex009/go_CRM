@@ -63,8 +63,16 @@ export default function AppRoot() {
 
           {/* Authenticated app: guard first, then the shared portal chrome */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/invoices/:id/preview" element={<DocumentPreview kind="invoice" />} />
-            <Route path="/quotes/:id/preview" element={<DocumentPreview kind="quote" />} />
+            <Route
+              element={
+                <RequireRole
+                  allowedRoles={["owner", "admin", "sales", "account_manager"]}
+                />
+              }
+            >
+              <Route path="/invoices/:id/preview" element={<DocumentPreview kind="invoice" />} />
+              <Route path="/quotes/:id/preview" element={<DocumentPreview kind="quote" />} />
+            </Route>
 
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
@@ -109,7 +117,7 @@ export default function AppRoot() {
               <Route
                 element={
                   <RequireRole
-                    allowedRoles={["owner", "admin", "manager", "sales", "account_manager", "engineer"]}
+                    allowedRoles={["owner", "admin", "manager", "sales", "account_manager"]}
                   />
                 }
               >

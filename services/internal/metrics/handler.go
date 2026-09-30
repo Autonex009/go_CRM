@@ -13,7 +13,7 @@ import (
 
 // managerRoles may see the whole pipeline. Everyone else reaches the page too,
 // but only ever sees their own deals — see scope below.
-var managerRoles = map[string]bool{"owner": true, "admin": true, "account_manager": true, "manager": true}
+var managerRoles = map[string]bool{"owner": true, "admin": true, "account_manager": true}
 
 // Handler exposes GET /api/v1/metrics.
 type Handler struct {
@@ -28,14 +28,10 @@ func NewHandler(pool *pgxpool.Pool, secret string) *Handler {
 }
 
 // Routes returns the metrics sub-router, mounted at /api/v1/metrics.
-//
-// No RequireRole guard: unlike the Actions dashboard this is readable by the
-// whole team, because a rep seeing their own numbers is the point. What a rep
-// may not do is read the org's, which scope enforces on the filter rather than
-// at the door.
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireJWT(h.secret))
+	r.Use(middleware.RequireRole("owner", "admin", "sales", "account_manager"))
 	r.Get("/", h.report)
 	return r
 }

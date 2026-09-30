@@ -45,8 +45,8 @@ func newService(pool *pgxpool.Pool, notifier *notify.Notifier) *Service {
 	return &Service{store: &store{pool: pool}, notifier: notifier}
 }
 
-func (s *Service) List(ctx context.Context, dealID string) ([]Task, error) {
-	return s.store.list(ctx, dealID)
+func (s *Service) List(ctx context.Context, orgID, dealID string) ([]Task, error) {
+	return s.store.list(ctx, orgID, dealID)
 }
 
 func (s *Service) Create(ctx context.Context, orgID, actorID string, in Input) (Task, error) {
@@ -78,7 +78,7 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 	// you". Silence is the safe wrong answer here.
 	before, readErr := s.store.get(ctx, id)
 
-	t, err := s.store.update(ctx, id, in, actorID)
+	t, err := s.store.update(ctx, orgID, id, in, actorID)
 	if err != nil {
 		return Task{}, err
 	}
@@ -108,8 +108,8 @@ func (s *Service) announce(ctx context.Context, orgID, actorID string, t Task, p
 	})
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
-	return s.store.delete(ctx, id)
+func (s *Service) Delete(ctx context.Context, orgID, id string) error {
+	return s.store.delete(ctx, orgID, id)
 }
 
 // prepare normalizes input and checks the references it names. requireDeal is
@@ -145,7 +145,7 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requireDe
 		if in.DealID == "" {
 			return Input{}, apperr.Invalid("dealId is required")
 		}
-		ok, err := s.store.dealExists(ctx, in.DealID)
+		ok, err := s.store.dealExists(ctx, orgID, in.DealID)
 		if err != nil {
 			return Input{}, err
 		}

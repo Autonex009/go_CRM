@@ -45,10 +45,10 @@ func (h *Handler) Routes() chi.Router {
 			adminRouter.Use(middleware.RequireRole("owner", "admin"))
 			adminRouter.Patch("/members/{id}/role", h.updateMemberRole)
 			adminRouter.Patch("/members/{id}/manager", h.updateMemberManager)
+			adminRouter.Get("/invitations", h.invitations)
+			adminRouter.Post("/invitations", h.invite)
+			adminRouter.Delete("/invitations/{id}", h.revoke)
 		})
-		pr.Get("/invitations", h.invitations)
-		pr.Post("/invitations", h.invite)
-		pr.Delete("/invitations/{id}", h.revoke)
 	})
 	return r
 }
@@ -109,6 +109,10 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	if in.Role == "owner" && middleware.Role(ctx) != "owner" {
+		httpx.WriteError(w, http.StatusForbidden, "only an owner can invite an owner")
+		return
+	}
 	inv, err := h.svc.Invite(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), in.Email, in.Role, in.ManagerID)
 	if err != nil {
 		writeErr(w, err, "could not create invitation")

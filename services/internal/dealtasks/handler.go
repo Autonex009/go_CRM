@@ -24,10 +24,10 @@ func NewHandler(pool *pgxpool.Pool, secret string, notifier *notify.Notifier) *H
 	return &Handler{svc: newService(pool, notifier), secret: secret}
 }
 
-// Routes returns the sub-router mounted at /api/v1/deal-tasks.
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireJWT(h.secret))
+	r.Use(middleware.RequireRole("owner", "admin", "sales", "account_manager"))
 
 	r.Get("/", h.list)
 	r.Post("/", h.create)
@@ -44,7 +44,8 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.svc.List(r.Context(), dealID)
+	ctx := r.Context()
+	items, err := h.svc.List(ctx, middleware.OrgID(ctx), dealID)
 	if err != nil {
 		httpx.WriteServerError(w, "could not list tasks", err)
 		return
@@ -81,7 +82,8 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) remove(w http.ResponseWriter, r *http.Request) {
-	if err := h.svc.Delete(r.Context(), chi.URLParam(r, "id")); err != nil {
+	ctx := r.Context()
+	if err := h.svc.Delete(ctx, middleware.OrgID(ctx), chi.URLParam(r, "id")); err != nil {
 		h.writeErr(w, err, "could not delete task")
 		return
 	}
