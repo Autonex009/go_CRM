@@ -133,8 +133,8 @@ export default function AppLayout() {
     <div className="min-h-screen bg-canvas text-fg">
       {/* Desktop sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line bg-surface/95 backdrop-blur-md transition-[width] duration-200 select-none lg:flex ${
-          sidebarOpen ? "w-60" : "w-16"
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line/80 bg-surface/95 backdrop-blur-md transition-[width] duration-200 select-none lg:flex ${
+          sidebarOpen ? "w-64" : "w-16"
         }`}
       >
         <Sidebar collapsed={!sidebarOpen} />
@@ -152,7 +152,7 @@ export default function AppLayout() {
           }`}
         />
         <aside
-          className={`absolute inset-y-0 left-0 flex w-60 flex-col border-r border-line bg-surface shadow-lg transition-transform duration-200 ${
+          className={`absolute inset-y-0 left-0 flex w-64 flex-col border-r border-line bg-surface shadow-2xl transition-transform duration-200 ${
             drawerOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -162,7 +162,7 @@ export default function AppLayout() {
 
       <div
         className={`flex min-h-screen flex-col transition-[padding] duration-200 ${
-          sidebarOpen ? "lg:pl-60" : "lg:pl-16"
+          sidebarOpen ? "lg:pl-64" : "lg:pl-16"
         }`}
       >
         <Topbar
@@ -200,18 +200,31 @@ const Sidebar = memo(function Sidebar({
   return (
     <>
       {/* Brand Header */}
-      <div className={`flex h-16 items-center border-b border-line px-3.5 ${collapsed ? "justify-center" : "justify-start px-4"}`}>
-        <Link to="/" onClick={onNavigate} className="flex items-center gap-2.5 overflow-hidden">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden border border-line bg-surface shadow-xs">
-            <img src="/autonex_ai_logo.jpeg" alt="Autonex AI" className="h-full w-full object-cover" />
+      <div
+        className={`flex h-16 shrink-0 items-center border-b border-line/80 transition-all duration-200 ${
+          collapsed ? "justify-center px-2" : "justify-start px-4"
+        }`}
+      >
+        <Link
+          to="/"
+          onClick={onNavigate}
+          className={`group flex items-center gap-3 overflow-hidden ${collapsed ? "justify-center" : ""}`}
+        >
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden border border-line-strong/30 bg-surface shadow-xs transition-transform duration-200 group-hover:scale-105">
+            <img src="/autonex_ai_logo.jpeg" alt="DealBridge" className="h-full w-full object-cover" />
           </div>
           {!collapsed && (
-            <div className="flex flex-col transition-opacity duration-200">
-              <span className="text-base font-bold tracking-tight text-fg">
-                DealBridge
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">
-                CRM Portal
+            <div className="flex min-w-0 flex-col transition-opacity duration-200">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold tracking-tight text-fg leading-none">
+                  DealBridge
+                </span>
+                <span className="rounded-md bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  CRM
+                </span>
+              </div>
+              <span className="text-[10px] font-medium text-fg-subtle truncate mt-0.5">
+                Workspace Hub
               </span>
             </div>
           )}
@@ -219,104 +232,113 @@ const Sidebar = memo(function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3.5">
         {NAV_GROUPS.map((group, idx) => {
           const items = group.items.filter((item) => !item.roles || (!!role && item.roles.includes(role)));
           if (items.length === 0) return null;
 
           return (
-          <div key={idx} className="space-y-1">
-            {!collapsed ? (
-              <h3 className="mb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
-                {group.group}
-              </h3>
-            ) : (
-              <div className="h-px bg-line/60 my-2 mx-1" />
-            )}
-            {items.map((item) => {
-              const IconComp = item.icon;
-              const isActive =
-                item.end || item.to === "/"
-                  ? location.pathname === item.to
-                  : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+            <div key={idx} className="space-y-1">
+              {!collapsed ? (
+                <div className="px-2.5 pt-2 pb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle/80">
+                    {group.group}
+                  </span>
+                </div>
+              ) : (
+                <div className="my-2 mx-1.5 h-px bg-line/60" />
+              )}
+              {items.map((item) => {
+                const IconComp = item.icon;
+                const isActive =
+                  item.end || item.to === "/"
+                    ? location.pathname === item.to
+                    : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
 
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  onClick={onNavigate}
-                  title={collapsed ? `${item.label} (${group.group})` : undefined}
-                  className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-100 ${
-                    collapsed ? "justify-center px-0" : ""
-                  } ${
-                    isActive
-                      ? "bg-indigo-500/10 font-semibold text-indigo-600 dark:text-indigo-400"
-                      : "font-medium text-fg-muted hover:bg-surface-hover hover:text-fg"
-                  }`}
-                >
-                  {/* A rail rather than a filled block: the active row stays
-                      legible against the page it leads to, and the eye tracks a
-                      single vertical marker down the list. */}
-                  {isActive && (
-                    <span
-                      aria-hidden
-                      className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-indigo-500 ${
-                        collapsed ? "-left-px" : ""
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    onClick={onNavigate}
+                    title={collapsed ? `${item.label} (${group.group})` : undefined}
+                    className={`group relative flex items-center transition-all duration-150 ${
+                      collapsed
+                        ? "h-10 w-10 mx-auto justify-center rounded-xl"
+                        : "gap-3 rounded-xl px-3 py-2 text-sm font-medium"
+                    } ${
+                      isActive
+                        ? "bg-indigo-50/90 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-200/60 dark:border-indigo-800/40 shadow-xs"
+                        : "text-fg-muted hover:bg-surface-hover hover:text-fg"
+                    }`}
+                  >
+                    {isActive && !collapsed && (
+                      <span
+                        aria-hidden
+                        className="absolute left-1.5 top-1/2 -translate-y-1/2 h-4 w-1 rounded-full bg-indigo-600 dark:bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
+                      />
+                    )}
+                    <IconComp
+                      className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
+                        isActive
+                          ? "text-indigo-600 dark:text-indigo-400"
+                          : "text-fg-subtle group-hover:text-fg"
                       }`}
                     />
-                  )}
-                  <IconComp
-                    className={`h-4 w-4 shrink-0 ${
-                      isActive ? "text-indigo-600 dark:text-indigo-400" : "text-fg-subtle group-hover:text-fg"
-                    }`}
-                  />
-                  {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                    {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
 
-                  {/* Collapsed Tooltip on Hover */}
-                  {collapsed && (
-                    <div className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-fg shadow-lg group-hover:block whitespace-nowrap">
-                      {item.label}
-                    </div>
-                  )}
-                </NavLink>
-              );
-            })}
-          </div>
+                    {/* Collapsed Tooltip on Hover */}
+                    {collapsed && (
+                      <div className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-fg shadow-lg group-hover:block whitespace-nowrap">
+                        {item.label}
+                      </div>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
 
-      {/* Footer: the workspace you are actually in, and your role in it. The
-          old badge announced a hardcoded "Pro Plan · Active", which told nobody
-          anything and was wrong for every workspace but one. */}
+      {/* Footer: Workspace & Role Card */}
       {!collapsed ? (
-        <Link
-          to="/team"
-          onClick={onNavigate}
-          className="flex items-center gap-2.5 border-t border-line p-3 transition-colors hover:bg-surface-hover"
-        >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-            {(workspaceName || "W").slice(0, 2).toUpperCase()}
-          </div>
-          <div className="flex min-w-0 flex-col text-xs">
-            <span className="truncate font-semibold text-fg">{workspaceName || "Workspace"}</span>
-            <span className="truncate text-[11px] capitalize text-fg-muted">
-              {role ? role.replace(/_/g, " ") : "Member"}
-            </span>
-          </div>
-        </Link>
+        <div className="shrink-0 border-t border-line/80 p-2.5">
+          <Link
+            to="/team"
+            onClick={onNavigate}
+            className="group flex items-center gap-2.5 rounded-xl border border-line/70 bg-surface-muted/30 p-2 transition-all duration-150 hover:border-line-strong hover:bg-surface-hover shadow-2xs"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-xs">
+              {(workspaceName || "W").slice(0, 2).toUpperCase()}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col text-left">
+              <span className="truncate text-xs font-semibold text-fg group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                {workspaceName || "Workspace"}
+              </span>
+              <span className="flex items-center gap-1.5 text-[10px] text-fg-muted capitalize">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span className="truncate">{role ? role.replace(/_/g, " ") : "Member"}</span>
+              </span>
+            </div>
+            <Settings className="h-3.5 w-3.5 text-fg-subtle group-hover:text-fg group-hover:rotate-45 transition-all shrink-0 mr-0.5" />
+          </Link>
+        </div>
       ) : (
-        <Link
-          to="/team"
-          onClick={onNavigate}
-          title={workspaceName || "Workspace"}
-          className="flex justify-center border-t border-line p-3 transition-colors hover:bg-surface-hover"
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+        <div className="shrink-0 border-t border-line/80 p-2.5 flex justify-center">
+          <Link
+            to="/team"
+            onClick={onNavigate}
+            title={`${workspaceName || "Workspace"} (${role || "Member"})`}
+            className="group relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-xs hover:opacity-90 transition-opacity"
+          >
             {(workspaceName || "W").slice(0, 2).toUpperCase()}
-          </div>
-        </Link>
+            <div className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-fg shadow-lg group-hover:block whitespace-nowrap">
+              <p className="font-bold text-fg">{workspaceName || "Workspace"}</p>
+              <p className="text-[10px] capitalize text-fg-muted">{role ? role.replace(/_/g, " ") : "Member"}</p>
+            </div>
+          </Link>
+        </div>
       )}
     </>
   );
