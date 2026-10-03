@@ -78,15 +78,20 @@ func (n *Notifier) TaskAssigned(ctx context.Context, orgID string, t TaskAssignm
 		deal, company := n.taskContext(sendCtx, orgID, t)
 		actor := n.actorName(sendCtx, t.ActorID)
 
+		// Engineers see /implementation ("My Tasks"); everyone else
+		// lands on /deals where they manage the pipeline.
+		appPath := "/deals"
+		if role := n.userRole(sendCtx, t.AssigneeID); role == "engineer" {
+			appPath = "/implementation"
+		}
+
 		if err := n.deliver(sendCtx, NotificationItem{
-			OrgID:  orgID,
-			UserID: t.AssigneeID,
-			Type:   "task_assigned",
-			Title:  "Task assigned to you",
-			Body:   taskBody(t, deal, company, actor),
-			// The deal board, not a per-deal URL: no route takes a deal id yet,
-			// and a link that 404s is worse than one that lands a click away.
-			ActionURL: "/deals",
+			OrgID:     orgID,
+			UserID:    t.AssigneeID,
+			Type:      "task_assigned",
+			Title:     "Task assigned to you",
+			Body:      taskBody(t, deal, company, actor),
+			ActionURL: appPath,
 			Priority:  taskPriority(t.Priority),
 		}); err != nil {
 			log.Printf("notify: could not record task %s assignment: %v", t.TaskID, err)
@@ -106,7 +111,7 @@ func (n *Notifier) TaskAssigned(ctx context.Context, orgID string, t TaskAssignm
 		if err := n.mail.Send(sendCtx, mailer.Message{
 			To:      []string{to},
 			Subject: taskSubject(t, deal),
-			Body:    n.taskEmailBody(t, deal, company, actor),
+			Body:    n.taskEmailBody(t, deal, company, actor, appPath),
 		}); err != nil {
 			log.Printf("notify: task %s assignment email failed: %v", t.TaskID, err)
 		}
@@ -239,9 +244,23 @@ func taskSubject(t TaskAssignment, deal string) string {
 	return "A task was assigned to you"
 }
 
+// userRole returns the profiles.role for a user, or "" when the lookup fails.
+// The role decides which page the notification links to; a miss falls back to
+// /deals which every non-engineer role can see.
+func (n *Notifier) userRole(ctx context.Context, userID string) string {
+	var role string
+	if err := n.pool.QueryRow(ctx,
+		`SELECT coalesce(p.role, '') FROM profiles p WHERE p.id = $1::uuid`,
+		userID).Scan(&role); err != nil {
+		return ""
+	}
+	return role
+}
+
 // taskEmailBody spells out what the one-line body compresses, and links back
-// to the app the same way the deal-moved mail does.
-func (n *Notifier) taskEmailBody(t TaskAssignment, deal, company, actor string) string {
+// to the app the same way the deal-moved mail does. appPath is the role-aware
+// route ("/implementation" for engineers, "/deals" for everyone else).
+func (n *Notifier) taskEmailBody(t TaskAssignment, deal, company, actor, appPath string) string {
 	var b strings.Builder
 
 	if actor != "" {
@@ -262,7 +281,7 @@ func (n *Notifier) taskEmailBody(t TaskAssignment, deal, company, actor string) 
 	}
 
 	if n.webAppURL != "" {
-		fmt.Fprintf(&b, "\n%s/deals\n", strings.TrimRight(n.webAppURL, "/"))
+		fmt.Fprintf(&b, "\n%s%s\n", strings.TrimRight(n.webAppURL, "/"), appPath)
 	}
 	return b.String()
 }
