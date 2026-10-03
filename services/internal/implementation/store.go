@@ -102,6 +102,12 @@ func where(orgID string, f Filter) (string, []any) {
 	if f.OpenOnly {
 		sql += ` AND a.status NOT IN ('verified', 'wont_do')`
 	}
+	if f.ViewerID != "" {
+		if clause := VisibleClause("a", f.ViewerRole, "$"+strconv.Itoa(len(args)+1)); clause != "" {
+			args = append(args, f.ViewerID)
+			sql += " AND " + clause
+		}
+	}
 	if f.Overdue {
 		sql += ` AND a.due_at IS NOT NULL AND a.due_at < now()
 		         AND a.status NOT IN ('verified', 'wont_do')`
@@ -272,25 +278,26 @@ func (s *store) getParentRefs(ctx context.Context, orgID, parentID string) (deal
 	return d, l, err
 }
 
-func (s *store) managerTeamUserIDs(ctx context.Context, orgID, managerID string) ([]string, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT u.id::text FROM users u
-		 JOIN profiles p ON p.id = u.id
-		 WHERE u.org_id = $1::uuid AND p.manager_id = $2::uuid`,
-		orgID, managerID)
-	if err != nil {
-		return nil, err
+// visible reports whether a viewer may see one ask. An id that does not parse
+// is simply not visible.
+func (s *store) visible(ctx context.Context, orgID, id, viewerID, viewerRole string) (bool, error) {
+	clause := VisibleClause("a", viewerRole, "$3")
+	args := []any{orgID, id}
+	if clause == "" {
+		clause = "true"
+	} else {
+		args = append(args, viewerID)
 	}
-	defer rows.Close()
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
+	var ok bool
+	err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS (
+		     SELECT 1 FROM implementation_asks a
+		      WHERE a.org_id = $1::uuid AND a.id = $2::uuid AND `+clause+`)`,
+		args...).Scan(&ok)
+	if err != nil && database.IsInvalidTextRepr(err) {
+		return false, nil
 	}
-	return ids, rows.Err()
+	return ok, err
 }
 
 func (s *store) assigneeInOrg(ctx context.Context, orgID, userID string) (bool, error) {

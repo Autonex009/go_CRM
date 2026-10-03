@@ -32,26 +32,48 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/", h.board)
 	r.Post("/", h.create)
 	r.Get("/manager/roster", h.managerRoster)
-	r.Get("/{id}", h.get)
-	r.Get("/{id}/subtasks", h.subtasks)
-	r.Patch("/{id}", h.update)
-	r.Post("/{id}/move", h.move)
-	r.Get("/{id}/events", h.events)
-	r.Delete("/{id}", h.remove)
-
 	// The managed list of ask types. Ahead of /{id} so "types" is not read as
 	// an ask id.
 	r.Get("/types", h.listTypes)
 	r.Post("/types", h.createType)
 	r.Delete("/types/{typeId}", h.deleteType)
 
-	r.Get("/{id}/attachments", h.listAttachments)
-	r.Post("/{id}/attachments", h.attach)
-	r.Get("/{id}/attachments/{fileId}", h.attachmentURL)
-	r.Patch("/{id}/attachments/{fileId}", h.renameAttachment)
-	r.Delete("/{id}/attachments/{fileId}", h.detach)
+	// Everything addressed by ask id goes through requireVisible, so an
+	// engineer or manager cannot read or touch an ask outside their scope by
+	// guessing its id.
+	r.Group(func(r chi.Router) {
+		r.Use(h.requireVisible)
+
+		r.Get("/{id}", h.get)
+		r.Get("/{id}/subtasks", h.subtasks)
+		r.Patch("/{id}", h.update)
+		r.Post("/{id}/move", h.move)
+		r.Get("/{id}/events", h.events)
+		r.Delete("/{id}", h.remove)
+
+		r.Get("/{id}/attachments", h.listAttachments)
+		r.Post("/{id}/attachments", h.attach)
+		r.Get("/{id}/attachments/{fileId}", h.attachmentURL)
+		r.Patch("/{id}/attachments/{fileId}", h.renameAttachment)
+		r.Delete("/{id}/attachments/{fileId}", h.detach)
+	})
 
 	return r
+}
+
+// requireVisible answers 404 for an ask the caller may not see. The id is read
+// from the route pattern, which chi has matched by the time a group's
+// middleware runs.
+func (h *Handler) requireVisible(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if err := h.svc.CanSee(ctx, middleware.OrgID(ctx), middleware.UserID(ctx),
+			middleware.Role(ctx), chi.URLParam(r, "id")); err != nil {
+			h.writeErr(w, err, "could not load that ask")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (h *Handler) board(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +190,8 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) subtasks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	items, err := h.svc.Subtasks(ctx, middleware.OrgID(ctx), chi.URLParam(r, "id"))
+	items, err := h.svc.Subtasks(ctx, middleware.OrgID(ctx), middleware.UserID(ctx),
+		middleware.Role(ctx), chi.URLParam(r, "id"))
 	if err != nil {
 		h.writeErr(w, err, "could not load sub-tasks")
 		return

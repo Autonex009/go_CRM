@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Users } from "lucide-react";
 
 import { useAuthStore } from "../auth/store";
@@ -53,11 +53,31 @@ export default function Implementation() {
   const [dealFilter, setDealFilter] = useState("");
   const [dialog, setDialog] = useState<Ask | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedAskId = searchParams.get("ask");
 
   const query = useQuery({
     queryKey: ["implementation"],
     queryFn: () => implementationApi.board(),
   });
+
+  // ?ask=<id> comes from a notification or email link: open that card once the
+  // board loads. The board is already scoped by the server to what this viewer
+  // may see, so an ask outside their scope is simply not found and nothing
+  // opens. The param is cleared either way so closing the dialog sticks.
+  useEffect(() => {
+    if (!linkedAskId || !query.data) return;
+    const target = query.data.asks.find((a) => a.id === linkedAskId);
+    if (target) setDialog(target);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("ask");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedAskId, query.data, setSearchParams]);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["implementation"] });

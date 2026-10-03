@@ -129,6 +129,10 @@ type Filter struct {
 	Type         string
 	AssignedTo   string
 	AssigneeIDs  []string
+	// ViewerID and ViewerRole limit the result to what that viewer may see
+	// (see VisibleClause). Every read served to a user must set them.
+	ViewerID   string
+	ViewerRole string
 	// OpenOnly drops the terminal states.
 	OpenOnly bool
 	// Overdue keeps asks past their due date and not closed.

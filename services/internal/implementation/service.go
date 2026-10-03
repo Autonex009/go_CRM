@@ -55,18 +55,10 @@ func NewService(pool *pgxpool.Pool, notifier *notify.Notifier, storage StorageCo
 
 // Board returns the asks a filter admits plus the counts, in one response.
 func (s *Service) Board(ctx context.Context, orgID, viewerID, viewerRole string, f Filter) (Board, error) {
-	// Role-based scoping:
-	if viewerRole == "engineer" {
-		// Engineers strictly see ONLY their own assigned tasks
-		f.AssignedTo = viewerID
-		f.AssigneeIDs = nil
-	} else if viewerRole == "manager" && f.AssignedTo == "" {
-		// Managers see asks assigned to them + tasks assigned to engineers reporting to them
-		teamIDs, err := s.store.managerTeamUserIDs(ctx, orgID, viewerID)
-		if err == nil {
-			f.AssigneeIDs = append(teamIDs, viewerID)
-		}
-	}
+	// Role-based scoping, applied in SQL: an engineer sees only their own
+	// asks, a manager only their own and their team's (see VisibleClause).
+	f.ViewerID = viewerID
+	f.ViewerRole = viewerRole
 
 	asks, err := s.store.list(ctx, orgID, f)
 	if err != nil {
@@ -99,8 +91,25 @@ func (s *Service) Board(ctx context.Context, orgID, viewerID, viewerRole string,
 }
 
 // Subtasks returns child asks connected to a parent ask.
-func (s *Service) Subtasks(ctx context.Context, orgID, parentAskID string) ([]Ask, error) {
-	return s.store.list(ctx, orgID, Filter{ParentAskID: parentAskID})
+func (s *Service) Subtasks(ctx context.Context, orgID, viewerID, viewerRole, parentAskID string) ([]Ask, error) {
+	return s.store.list(ctx, orgID, Filter{
+		ParentAskID: parentAskID,
+		ViewerID:    viewerID,
+		ViewerRole:  viewerRole,
+	})
+}
+
+// CanSee returns ErrNotFound when the viewer may not see the ask, so a hidden
+// ask is indistinguishable from one that does not exist.
+func (s *Service) CanSee(ctx context.Context, orgID, viewerID, viewerRole, id string) error {
+	ok, err := s.store.visible(ctx, orgID, id, viewerID, viewerRole)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // ManagerRoster returns engineers and their assigned tasks for the Manager view.
@@ -450,6 +459,7 @@ func (s *Service) announce(ctx context.Context, orgID, actorID string, a Ask, pr
 		LeadID:     deref(a.LeadID),
 		AssigneeID: *a.AssignedTo,
 		ActorID:    actorID,
+		Kind:       notify.KindAsk,
 	})
 }
 
