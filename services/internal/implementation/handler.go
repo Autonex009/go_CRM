@@ -133,7 +133,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	a, err := h.svc.Update(ctx, middleware.OrgID(ctx), middleware.UserID(ctx),
-		chi.URLParam(r, "id"), in)
+		middleware.Role(ctx), chi.URLParam(r, "id"), in)
 	if err != nil {
 		h.writeErr(w, err, "could not update that ask")
 		return

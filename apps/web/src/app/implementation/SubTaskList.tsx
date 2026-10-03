@@ -227,6 +227,8 @@ function CreateSubTaskModal({
             name="subtaskAssignee"
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
+            // Engineer sub-tasks are always theirs; the server enforces it too.
+            disabled={isEngineer}
           >
             <option value="">Unassigned</option>
             {assignees.map((m) => (

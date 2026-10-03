@@ -258,7 +258,7 @@ func (s *Service) Create(ctx context.Context, orgID, actorID, actorRole string, 
 }
 
 // Update edits the fields. Status is not one of them — see Move.
-func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Input) (Ask, error) {
+func (s *Service) Update(ctx context.Context, orgID, actorID, actorRole, id string, in Input) (Ask, error) {
 	in, err := s.prepare(ctx, orgID, in, false)
 	if err != nil {
 		return Ask{}, err
@@ -268,6 +268,15 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 	// disqualifies the diff and the notification rather than guessing — an
 	// unreadable "before" looks exactly like "nobody was assigned".
 	before, readErr := s.store.get(ctx, orgID, id)
+
+	// Engineers cannot reassign work; whatever they send, the assignee stays.
+	// Without a readable "before" there is nothing safe to keep, so refuse.
+	if actorRole == "engineer" {
+		if readErr != nil {
+			return Ask{}, readErr
+		}
+		in.AssignedTo = before.AssignedTo
+	}
 
 	after, err := s.store.update(ctx, orgID, id, in)
 	if err != nil {

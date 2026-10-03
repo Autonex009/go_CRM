@@ -226,6 +226,8 @@ export function AskDialog({
             name="assignedTo"
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
+            // Engineers cannot reassign work; the server keeps the assignee too.
+            disabled={isEngineer}
           >
             <option value="">Unassigned</option>
             {(members.data ?? []).map((m) => (
