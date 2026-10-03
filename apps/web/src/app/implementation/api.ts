@@ -28,6 +28,7 @@ export interface Ask {
   assignedToName: string | null;
   createdBy: string | null;
   createdByName: string | null;
+  createdByRole?: string | null;
 
   dueAt: string | null;
   position: number;

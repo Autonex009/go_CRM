@@ -55,18 +55,10 @@ func NewService(pool *pgxpool.Pool, notifier *notify.Notifier, storage StorageCo
 
 // Board returns the asks a filter admits plus the counts, in one response.
 func (s *Service) Board(ctx context.Context, orgID, viewerID, viewerRole string, f Filter) (Board, error) {
-	// Role-based scoping:
-	if viewerRole == "engineer" {
-		// Engineers strictly see ONLY their own assigned tasks
-		f.AssignedTo = viewerID
-		f.AssigneeIDs = nil
-	} else if viewerRole == "manager" && f.AssignedTo == "" {
-		// Managers see asks assigned to them + tasks assigned to engineers reporting to them
-		teamIDs, err := s.store.managerTeamUserIDs(ctx, orgID, viewerID)
-		if err == nil {
-			f.AssigneeIDs = append(teamIDs, viewerID)
-		}
-	}
+	// Role-based scoping, applied in SQL: an engineer sees only their own
+	// asks, a manager only their own and their team's (see VisibleClause).
+	f.ViewerID = viewerID
+	f.ViewerRole = viewerRole
 
 	asks, err := s.store.list(ctx, orgID, f)
 	if err != nil {
@@ -99,8 +91,25 @@ func (s *Service) Board(ctx context.Context, orgID, viewerID, viewerRole string,
 }
 
 // Subtasks returns child asks connected to a parent ask.
-func (s *Service) Subtasks(ctx context.Context, orgID, parentAskID string) ([]Ask, error) {
-	return s.store.list(ctx, orgID, Filter{ParentAskID: parentAskID})
+func (s *Service) Subtasks(ctx context.Context, orgID, viewerID, viewerRole, parentAskID string) ([]Ask, error) {
+	return s.store.list(ctx, orgID, Filter{
+		ParentAskID: parentAskID,
+		ViewerID:    viewerID,
+		ViewerRole:  viewerRole,
+	})
+}
+
+// CanSee returns ErrNotFound when the viewer may not see the ask, so a hidden
+// ask is indistinguishable from one that does not exist.
+func (s *Service) CanSee(ctx context.Context, orgID, viewerID, viewerRole, id string) error {
+	ok, err := s.store.visible(ctx, orgID, id, viewerID, viewerRole)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // ManagerRoster returns engineers and their assigned tasks for the Manager view.
@@ -210,7 +219,33 @@ func (s *Service) Events(ctx context.Context, orgID, id string) ([]Event, error)
 
 // Create raises an ask at "requested", then opens its history, logs the parent
 // deal's timeline and notifies the assignee. None of those can fail the create.
-func (s *Service) Create(ctx context.Context, orgID, actorID string, in Input) (Ask, error) {
+func (s *Service) Create(ctx context.Context, orgID, actorID, actorRole string, in Input) (Ask, error) {
+	if actorRole == "engineer" {
+		if in.ParentAskID == nil || *in.ParentAskID == "" {
+			return Ask{}, ErrEngineerMustLinkTask
+		}
+		parent, err := s.store.get(ctx, orgID, *in.ParentAskID)
+		if err != nil {
+			return Ask{}, apperr.Invalid("parent task not found")
+		}
+		if parent.AssignedTo == nil || *parent.AssignedTo != actorID {
+			return Ask{}, ErrEngineerUnassignedParent
+		}
+		// Engineer cards are always assigned to the engineer who created them
+		in.AssignedTo = &actorID
+		if in.Type == "" {
+			if parent.Type != "" {
+				in.Type = parent.Type
+			} else {
+				in.Type = "engineering"
+			}
+		}
+		if in.DealID == nil && in.LeadID == nil {
+			in.DealID = parent.DealID
+			in.LeadID = parent.LeadID
+		}
+	}
+
 	in, err := s.prepare(ctx, orgID, in, true)
 	if err != nil {
 		return Ask{}, err
@@ -232,7 +267,7 @@ func (s *Service) Create(ctx context.Context, orgID, actorID string, in Input) (
 }
 
 // Update edits the fields. Status is not one of them — see Move.
-func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Input) (Ask, error) {
+func (s *Service) Update(ctx context.Context, orgID, actorID, actorRole, id string, in Input) (Ask, error) {
 	in, err := s.prepare(ctx, orgID, in, false)
 	if err != nil {
 		return Ask{}, err
@@ -242,6 +277,15 @@ func (s *Service) Update(ctx context.Context, orgID, actorID, id string, in Inpu
 	// disqualifies the diff and the notification rather than guessing — an
 	// unreadable "before" looks exactly like "nobody was assigned".
 	before, readErr := s.store.get(ctx, orgID, id)
+
+	// Engineers cannot reassign work; whatever they send, the assignee stays.
+	// Without a readable "before" there is nothing safe to keep, so refuse.
+	if actorRole == "engineer" {
+		if readErr != nil {
+			return Ask{}, readErr
+		}
+		in.AssignedTo = before.AssignedTo
+	}
 
 	after, err := s.store.update(ctx, orgID, id, in)
 	if err != nil {
@@ -415,6 +459,7 @@ func (s *Service) announce(ctx context.Context, orgID, actorID string, a Ask, pr
 		LeadID:     deref(a.LeadID),
 		AssigneeID: *a.AssignedTo,
 		ActorID:    actorID,
+		Kind:       notify.KindAsk,
 	})
 }
 

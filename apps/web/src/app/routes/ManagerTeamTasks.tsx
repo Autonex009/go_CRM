@@ -357,6 +357,15 @@ export default function ManagerTeamTasks() {
                         >
                           {STATUS_META[t.status]?.label ?? t.status}
                         </span>
+
+                        {(t.createdByRole === "engineer" || t.type?.toLowerCase() === "engineer") && (
+                          <span
+                            className="rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-1.5 py-0.5 font-semibold"
+                            title={`Engineer's card${t.createdByName ? ` · created by ${t.createdByName}` : ""}`}
+                          >
+                            Engineer
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-xs font-medium text-fg leading-snug">

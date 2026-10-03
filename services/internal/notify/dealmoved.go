@@ -192,14 +192,16 @@ func (n *Notifier) recordDealMoved(ctx context.Context, orgID, actorID string, m
 	}
 }
 
-// orgMemberIDs lists the profile ids of everyone in the organization — the
-// audience for an org-wide notification.
+// orgMemberIDs lists the profile ids of everyone in the organization who may
+// open the deals board — the audience for a deal notification. Engineers and
+// managers are shielded from commercial data, so they are left out.
 func (n *Notifier) orgMemberIDs(ctx context.Context, orgID string) ([]string, error) {
 	rows, err := n.pool.Query(ctx,
 		`SELECT u.id::text
 		   FROM users u
 		   JOIN profiles p ON p.id = u.id
-		  WHERE u.org_id = $1::uuid`, orgID)
+		  WHERE u.org_id = $1::uuid
+		    AND p.role = ANY($2)`, orgID, commercialRoleList())
 	if err != nil {
 		return nil, err
 	}
@@ -216,8 +218,8 @@ func (n *Notifier) orgMemberIDs(ctx context.Context, orgID string) ([]string, er
 	return out, rows.Err()
 }
 
-// orgRecipients lists everyone in the organization, the person who moved the
-// card included.
+// orgRecipients lists everyone in the organization who may open the deals
+// board, the person who moved the card included.
 //
 // The join onto profiles is what "every profile in the organization" means here:
 // profiles carry no email of their own, so an address is reachable only through
@@ -230,7 +232,8 @@ func (n *Notifier) orgRecipients(ctx context.Context, orgID string) ([]string, e
 		   JOIN profiles p ON p.id = u.id
 		  WHERE u.org_id = $1
 		    AND u.email <> ''
-		  ORDER BY u.email`, orgID)
+		    AND p.role = ANY($2)
+		  ORDER BY u.email`, orgID, commercialRoleList())
 	if err != nil {
 		return nil, err
 	}
@@ -312,4 +315,13 @@ func (n *Notifier) dealMovedBody(mv DealMove, company, currency, actor string) s
 		fmt.Fprintf(&b, "\nOpen the board: %s/app/deals\n", strings.TrimRight(n.webAppURL, "/"))
 	}
 	return b.String()
+}
+
+// commercialRoleList is commercialRoles as a query parameter.
+func commercialRoleList() []string {
+	out := make([]string, 0, len(commercialRoles))
+	for role := range commercialRoles {
+		out = append(out, role)
+	}
+	return out
 }

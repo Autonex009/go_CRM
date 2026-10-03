@@ -50,17 +50,15 @@ export function SubTaskList({
           </span>
         </div>
 
-        {!isEngineer && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            icon="plus"
-          >
-            Add sub-task
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowAddModal(true)}
+          icon="plus"
+        >
+          Add sub-task
+        </Button>
       </div>
 
       {subtasks.length > 0 && (
@@ -101,6 +99,11 @@ export function SubTaskList({
                   }`}
                 />
                 <span className="truncate font-medium text-fg">{st.title}</span>
+                {(st.createdByRole === "engineer" || st.type?.toLowerCase() === "engineer") && (
+                  <span className="shrink-0 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-1.5 py-0.5 text-[9px] font-semibold">
+                    Engineer
+                  </span>
+                )}
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
@@ -157,8 +160,10 @@ function CreateSubTaskModal({
 }) {
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
+  const user = useAuthStore((s) => s.user);
+  const isEngineer = user?.role === "engineer";
   const [priority, setPriority] = useState<AskPriority>(parentAsk.priority || "p1");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedTo, setAssignedTo] = useState(isEngineer && user?.id ? user.id : "");
   const [dueAt, setDueAt] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -222,6 +227,8 @@ function CreateSubTaskModal({
             name="subtaskAssignee"
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
+            // Engineer sub-tasks are always theirs; the server enforces it too.
+            disabled={isEngineer}
           >
             <option value="">Unassigned</option>
             {assignees.map((m) => (

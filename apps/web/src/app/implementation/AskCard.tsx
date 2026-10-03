@@ -20,6 +20,9 @@ export function AskCard({
 }) {
   const due = dueLabel(ask);
   const blocked = ask.status === "blocked";
+  const isEngineerCard =
+    ask.createdByRole === "engineer" ||
+    ask.type?.toLowerCase() === "engineer";
 
   return (
     <article
@@ -41,7 +44,15 @@ export function AskCard({
         >
           {parentName(ask)}
         </span>
-        {ask.type && (
+        {isEngineerCard && (
+          <span
+            className="shrink-0 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-1.5 py-0.5 text-[10px] font-semibold"
+            title={`Engineer's card${ask.createdByName ? ` · created by ${ask.createdByName}` : ""}`}
+          >
+            Engineer
+          </span>
+        )}
+        {ask.type && ask.type.toLowerCase() !== "engineer" && (
           <span
             className="max-w-[90px] shrink-0 truncate rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-fg-subtle"
             title={ask.type}

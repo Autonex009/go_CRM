@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-crm/services/internal/implementation"
 	"github.com/go-crm/services/pkg/httpx"
 	"github.com/go-crm/services/pkg/middleware"
 	"github.com/go-crm/services/pkg/paging"
@@ -74,7 +75,7 @@ func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
 		// Engineers and managers are restricted to technical implementation activity;
 		// commercial activity (deals, leads, quotes, invoices) is confidential.
 		if source == "" || source == "all" || source == "implementation" {
-			page, err = h.implementationActivity(ctx, orgID, true, limit, offset)
+			page, err = h.implementationActivity(ctx, orgID, middleware.UserID(ctx), role, true, limit, offset)
 		} else {
 			httpx.WriteError(w, http.StatusForbidden, "commercial activity is confidential")
 			return
@@ -82,7 +83,7 @@ func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
 	} else {
 		switch {
 		case source == "implementation":
-			page, err = h.implementationActivity(ctx, orgID, false, limit, offset)
+			page, err = h.implementationActivity(ctx, orgID, middleware.UserID(ctx), role, false, limit, offset)
 		case source == "" || source == "all":
 			page, err = h.timelineActivity(ctx, orgID, "", limit, offset)
 		case activityEntities[source]:
@@ -173,10 +174,24 @@ func (h *Handler) timelineActivity(ctx context.Context, orgID, entity string, li
 // so a reader sees which field and what it moved between. The org's timeline
 // only carries the headlines — raised, delivered, verified, dropped — which is
 // what keeps a deal's story readable; the whole trail lives here instead.
-func (h *Handler) implementationActivity(ctx context.Context, orgID string, confidential bool, limit, offset int) (ActivityPage, error) {
+//
+// Engineers and managers only see the history of asks they may see on the
+// board (implementation.VisibleClause), not the whole workspace's.
+func (h *Handler) implementationActivity(ctx context.Context, orgID, viewerID, role string, confidential bool, limit, offset int) (ActivityPage, error) {
+	countScope, countArgs := "", []any{orgID}
+	listScope, listArgs := "", []any{orgID, limit, offset, confidential}
+	if clause := implementation.VisibleClause("a", role, "$2"); clause != "" {
+		countScope, countArgs = " AND "+clause, append(countArgs, viewerID)
+		listScope = " AND " + implementation.VisibleClause("a", role, "$5")
+		listArgs = append(listArgs, viewerID)
+	}
+
 	var page ActivityPage
 	if err := h.pool.QueryRow(ctx,
-		`SELECT count(*) FROM ask_events WHERE org_id = $1::uuid`, orgID).Scan(&page.Total); err != nil {
+		`SELECT count(*)
+		   FROM ask_events e
+		   JOIN implementation_asks a ON a.id = e.ask_id
+		  WHERE e.org_id = $1::uuid`+countScope, countArgs...).Scan(&page.Total); err != nil {
 		return ActivityPage{}, err
 	}
 
@@ -193,9 +208,9 @@ func (h *Handler) implementationActivity(ctx context.Context, orgID string, conf
 		  LEFT JOIN deals    d  ON d.id  = a.deal_id
 		  LEFT JOIN leads    l  ON l.id  = a.lead_id
 		  LEFT JOIN profiles p  ON p.id  = e.actor_id
-		 WHERE e.org_id = $1::uuid
+		 WHERE e.org_id = $1::uuid`+listScope+`
 		 ORDER BY e.occurred_at DESC
-		 LIMIT $2 OFFSET $3`, orgID, limit, offset, confidential)
+		 LIMIT $2 OFFSET $3`, listArgs...)
 	if err != nil {
 		return ActivityPage{}, err
 	}

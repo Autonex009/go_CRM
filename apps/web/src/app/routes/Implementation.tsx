@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Users } from "lucide-react";
 
 import { useAuthStore } from "../auth/store";
 import { AskDialog, type AskParent } from "../implementation/AskDialog";
 import {
+  ASK_PRIORITIES,
   implementationApi,
   type Ask,
   type AskInput,
+  type AskPriority,
   type AskStatus,
 } from "../implementation/api";
 import { AskCard } from "../implementation/AskCard";
@@ -16,11 +18,22 @@ import { useDeleteAsk } from "../implementation/useDeleteAsk";
 import {
   BOARD_STATUSES,
   IMPLEMENTATION_COLUMNS,
+  PRIORITY_META,
   isOverdue,
   parentName,
 } from "../implementation/meta";
 import { ApiError } from "../lib/api";
-import { Alert, BoardSkeleton, EmptyState, KanbanBoard } from "../ui";
+import {
+  Alert,
+  BoardSkeleton,
+  Button,
+  EmptyState,
+  Field,
+  KanbanBoard,
+  Modal,
+  SelectField,
+  TextareaField,
+} from "../ui";
 
 type View = "all" | "mine" | "blocked" | "overdue" | string;
 
@@ -39,11 +52,32 @@ export default function Implementation() {
   const [view, setView] = useState<View>("all");
   const [dealFilter, setDealFilter] = useState("");
   const [dialog, setDialog] = useState<Ask | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedAskId = searchParams.get("ask");
 
   const query = useQuery({
     queryKey: ["implementation"],
     queryFn: () => implementationApi.board(),
   });
+
+  // ?ask=<id> comes from a notification or email link: open that card once the
+  // board loads. The board is already scoped by the server to what this viewer
+  // may see, so an ask outside their scope is simply not found and nothing
+  // opens. The param is cleared either way so closing the dialog sticks.
+  useEffect(() => {
+    if (!linkedAskId || !query.data) return;
+    const target = query.data.asks.find((a) => a.id === linkedAskId);
+    if (target) setDialog(target);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("ask");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedAskId, query.data, setSearchParams]);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["implementation"] });
@@ -85,6 +119,15 @@ export default function Implementation() {
     return [...seen].map(([id, label]) => ({ id, label })).sort((a, b) =>
       a.label.localeCompare(b.label),
     );
+  }, [board]);
+
+  const myAssignedTasks = useMemo(() => {
+    const openTasks = (board?.asks ?? []).filter(
+      (a) => !a.parentAskId && a.status !== "verified" && a.status !== "wont_do",
+    );
+    if (openTasks.length > 0) return openTasks;
+    const mainTasks = (board?.asks ?? []).filter((a) => !a.parentAskId);
+    return mainTasks.length > 0 ? mainTasks : (board?.asks ?? []);
   }, [board]);
 
   const asks = useMemo(() => {
@@ -143,15 +186,29 @@ export default function Implementation() {
           )}
         </div>
 
-        {(isManager || isAdmin) && (
-          <Link
-            to="/implementation/team-tasks"
-            className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1 text-xs font-semibold text-fg shadow-sm hover:border-accent/40 hover:bg-surface-hover"
-          >
-            <Users className="h-3.5 w-3.5 text-indigo-500" />
-            <span>Engineer Tasks Matrix</span>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {isEngineer && (
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              icon="plus"
+              onClick={() => setShowCreateModal(true)}
+            >
+              New Sub-task Card
+            </Button>
+          )}
+
+          {(isManager || isAdmin) && (
+            <Link
+              to="/implementation/team-tasks"
+              className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1 text-xs font-semibold text-fg shadow-sm hover:border-accent/40 hover:bg-surface-hover"
+            >
+              <Users className="h-3.5 w-3.5 text-indigo-500" />
+              <span>Engineer Tasks Matrix</span>
+            </Link>
+          )}
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -273,7 +330,165 @@ export default function Implementation() {
           onSelectSubtask={(st) => setDialog(st)}
         />
       )}
+
+      {showCreateModal && (
+        <CreateEngineerCardModal
+          assignedTasks={myAssignedTasks}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            setShowCreateModal(false);
+            invalidate();
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+function CreateEngineerCardModal({
+  assignedTasks,
+  onClose,
+  onCreated,
+}: {
+  assignedTasks: Ask[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [parentAskId, setParentAskId] = useState(assignedTasks[0]?.id ?? "");
+  const [title, setTitle] = useState("");
+  const [detail, setDetail] = useState("");
+  const [priority, setPriority] = useState<AskPriority>("p1");
+  const [dueAt, setDueAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!parentAskId && assignedTasks.length > 0) {
+      setParentAskId(assignedTasks[0].id);
+    }
+  }, [assignedTasks, parentAskId]);
+
+  const createMutation = useMutation({
+    mutationFn: (input: AskInput) => implementationApi.create(input),
+    onSuccess: onCreated,
+    onError: (err: any) => setError(err?.message || "Could not create card"),
+  });
+
+  const selectedParent = assignedTasks.find((t) => t.id === parentAskId);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!parentAskId) {
+      setError("Please select an assigned task to link this card to");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Please enter a title for the card");
+      return;
+    }
+    createMutation.mutate({
+      parentAskId,
+      title: title.trim(),
+      type: selectedParent?.type || "engineering",
+      detail: detail.trim(),
+      priority,
+      dueAt: dueAt ? `${dueAt}T00:00:00Z` : null,
+    });
+  };
+
+  return (
+    <Modal title="Create Sub-task Card" onClose={onClose} size="lg">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        {assignedTasks.length === 0 ? (
+          <div className="rounded-lg bg-surface-muted p-4 text-center text-xs text-fg-muted">
+            <p className="font-semibold text-fg">No assigned tasks available</p>
+            <p className="mt-1">
+              You must have an assigned implementation task before you can create subtask cards linked to it.
+            </p>
+          </div>
+        ) : (
+          <>
+            <SelectField
+              label="Link to Assigned Task *"
+              name="parentTask"
+              value={parentAskId}
+              onChange={(e) => setParentAskId(e.target.value)}
+              required
+            >
+              {assignedTasks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {parentName(t) ? `${parentName(t)} — ` : ""}{t.title}
+                </option>
+              ))}
+            </SelectField>
+
+            <Field
+              label="Card Title *"
+              name="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Implement webhook retry handler"
+              autoFocus
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-fg-muted">Priority</span>
+                <div className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-surface-muted/60 p-1">
+                  {ASK_PRIORITIES.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPriority(p)}
+                      className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                        priority === p
+                          ? PRIORITY_META[p].chip
+                          : "text-fg-muted hover:text-fg"
+                      }`}
+                    >
+                      {PRIORITY_META[p].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Field
+                label="Due Date"
+                name="dueAt"
+                type="date"
+                value={dueAt}
+                onChange={(e) => setDueAt(e.target.value)}
+              />
+            </div>
+
+            <TextareaField
+              label="Technical Details / Notes"
+              name="detail"
+              rows={3}
+              value={detail}
+              onChange={(e) => setDetail(e.target.value)}
+              placeholder="Technical specs, endpoints, acceptance criteria…"
+            />
+          </>
+        )}
+
+        {error && <Alert>{error}</Alert>}
+
+        <div className="flex justify-end gap-2 border-t border-line pt-3">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          {assignedTasks.length > 0 && (
+            <Button
+              type="submit"
+              disabled={createMutation.isPending}
+              icon="check"
+            >
+              Create Card
+            </Button>
+          )}
+        </div>
+      </form>
+    </Modal>
   );
 }
 

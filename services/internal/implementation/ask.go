@@ -21,6 +21,10 @@ var (
 	ErrLeadNotFound = errors.New("lead not found")
 	// ErrAssigneeNotFound means the assignee is not a member of the caller's org.
 	ErrAssigneeNotFound = errors.New("assignee not found")
+	// ErrEngineerMustLinkTask means an engineer must link their card to an assigned task.
+	ErrEngineerMustLinkTask = errors.New("engineers must link their card to an assigned task")
+	// ErrEngineerUnassignedParent means an engineer tried to link to a task not assigned to them.
+	ErrEngineerUnassignedParent = errors.New("you can only create cards linked to tasks assigned to you")
 )
 
 // Statuses is the flow, in board order: one kanban column each.
@@ -79,6 +83,7 @@ type Ask struct {
 	AssignedToName *string `json:"assignedToName"`
 	CreatedBy      *string `json:"createdBy"`
 	CreatedByName  *string `json:"createdByName"`
+	CreatedByRole  *string `json:"createdByRole"`
 
 	DueAt    *time.Time `json:"dueAt"`
 	Position float64    `json:"position"`
@@ -124,6 +129,10 @@ type Filter struct {
 	Type         string
 	AssignedTo   string
 	AssigneeIDs  []string
+	// ViewerID and ViewerRole limit the result to what that viewer may see
+	// (see VisibleClause). Every read served to a user must set them.
+	ViewerID   string
+	ViewerRole string
 	// OpenOnly drops the terminal states.
 	OpenOnly bool
 	// Overdue keeps asks past their due date and not closed.

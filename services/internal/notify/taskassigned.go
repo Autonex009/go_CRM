@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,37 @@ type TaskAssignment struct {
 	// AssigneeID is who the work landed on, and ActorID who put it there.
 	AssigneeID string
 	ActorID    string
+	// Kind says which surface the task lives on, and so where the link points.
+	// Empty means a deal task or an Action, both of which live on the deals
+	// board; KindAsk is an implementation ask.
+	Kind string
+}
+
+// KindAsk marks a TaskAssignment raised from the implementation board.
+const KindAsk = "ask"
+
+// commercialRoles may open the deals board. It mirrors the RequireRole guard on
+// the web app's commercial routes; everyone else is shielded from them.
+var commercialRoles = map[string]bool{
+	"owner": true, "admin": true, "sales": true, "account_manager": true,
+}
+
+// taskLink is the in-app path (under the web app's /app basename) the
+// assignee should land on — only ever a page their role may open.
+//
+// An ask links straight to its card on the implementation board, which every
+// role can open and which the server scopes to what the viewer may see. A deal
+// task or Action lives on the deals board, so only a commercial role gets
+// that link; anyone else lands on the dashboard instead of a page that would
+// bounce them.
+func taskLink(t TaskAssignment, role string) string {
+	if t.Kind == KindAsk {
+		return "/implementation?ask=" + url.QueryEscape(t.TaskID)
+	}
+	if commercialRoles[role] {
+		return "/deals"
+	}
+	return "/"
 }
 
 // AssignmentChanged reports whether an assignee is worth telling.
@@ -78,12 +110,7 @@ func (n *Notifier) TaskAssigned(ctx context.Context, orgID string, t TaskAssignm
 		deal, company := n.taskContext(sendCtx, orgID, t)
 		actor := n.actorName(sendCtx, t.ActorID)
 
-		// Engineers see /implementation ("My Tasks"); everyone else
-		// lands on /deals where they manage the pipeline.
-		appPath := "/deals"
-		if role := n.userRole(sendCtx, t.AssigneeID); role == "engineer" {
-			appPath = "/implementation"
-		}
+		appPath := taskLink(t, n.userRole(sendCtx, t.AssigneeID))
 
 		if err := n.deliver(sendCtx, NotificationItem{
 			OrgID:     orgID,
@@ -245,8 +272,8 @@ func taskSubject(t TaskAssignment, deal string) string {
 }
 
 // userRole returns the profiles.role for a user, or "" when the lookup fails.
-// The role decides which page the notification links to; a miss falls back to
-// /deals which every non-engineer role can see.
+// The role decides which page the notification links to; a miss is treated as
+// non-commercial, so it never yields a link the user may not open.
 func (n *Notifier) userRole(ctx context.Context, userID string) string {
 	var role string
 	if err := n.pool.QueryRow(ctx,
@@ -259,7 +286,7 @@ func (n *Notifier) userRole(ctx context.Context, userID string) string {
 
 // taskEmailBody spells out what the one-line body compresses, and links back
 // to the app the same way the deal-moved mail does. appPath is the role-aware
-// route ("/implementation" for engineers, "/deals" for everyone else).
+// route from taskLink; the web app is served under /app, so the mail adds it.
 func (n *Notifier) taskEmailBody(t TaskAssignment, deal, company, actor, appPath string) string {
 	var b strings.Builder
 
@@ -281,7 +308,7 @@ func (n *Notifier) taskEmailBody(t TaskAssignment, deal, company, actor, appPath
 	}
 
 	if n.webAppURL != "" {
-		fmt.Fprintf(&b, "\n%s%s\n", strings.TrimRight(n.webAppURL, "/"), appPath)
+		fmt.Fprintf(&b, "\nOpen it: %s/app%s\n", strings.TrimRight(n.webAppURL, "/"), appPath)
 	}
 	return b.String()
 }

@@ -185,6 +185,14 @@ export function AskDialog({
           </div>
         </div>
 
+        {ask && (ask.createdByRole === "engineer" || ask.type?.toLowerCase() === "engineer") && (
+          <div className="flex items-center gap-2 rounded-md border border-blue-500/20 bg-blue-500/10 px-md py-sm text-xs font-medium text-blue-600 dark:text-blue-400">
+            <span className="font-semibold uppercase tracking-wide">Engineer Card</span>
+            <span className="text-fg-subtle">·</span>
+            <span>Created by {ask.createdByName ? `${ask.createdByName} (Engineer)` : "an engineer"}</span>
+          </div>
+        )}
+
         <Field
           label="Title"
           name="title"
@@ -218,6 +226,8 @@ export function AskDialog({
             name="assignedTo"
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
+            // Engineers cannot reassign work; the server keeps the assignee too.
+            disabled={isEngineer}
           >
             <option value="">Unassigned</option>
             {(members.data ?? []).map((m) => (

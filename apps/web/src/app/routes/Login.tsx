@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { loginSchema, type LoginInput } from "@go-crm/schemas";
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Shield, Briefcase, Terminal } from "lucide-react";
 
@@ -12,8 +12,23 @@ import { ApiError, authApi } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { Divider } from "../ui";
 
+/**
+ * Where to go after signing in: the page that sent the user here (e.g. a task
+ * link from a notification email), if it is a path inside this app. Anything
+ * else — absent, or an attempt at an off-site "//host" — falls back to "/".
+ */
+function returnPath(state: unknown): string {
+  const from = (state as { from?: unknown } | null)?.from;
+  if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//")) {
+    return "/";
+  }
+  return from.startsWith("/login") ? "/" : from;
+}
+
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = returnPath(location.state);
   const [searchParams, setSearchParams] = useSearchParams();
   const urlPortal = searchParams.get("portal") as AuthPortalVariant | null;
   const initialPortal: AuthPortalVariant =
@@ -52,7 +67,7 @@ export default function Login() {
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
   if (authenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={destination} replace />;
   }
 
   const onSubmit = handleSubmit(async ({ email, password }) => {
@@ -60,7 +75,7 @@ export default function Login() {
     try {
       const { token, user } = await authApi.login(email, password);
       setSession(token, user);
-      navigate("/", { replace: true });
+      navigate(destination, { replace: true });
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Something went wrong");
     }
