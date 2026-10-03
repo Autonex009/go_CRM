@@ -23,7 +23,7 @@ const askColumns = `
 	COALESCE(sub.cnt, 0), COALESCE(sub.done_cnt, 0),
 	a.title, a.type, a.detail, a.priority, a.status, a.blocked_reason,
 	a.assigned_to::text, pa.full_name,
-	a.created_by::text, pc.full_name,
+	a.created_by::text, pc.full_name, pc.role,
 	a.due_at, a.position,
 	a.delivered_at, a.verified_at, a.created_at, a.updated_at`
 
@@ -53,7 +53,7 @@ func scanAsk(row rowScanner) (Ask, error) {
 		&a.SubtaskCount, &a.SubtaskDoneCount,
 		&a.Title, &a.Type, &a.Detail, &a.Priority, &a.Status, &a.BlockedReason,
 		&a.AssignedTo, &a.AssignedToName,
-		&a.CreatedBy, &a.CreatedByName,
+		&a.CreatedBy, &a.CreatedByName, &a.CreatedByRole,
 		&a.DueAt, &a.Position,
 		&a.DeliveredAt, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt,
 	)

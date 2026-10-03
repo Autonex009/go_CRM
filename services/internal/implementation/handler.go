@@ -118,7 +118,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	a, err := h.svc.Create(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), in)
+	a, err := h.svc.Create(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), middleware.Role(ctx), in)
 	if err != nil {
 		h.writeErr(w, err, "could not create that ask")
 		return
@@ -330,5 +330,7 @@ func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 		httpx.Rule{Err: ErrAssigneeNotFound, Status: http.StatusBadRequest, Message: "assignee not found"},
 		httpx.Rule{Err: ErrStorageUnconfigured, Status: http.StatusServiceUnavailable, Message: "file attachments are not configured"},
 		httpx.Rule{Err: ErrTypeExists, Status: http.StatusConflict, Message: "that type already exists"},
+		httpx.Rule{Err: ErrEngineerMustLinkTask, Status: http.StatusBadRequest, Message: "engineers must link their card to an assigned task"},
+		httpx.Rule{Err: ErrEngineerUnassignedParent, Status: http.StatusForbidden, Message: "you can only create cards linked to tasks assigned to you"},
 	)
 }

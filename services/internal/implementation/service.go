@@ -210,7 +210,33 @@ func (s *Service) Events(ctx context.Context, orgID, id string) ([]Event, error)
 
 // Create raises an ask at "requested", then opens its history, logs the parent
 // deal's timeline and notifies the assignee. None of those can fail the create.
-func (s *Service) Create(ctx context.Context, orgID, actorID string, in Input) (Ask, error) {
+func (s *Service) Create(ctx context.Context, orgID, actorID, actorRole string, in Input) (Ask, error) {
+	if actorRole == "engineer" {
+		if in.ParentAskID == nil || *in.ParentAskID == "" {
+			return Ask{}, ErrEngineerMustLinkTask
+		}
+		parent, err := s.store.get(ctx, orgID, *in.ParentAskID)
+		if err != nil {
+			return Ask{}, apperr.Invalid("parent task not found")
+		}
+		if parent.AssignedTo == nil || *parent.AssignedTo != actorID {
+			return Ask{}, ErrEngineerUnassignedParent
+		}
+		// Engineer cards are always assigned to the engineer who created them
+		in.AssignedTo = &actorID
+		if in.Type == "" {
+			if parent.Type != "" {
+				in.Type = parent.Type
+			} else {
+				in.Type = "engineering"
+			}
+		}
+		if in.DealID == nil && in.LeadID == nil {
+			in.DealID = parent.DealID
+			in.LeadID = parent.LeadID
+		}
+	}
+
 	in, err := s.prepare(ctx, orgID, in, true)
 	if err != nil {
 		return Ask{}, err
