@@ -37,7 +37,7 @@ import {
   Skeleton,
   AssigneePicker,
 } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 
 /** The linking fields the quote record itself carries. */
 interface Links {
@@ -60,9 +60,6 @@ interface Links {
  * items, so the total on the quotes list, the company financials and any invoice
  * raised later all read the same numbers.
  */
-
-/** Commercial owners first: these records are run by sales. */
-const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 export default function VigilProposalEditor() {
   const { id } = useParams();
   const isNew = !id || id === "new";
@@ -378,7 +375,7 @@ export default function VigilProposalEditor() {
           </SelectField>
           <AssigneePicker
             label="Owner"
-            groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+            groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: links.ownerUserId })}
             value={links.ownerUserId}
             disabled={!editable}
             onChange={(id) => {

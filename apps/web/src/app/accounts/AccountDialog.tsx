@@ -14,7 +14,7 @@ import {
   TextareaField,
   AssigneePicker,
 } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import type { Account, AccountFormValues } from "./api";
 import { accountFormSchema } from "./api";
 
@@ -27,9 +27,6 @@ interface AccountDialogProps {
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-
-/** Commercial owners first: these records are run by sales. */
-const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 export function AccountDialog({
   account,
   onClose,
@@ -140,7 +137,7 @@ export function AccountDialog({
             render={({ field }) => (
               <AssigneePicker
                 label="Owner"
-                groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+                groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: field.value })}
                 value={field.value ?? ""}
                 onChange={field.onChange}
                 allowUnassigned

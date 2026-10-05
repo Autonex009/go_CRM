@@ -39,7 +39,7 @@ import {
   buttonClass,
   AssigneePicker,
 } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 
 interface Header {
   title: string;
@@ -68,9 +68,6 @@ const emptyHeader = (state?: Partial<Header> | null): Header => ({
  * shared line-item grid, a live totals preview — plus the parts only a bill has:
  * a balance, a payment history, and no way back once issued.
  */
-
-/** Commercial owners first: these records are run by sales. */
-const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 
 export default function InvoiceEditor() {
   const { id } = useParams();
@@ -394,7 +391,7 @@ export default function InvoiceEditor() {
 
           <AssigneePicker
             label="Owner"
-            groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+            groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: header.ownerUserId })}
             value={header.ownerUserId}
             disabled={!editable}
             onChange={(id) => patchHeader({ ownerUserId: id })}

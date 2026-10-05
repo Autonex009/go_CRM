@@ -12,7 +12,7 @@ import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { orgApi } from "../org/api";
 import { Alert, Badge, Button, Field, Modal, SelectField, AssigneePicker } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import type { Deal, DealInput } from "./api";
 import { buildQuoteStateFromDeal } from "./quote-utils";
 import { TaskHistory } from "./TaskHistory";
@@ -36,9 +36,6 @@ interface DealDialogProps {
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-
-/** Commercial owners first: these records are run by sales. */
-const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 export function DealDialog({
   deal,
   defaultStage,
@@ -285,7 +282,7 @@ export function DealDialog({
             render={({ field }) => (
               <AssigneePicker
                 label="Owner"
-                groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+                groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: field.value })}
                 value={field.value ?? ""}
                 onChange={field.onChange}
                 allowUnassigned

@@ -40,7 +40,7 @@ import {
   buttonClass,
   AssigneePicker,
 } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 
 const emptyItem = emptyDocumentItem;
 
@@ -70,9 +70,6 @@ const emptyHeader = (state?: Partial<Header> | null): Header => ({
  * A route rather than a modal: line items need the full width, and a document
  * you can link to and reload is worth more than one trapped in a dialog.
  */
-
-/** Commercial owners first: these records are run by sales. */
-const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 
 export default function QuoteEditor() {
   const { id } = useParams();
@@ -426,7 +423,7 @@ export default function QuoteEditor() {
 
           <AssigneePicker
             label="Owner"
-            groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+            groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: header.ownerUserId })}
             value={header.ownerUserId}
             disabled={!editable}
             onChange={(id) => patchHeader({ ownerUserId: id })}

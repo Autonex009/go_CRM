@@ -20,7 +20,7 @@ import {
   TextareaField,
   AssigneePicker,
 } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import { leadCompany, leadName, type ConvertInput, type Lead } from "./api";
 
 interface ConvertDialogProps {
@@ -34,9 +34,6 @@ interface ConvertDialogProps {
  * Replicates the full Deal form so all fields can be reviewed and edited,
  * while minimizing manual typing by pre-filling everything from the lead.
  */
-
-/** Commercial owners first: these records are run by sales. */
-const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 export function ConvertDialog({ lead, onClose, onSubmit }: ConvertDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -206,7 +203,7 @@ export function ConvertDialog({ lead, onClose, onSubmit }: ConvertDialogProps) {
             render={({ field }) => (
               <AssigneePicker
                 label="Owner"
-                groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+                groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: field.value })}
                 value={field.value ?? ""}
                 onChange={field.onChange}
                 allowUnassigned

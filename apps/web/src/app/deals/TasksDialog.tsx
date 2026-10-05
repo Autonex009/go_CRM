@@ -14,7 +14,7 @@ import {
   PriorityPicker,
   AssigneePicker,
 } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import type { Deal } from "./api";
 import { getStageMeta, stageLabel } from "./stages";
 import {
@@ -207,7 +207,10 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
                 <AssigneePicker
                   size="sm"
                   className="mt-[1px] w-36 shrink-0"
-                  groups={memberGroups(memberOptions)}
+                  groups={memberGroups(memberOptions, {
+                    roles: COMMERCIAL_ROLES,
+                    keep: task.assignedTo,
+                  })}
                   value={task.assignedTo ?? ""}
                   onChange={(id) =>
                     save.mutate({
@@ -268,7 +271,7 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
             size="sm"
             className="w-40 shrink-0"
             triggerClassName="h-8"
-            groups={memberGroups(memberOptions)}
+            groups={memberGroups(memberOptions, { roles: COMMERCIAL_ROLES })}
             value={draftAssignee}
             onChange={setDraftAssignee}
             ariaLabel="Assign the new task"

@@ -8,7 +8,7 @@ import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
 import { orgApi } from "../org/api";
 import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField, AssigneePicker } from "../ui";
-import { memberGroups } from "../org/memberGroups";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import { LEAD_STAGES, STAGE_META, stageLabel, type Lead, type LeadInput } from "./api";
 import { leadFormSchema, toPayload, type LeadFormValues } from "./schemas";
 
@@ -35,9 +35,6 @@ interface LeadDialogProps {
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
-
-/** Commercial owners first: these records are run by sales. */
-const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: LeadDialogProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -159,7 +156,7 @@ export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: 
             render={({ field }) => (
               <AssigneePicker
                 label="Owner"
-                groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+                groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: field.value })}
                 value={field.value ?? ""}
                 onChange={field.onChange}
                 allowUnassigned
