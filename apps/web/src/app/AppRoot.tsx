@@ -104,10 +104,13 @@ export default function AppRoot() {
                 <Route path="/metrics" element={<Metrics />} />
               </Route>
 
-              {/* Manager & Admin engineering team workflows */}
+              {/* Engineering team workload: managers (own team) and the roles
+                  that already see every ask on the Implementation board */}
               <Route
                 element={
-                  <RequireRole allowedRoles={["owner", "admin", "manager"]} />
+                  <RequireRole
+                    allowedRoles={["owner", "admin", "sales", "account_manager", "manager"]}
+                  />
                 }
               >
                 <Route path="/implementation/team-tasks" element={<ManagerTeamTasks />} />

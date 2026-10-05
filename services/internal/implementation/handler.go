@@ -207,7 +207,9 @@ func (h *Handler) subtasks(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) managerRoster(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	role := middleware.Role(ctx)
-	if role != "owner" && role != "admin" && role != "manager" {
+	// Managers see their own team; the roles that already see every ask on the
+	// board see every engineer. Engineers and clients are refused.
+	if role != "manager" && !fullAccessRoles[role] {
 		httpx.WriteError(w, http.StatusForbidden, "you don't have permission to view the team roster")
 		return
 	}

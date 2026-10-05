@@ -73,6 +73,10 @@ export interface PipelinePatch {
 /** Roles that create, reassign and archive pipelines (mirrors the server). */
 export const PIPELINE_ADMIN_ROLES = ["owner", "admin", "sales", "account_manager"];
 
+/** Roles that may open the Engineer Tasks page: everyone who already sees all
+ *  asks on the board, plus managers (who see their own team there). */
+export const ENGINEER_TASKS_ROLES = [...PIPELINE_ADMIN_ROLES, "manager"];
+
 export const ASK_STATUSES = [
   "requested",
   "acknowledged",

@@ -13,6 +13,7 @@ import {
   type AskPriority,
   type AskStatus,
   type Pipeline,
+  ENGINEER_TASKS_ROLES,
   PIPELINE_ADMIN_ROLES,
 } from "../implementation/api";
 import { AskCard } from "../implementation/AskCard";
@@ -55,8 +56,6 @@ export default function Implementation() {
   const user = useAuthStore((s) => s.user);
   const viewerId = user?.id;
   const isEngineer = user?.role === "engineer";
-  const isManager = user?.role === "manager";
-  const isAdmin = user?.role === "owner" || user?.role === "admin";
   const [view, setView] = useState<View>("all");
   const [dealFilter, setDealFilter] = useState("");
   const [dialog, setDialog] = useState<Ask | null>(null);
@@ -286,7 +285,7 @@ export default function Implementation() {
             </Button>
           )}
 
-          {(isManager || isAdmin) && (
+          {ENGINEER_TASKS_ROLES.includes(user?.role ?? "") && (
             <Link
               to="/implementation/team-tasks"
               className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1 text-xs font-semibold text-fg shadow-sm hover:border-accent/40 hover:bg-surface-hover"
