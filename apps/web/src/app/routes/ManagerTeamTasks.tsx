@@ -21,6 +21,7 @@ import {
 } from "../implementation/api";
 import { STATUS_META, PRIORITY_META } from "../implementation/meta";
 import { memberLabel, orgApi, type Member } from "../org/api";
+import { AssigneePicker, type AssigneeGroup } from "../implementation/AssigneePicker";
 import {
   Alert,
   Avatar,
@@ -267,23 +268,16 @@ export default function ManagerTeamTasks() {
                 </div>
 
                 <div className="flex items-center gap-2 mt-1">
-                  <select
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        quickAssignMutation.mutate({
-                          task,
-                          assigneeId: e.target.value,
-                        });
-                      }
+                  <AssigneePicker
+                    size="sm"
+                    groups={assigneeGroups(engineers, managers)}
+                    value=""
+                    placeholder={managers.length > 0 ? "Assign to…" : "Assign to engineer…"}
+                    disabled={quickAssignMutation.isPending}
+                    onChange={(id) => {
+                      if (id) quickAssignMutation.mutate({ task, assigneeId: id });
                     }}
-                    className="h-7 w-full rounded border border-line bg-surface px-2 text-[11px] text-fg focus:border-accent focus:outline-none"
-                  >
-                    <option value="" disabled>
-                      {managers.length > 0 ? "Assign to…" : "Assign to engineer…"}
-                    </option>
-                    <AssigneeOptions engineers={engineers} managers={managers} />
-                  </select>
+                  />
                 </div>
               </div>
             ))}
@@ -444,31 +438,24 @@ export default function ManagerTeamTasks() {
  * Assignee choices: the team's engineers, plus — for owners and admins — the
  * engineering managers, each in their own group so the two are not confused.
  */
-function AssigneeOptions({
-  engineers,
-  managers,
-}: {
-  engineers: EngineerWorkload[];
-  managers: Member[];
-}) {
-  const engineerOptions = engineers.map((eng) => (
-    <option key={eng.engineerId} value={eng.engineerId}>
-      {eng.engineerName}
-    </option>
-  ));
-  if (managers.length === 0) return <>{engineerOptions}</>;
-  return (
-    <>
-      <optgroup label="Engineers">{engineerOptions}</optgroup>
-      <optgroup label="Managers">
-        {managers.map((m) => (
-          <option key={m.id} value={m.id}>
-            {memberLabel(m)}
-          </option>
-        ))}
-      </optgroup>
-    </>
-  );
+function assigneeGroups(engineers: EngineerWorkload[], managers: Member[]): AssigneeGroup[] {
+  const groups: AssigneeGroup[] = [
+    {
+      label: "Engineers",
+      options: engineers.map((eng) => ({
+        id: eng.engineerId,
+        name: eng.engineerName,
+        hint: `${eng.activeCount} active task${eng.activeCount === 1 ? "" : "s"}`,
+      })),
+    },
+  ];
+  if (managers.length > 0) {
+    groups.push({
+      label: "Managers",
+      options: managers.map((m) => ({ id: m.id, name: memberLabel(m), hint: "Engineering manager" })),
+    });
+  }
+  return groups;
 }
 
 function CreateTeamTaskModal({
@@ -555,15 +542,14 @@ function CreateTeamTaskModal({
         />
 
         <div className="grid grid-cols-2 gap-3">
-          <SelectField
+          <AssigneePicker
             label="Assignee"
-            name="assignee"
+            groups={assigneeGroups(engineers, managers)}
             value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
-          >
-            <option value="">Unassigned</option>
-            <AssigneeOptions engineers={engineers} managers={managers} />
-          </SelectField>
+            onChange={setAssignedTo}
+            placeholder="Unassigned"
+            allowUnassigned
+          />
 
           <Field
             label="Due Date"
