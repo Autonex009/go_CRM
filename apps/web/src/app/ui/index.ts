@@ -4,6 +4,11 @@
  * one-off, or the styles fork and the bundle grows twice.
  */
 export { Button, IconButton, LinkButton, buttonClass } from "./Button";
+export {
+  AssigneePicker,
+  type AssigneeGroup,
+  type AssigneeOption,
+} from "./AssigneePicker";
 export { Field, SelectField, TextareaField } from "./Field";
 export { Icon, type IconName } from "./Icon";
 export { Modal } from "./Modal";

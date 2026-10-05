@@ -7,7 +7,7 @@ import { dealsApi } from "../deals/api";
 import { LineItems } from "../documents/LineItems";
 import { asTimestamp, emptyDocumentItem } from "../documents/types";
 import { ApiError } from "../lib/api";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
 import { VigilProposalDocument } from "../quotes/VigilProposalDocument";
 import { VigilSectionEditor } from "../quotes/VigilSectionEditor";
@@ -35,7 +35,9 @@ import {
   PageHeader,
   SelectField,
   Skeleton,
+  AssigneePicker,
 } from "../ui";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 
 /** The linking fields the quote record itself carries. */
 interface Links {
@@ -371,22 +373,18 @@ export default function VigilProposalEditor() {
               </option>
             ))}
           </SelectField>
-          <SelectField
+          <AssigneePicker
             label="Owner"
+            groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: links.ownerUserId })}
             value={links.ownerUserId}
             disabled={!editable}
-            onChange={(e) => {
+            onChange={(id) => {
               setDirty(true);
-              setLinks((p) => ({ ...p, ownerUserId: e.target.value }));
+              setLinks((p) => ({ ...p, ownerUserId: id }));
             }}
-          >
-            <option value="">—</option>
-            {(members.data ?? []).map((member) => (
-              <option key={member.id} value={member.id}>
-                {memberLabel(member)}
-              </option>
-            ))}
-          </SelectField>
+            allowUnassigned
+            placeholder="Unassigned"
+          />
           <Field
             label="Valid until"
             type="date"

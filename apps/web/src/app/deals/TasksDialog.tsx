@@ -3,7 +3,7 @@ import { Check, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ApiError } from "../lib/api";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import {
   Alert,
   Badge,
@@ -12,7 +12,9 @@ import {
   Modal,
   PriorityCheck,
   PriorityPicker,
+  AssigneePicker,
 } from "../ui";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import type { Deal } from "./api";
 import { getStageMeta, stageLabel } from "./stages";
 import {
@@ -202,24 +204,24 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
                   )}
                 </div>
 
-                <select
+                <AssigneePicker
+                  size="sm"
+                  className="mt-[1px] w-36 shrink-0"
+                  groups={memberGroups(memberOptions, {
+                    roles: COMMERCIAL_ROLES,
+                    keep: task.assignedTo,
+                  })}
                   value={task.assignedTo ?? ""}
-                  onChange={(e) =>
+                  onChange={(id) =>
                     save.mutate({
                       task,
-                      change: { assignedTo: e.target.value || null },
+                      change: { assignedTo: id || null },
                     })
                   }
-                  aria-label={`Assignee for "${task.text}"`}
-                  className="mt-[1px] h-7 max-w-32 shrink-0 rounded border border-line bg-surface px-1 text-xs text-fg-muted focus:border-accent focus:outline-none"
-                >
-                  <option value="">Unassigned</option>
-                  {memberOptions.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {memberLabel(m)}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel={`Assignee for "${task.text}"`}
+                  allowUnassigned
+                  placeholder="Unassigned"
+                />
 
                 <PriorityPicker
                   value={task.priority}
@@ -265,19 +267,17 @@ export function DealTasksPanel({ deal }: { deal: Deal }) {
             meta={PRIORITY_META}
             onChange={setDraftPriority}
           />
-          <select
+          <AssigneePicker
+            size="sm"
+            className="w-40 shrink-0"
+            triggerClassName="h-8"
+            groups={memberGroups(memberOptions, { roles: COMMERCIAL_ROLES })}
             value={draftAssignee}
-            onChange={(e) => setDraftAssignee(e.target.value)}
-            aria-label="Assign the new task"
-            className="h-8 max-w-40 rounded border border-line bg-surface px-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
-          >
-            <option value="">Unassigned</option>
-            {memberOptions.map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </select>
+            onChange={setDraftAssignee}
+            ariaLabel="Assign the new task"
+            allowUnassigned
+            placeholder="Unassigned"
+          />
           <Button
             type="button"
             variant="secondary"

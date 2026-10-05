@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Check } from "lucide-react";
 
 import { ApiError } from "../lib/api";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import {
   Alert,
   Avatar,
@@ -12,7 +12,9 @@ import {
   Modal,
   SelectField,
   TextareaField,
+  AssigneePicker,
 } from "../ui";
+import { memberGroups } from "../org/memberGroups";
 import {
   ASK_PRIORITIES,
   ASK_STATUSES,
@@ -230,21 +232,16 @@ export function AskDialog({
         <div className="grid gap-md sm:grid-cols-2">
           <TypeSelect value={type} onChange={setType} />
 
-          <SelectField
+          <AssigneePicker
             label="Assign to"
-            name="assignedTo"
+            groups={memberGroups(members.data ?? [])}
             value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
+            onChange={setAssignedTo}
             // Engineers cannot reassign work; the server keeps the assignee too.
             disabled={isEngineer}
-          >
-            <option value="">Unassigned</option>
-            {(members.data ?? []).map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </SelectField>
+            allowUnassigned
+            placeholder="Unassigned"
+          />
         </div>
 
         <div className="flex flex-col gap-xs">

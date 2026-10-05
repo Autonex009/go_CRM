@@ -9,7 +9,7 @@ import { dealsApi } from "../deals/api";
 import { invoicesApi } from "../invoices/api";
 import { ApiError } from "../lib/api";
 import { formatMoneyExact } from "../lib/money";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
 import { LineItems } from "../documents/LineItems";
 import { asTimestamp, emptyDocumentItem } from "../documents/types";
@@ -38,7 +38,9 @@ import {
   Skeleton,
   TextareaField,
   buttonClass,
+  AssigneePicker,
 } from "../ui";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 
 const emptyItem = emptyDocumentItem;
 
@@ -68,6 +70,7 @@ const emptyHeader = (state?: Partial<Header> | null): Header => ({
  * A route rather than a modal: line items need the full width, and a document
  * you can link to and reload is worth more than one trapped in a dialog.
  */
+
 export default function QuoteEditor() {
   const { id } = useParams();
   const isNew = !id || id === "new";
@@ -418,20 +421,15 @@ export default function QuoteEditor() {
             ))}
           </SelectField>
 
-          <SelectField
+          <AssigneePicker
             label="Owner"
-            name="ownerUserId"
+            groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: header.ownerUserId })}
             value={header.ownerUserId}
             disabled={!editable}
-            onChange={(e) => patchHeader({ ownerUserId: e.target.value })}
-          >
-            <option value="">Unassigned</option>
-            {(members.data ?? []).map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </SelectField>
+            onChange={(id) => patchHeader({ ownerUserId: id })}
+            allowUnassigned
+            placeholder="Unassigned"
+          />
         </div>
       </Card>
 

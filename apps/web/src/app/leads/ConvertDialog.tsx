@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
 import { AccountSelect } from "../accounts/AccountSelect";
 import { DEAL_STAGES, stageLabel, normalizeDealStage } from "../deals/stages";
 import { dealFormSchema, type DealFormValues } from "../deals/schemas";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import {
   Alert,
   Avatar,
@@ -18,7 +18,9 @@ import {
   Modal,
   SelectField,
   TextareaField,
+  AssigneePicker,
 } from "../ui";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import { leadCompany, leadName, type ConvertInput, type Lead } from "./api";
 
 interface ConvertDialogProps {
@@ -50,6 +52,7 @@ export function ConvertDialog({ lead, onClose, onSubmit }: ConvertDialogProps) {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<DealFormValues>({
@@ -194,18 +197,21 @@ export function ConvertDialog({ lead, onClose, onSubmit }: ConvertDialogProps) {
             ))}
           </SelectField>
 
-          <SelectField
-            label="Owner"
-            error={errors.ownerUserId?.message}
-            {...register("ownerUserId")}
-          >
-            <option value="">Unassigned</option>
-            {(members.data ?? []).map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </SelectField>
+          <Controller
+            control={control}
+            name="ownerUserId"
+            render={({ field }) => (
+              <AssigneePicker
+                label="Owner"
+                groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: field.value })}
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                allowUnassigned
+                placeholder="Unassigned"
+                error={errors.ownerUserId?.message}
+              />
+            )}
+          />
         </div>
 
         <AccountSelect

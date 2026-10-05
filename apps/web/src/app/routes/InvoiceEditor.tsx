@@ -22,7 +22,7 @@ import {
 } from "../invoices/api";
 import { ApiError } from "../lib/api";
 import { formatMoneyExact } from "../lib/money";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
 import {
   Alert,
@@ -37,7 +37,9 @@ import {
   Skeleton,
   TextareaField,
   buttonClass,
+  AssigneePicker,
 } from "../ui";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 
 interface Header {
   title: string;
@@ -66,6 +68,7 @@ const emptyHeader = (state?: Partial<Header> | null): Header => ({
  * shared line-item grid, a live totals preview — plus the parts only a bill has:
  * a balance, a payment history, and no way back once issued.
  */
+
 export default function InvoiceEditor() {
   const { id } = useParams();
   const isNew = !id || id === "new";
@@ -386,20 +389,15 @@ export default function InvoiceEditor() {
             ))}
           </SelectField>
 
-          <SelectField
+          <AssigneePicker
             label="Owner"
-            name="ownerUserId"
+            groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: header.ownerUserId })}
             value={header.ownerUserId}
             disabled={!editable}
-            onChange={(e) => patchHeader({ ownerUserId: e.target.value })}
-          >
-            <option value="">Unassigned</option>
-            {(members.data ?? []).map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </SelectField>
+            onChange={(id) => patchHeader({ ownerUserId: id })}
+            allowUnassigned
+            placeholder="Unassigned"
+          />
         </div>
       </Card>
 

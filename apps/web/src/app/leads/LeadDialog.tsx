@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
 import { AccountSelect } from "../accounts/AccountSelect";
 import { Timeline } from "../activities/Timeline";
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
-import { memberLabel, orgApi } from "../org/api";
-import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField } from "../ui";
+import { orgApi } from "../org/api";
+import { Alert, Badge, Button, Field, Modal, SelectField, TextareaField, AssigneePicker } from "../ui";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import { LEAD_STAGES, STAGE_META, stageLabel, type Lead, type LeadInput } from "./api";
 import { leadFormSchema, toPayload, type LeadFormValues } from "./schemas";
 
@@ -45,6 +46,7 @@ export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: 
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LeadFormValues>({
@@ -148,18 +150,21 @@ export function LeadDialog({ lead, initialState, onClose, onSubmit, onDelete }: 
             {...register("followUpAt")}
           />
 
-          <SelectField
-            label="Owner"
-            error={errors.ownerUserId?.message}
-            {...register("ownerUserId")}
-          >
-            <option value="">Unassigned</option>
-            {(members.data ?? []).map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </SelectField>
+          <Controller
+            control={control}
+            name="ownerUserId"
+            render={({ field }) => (
+              <AssigneePicker
+                label="Owner"
+                groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: field.value })}
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                allowUnassigned
+                placeholder="Unassigned"
+                error={errors.ownerUserId?.message}
+              />
+            )}
+          />
 
           <SelectField label="Source" error={errors.source?.message} {...register("source")}>
             <option value="">—</option>

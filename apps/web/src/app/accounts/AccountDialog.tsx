@@ -1,19 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import {
   Alert,
   Badge,
   Button,
   Field,
   Modal,
-  SelectField,
   TextareaField,
+  AssigneePicker,
 } from "../ui";
+import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import type { Account, AccountFormValues } from "./api";
 import { accountFormSchema } from "./api";
 
@@ -42,6 +43,7 @@ export function AccountDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<AccountFormValues>({
@@ -129,18 +131,21 @@ export function AccountDialog({
             {...register("industry")}
           />
 
-          <SelectField
-            label="Owner"
-            error={errors.ownerUserId?.message}
-            {...register("ownerUserId")}
-          >
-            <option value="">Unassigned</option>
-            {(members.data ?? []).map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </SelectField>
+          <Controller
+            control={control}
+            name="ownerUserId"
+            render={({ field }) => (
+              <AssigneePicker
+                label="Owner"
+                groups={memberGroups(members.data ?? [], { roles: COMMERCIAL_ROLES, keep: field.value })}
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                allowUnassigned
+                placeholder="Unassigned"
+                error={errors.ownerUserId?.message}
+              />
+            )}
+          />
         </div>
 
         <TextareaField

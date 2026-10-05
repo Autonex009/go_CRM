@@ -21,6 +21,8 @@ import {
   ENGINEER_TASKS_ROLES,
 } from "../implementation/api";
 import { STATUS_META, PRIORITY_META } from "../implementation/meta";
+import { memberLabel, orgApi, type Member } from "../org/api";
+import { AssigneePicker, type AssigneeGroup } from "../ui";
 import {
   Alert,
   Avatar,
@@ -45,6 +47,20 @@ export default function ManagerTeamTasks() {
   }>({ open: false });
 
   const isManagerOrAdmin = ENGINEER_TASKS_ROLES.includes(user?.role ?? "");
+
+  // Owners and admins can also hand work to engineering managers (e.g. a lead
+  // who will split it across their team). Managers keep assigning within
+  // their own team only.
+  const canAssignManagers = user?.role === "owner" || user?.role === "admin";
+  const members = useQuery({
+    queryKey: ["members"],
+    queryFn: orgApi.members,
+    staleTime: 5 * 60_000,
+    enabled: canAssignManagers,
+  });
+  const managers = canAssignManagers
+    ? (members.data ?? []).filter((m) => m.role === "manager")
+    : [];
 
   const { data: roster, isLoading, isError, error } = useQuery({
     queryKey: ["managerRoster"],
@@ -82,13 +98,13 @@ export default function ManagerTeamTasks() {
   }, [engineers, search, statusFilter, priorityFilter]);
 
   const quickAssignMutation = useMutation({
-    mutationFn: ({ task, engineerId }: { task: Ask; engineerId: string }) => {
+    mutationFn: ({ task, assigneeId }: { task: Ask; assigneeId: string }) => {
       return implementationApi.update(task.id, {
         title: task.title,
         type: task.type,
         detail: task.detail,
         priority: task.priority,
-        assignedTo: engineerId,
+        assignedTo: assigneeId,
         dueAt: task.dueAt,
       });
     },
@@ -250,27 +266,16 @@ export default function ManagerTeamTasks() {
                 </div>
 
                 <div className="flex items-center gap-2 mt-1">
-                  <select
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        quickAssignMutation.mutate({
-                          task,
-                          engineerId: e.target.value,
-                        });
-                      }
+                  <AssigneePicker
+                    size="sm"
+                    groups={assigneeGroups(engineers, managers)}
+                    value=""
+                    placeholder={managers.length > 0 ? "Assign to…" : "Assign to engineer…"}
+                    disabled={quickAssignMutation.isPending}
+                    onChange={(id) => {
+                      if (id) quickAssignMutation.mutate({ task, assigneeId: id });
                     }}
-                    className="h-7 w-full rounded border border-line bg-surface px-2 text-[11px] text-fg focus:border-accent focus:outline-none"
-                  >
-                    <option value="" disabled>
-                      Assign to engineer…
-                    </option>
-                    {engineers.map((eng) => (
-                      <option key={eng.engineerId} value={eng.engineerId}>
-                        {eng.engineerName}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
             ))}
@@ -414,6 +419,7 @@ export default function ManagerTeamTasks() {
         <CreateTeamTaskModal
           preselectedEngineerId={assignModal.engineerId}
           engineers={engineers}
+          managers={managers}
           onClose={() => setAssignModal({ open: false })}
           onCreated={() => {
             setAssignModal({ open: false });
@@ -426,14 +432,40 @@ export default function ManagerTeamTasks() {
   );
 }
 
+/**
+ * Assignee choices: the team's engineers, plus — for owners and admins — the
+ * engineering managers, each in their own group so the two are not confused.
+ */
+function assigneeGroups(engineers: EngineerWorkload[], managers: Member[]): AssigneeGroup[] {
+  const groups: AssigneeGroup[] = [
+    {
+      label: "Engineers",
+      options: engineers.map((eng) => ({
+        id: eng.engineerId,
+        name: eng.engineerName,
+        hint: `${eng.activeCount} active task${eng.activeCount === 1 ? "" : "s"}`,
+      })),
+    },
+  ];
+  if (managers.length > 0) {
+    groups.push({
+      label: "Managers",
+      options: managers.map((m) => ({ id: m.id, name: memberLabel(m), hint: "Engineering manager" })),
+    });
+  }
+  return groups;
+}
+
 function CreateTeamTaskModal({
   preselectedEngineerId,
   engineers,
+  managers,
   onClose,
   onCreated,
 }: {
   preselectedEngineerId?: string;
   engineers: EngineerWorkload[];
+  managers: Member[];
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -508,19 +540,14 @@ function CreateTeamTaskModal({
         />
 
         <div className="grid grid-cols-2 gap-3">
-          <SelectField
+          <AssigneePicker
             label="Assignee"
-            name="assignee"
+            groups={assigneeGroups(engineers, managers)}
             value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
-          >
-            <option value="">Unassigned</option>
-            {engineers.map((eng) => (
-              <option key={eng.engineerId} value={eng.engineerId}>
-                {eng.engineerName}
-              </option>
-            ))}
-          </SelectField>
+            onChange={setAssignedTo}
+            placeholder="Unassigned"
+            allowUnassigned
+          />
 
           <Field
             label="Due Date"
