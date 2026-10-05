@@ -3,7 +3,7 @@ import { useState } from "react";
 import { GitFork } from "lucide-react";
 
 import { useAuthStore } from "../auth/store";
-import { orgApi, memberLabel } from "../org/api";
+import { orgApi } from "../org/api";
 import {
   implementationApi,
   type Ask,
@@ -12,7 +12,16 @@ import {
   ASK_PRIORITIES,
 } from "./api";
 import { STATUS_META, PRIORITY_META } from "./meta";
-import { Alert, Avatar, Button, Field, Modal, SelectField, TextareaField } from "../ui";
+import {
+  Alert,
+  Avatar,
+  Button,
+  Field,
+  Modal,
+  TextareaField,
+  AssigneePicker,
+} from "../ui";
+import { memberGroups } from "../org/memberGroups";
 
 export function SubTaskList({
   parentAsk,
@@ -222,21 +231,16 @@ function CreateSubTaskModal({
         />
 
         <div className="grid grid-cols-2 gap-3">
-          <SelectField
+          <AssigneePicker
             label="Assign To Engineer"
-            name="subtaskAssignee"
+            groups={memberGroups(assignees)}
             value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
+            onChange={setAssignedTo}
             // Engineer sub-tasks are always theirs; the server enforces it too.
             disabled={isEngineer}
-          >
-            <option value="">Unassigned</option>
-            {assignees.map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)} ({m.role || "member"})
-              </option>
-            ))}
-          </SelectField>
+            allowUnassigned
+            placeholder="Unassigned"
+          />
 
           <Field
             label="Due Date"

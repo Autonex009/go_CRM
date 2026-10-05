@@ -11,7 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search, UserRoundX } from "lucide-react";
 
-import { Avatar } from "../ui";
+import { Avatar } from "./primitives";
 
 export interface AssigneeOption {
   id: string;
@@ -36,6 +36,16 @@ interface AssigneePickerProps {
   /** "sm" for inline use on a card, "md" for a form field. */
   size?: "sm" | "md";
   label?: string;
+  /** Text for the "nobody" row and the empty trigger, e.g. "No manager". */
+  unassignedLabel?: string;
+  /** Validation message under the field, as Field and SelectField show it. */
+  error?: string;
+  /** Accessible name when there is no visible label. */
+  ariaLabel?: string;
+  /** Extra classes for the trigger, e.g. emphasis text. */
+  triggerClassName?: string;
+  /** Classes for the outer wrapper, e.g. a fixed width inside a flex row. */
+  className?: string;
   disabled?: boolean;
 }
 
@@ -64,6 +74,11 @@ export function AssigneePicker({
   allowUnassigned = false,
   size = "md",
   label,
+  unassignedLabel = "Unassigned",
+  error,
+  ariaLabel,
+  triggerClassName = "",
+  className = "",
   disabled = false,
 }: AssigneePickerProps) {
   const [open, setOpen] = useState(false);
@@ -198,7 +213,7 @@ export function AssigneePicker({
   const nextIndex = () => ++rowIndex;
 
   return (
-    <div className="flex min-w-0 flex-col gap-xs">
+    <div className={`flex min-w-0 flex-col gap-xs ${className}`}>
       {label && <span className="text-xs font-medium text-fg-muted">{label}</span>}
 
       <button
@@ -214,20 +229,24 @@ export function AssigneePicker({
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={label ? undefined : ariaLabel}
+        aria-invalid={error ? true : undefined}
         className={`flex w-full items-center justify-between border bg-surface text-left text-fg transition-colors hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 disabled:cursor-not-allowed disabled:opacity-60 ${triggerSize} ${
-          open ? "border-accent/60 ring-2 ring-accent/20" : "border-line"
-        }`}
+          open ? "border-accent/60 ring-2 ring-accent/20" : error ? "border-bad-fg/60" : "border-line"
+        } ${triggerClassName}`}
       >
         <span className="flex min-w-0 items-center gap-1.5">
           {selected && <Avatar name={selected.name} size="xs" />}
           <span className={`truncate ${selected ? "text-fg" : "text-fg-subtle"}`}>
-            {selected?.name ?? placeholder}
+            {selected?.name ?? (allowUnassigned && !value ? unassignedLabel : placeholder)}
           </span>
         </span>
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 text-fg-subtle transition-transform duration-150 ${open ? "rotate-180" : ""}`}
         />
       </button>
+
+      {error && <span className="text-xs text-bad-fg">{error}</span>}
 
       {open &&
         pos &&
@@ -262,7 +281,7 @@ export function AssigneePicker({
               ref={list}
               role="listbox"
               tabIndex={-1}
-              aria-label={label ?? placeholder}
+              aria-label={label ?? ariaLabel ?? placeholder}
               style={{ maxHeight: PANEL_MAX_HEIGHT - (total > SEARCH_THRESHOLD ? 40 : 0) }}
               className="overflow-y-auto overscroll-contain py-1 focus:outline-none"
             >
@@ -279,7 +298,7 @@ export function AssigneePicker({
                     <span className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-line text-fg-subtle">
                       <UserRoundX className="h-3 w-3" />
                     </span>
-                    <span className="truncate text-fg-muted">Unassigned</span>
+                    <span className="truncate text-fg-muted">{unassignedLabel}</span>
                   </PickerRow>
                 );
               })()}

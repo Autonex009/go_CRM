@@ -7,7 +7,7 @@ import { dealsApi } from "../deals/api";
 import { LineItems } from "../documents/LineItems";
 import { asTimestamp, emptyDocumentItem } from "../documents/types";
 import { ApiError } from "../lib/api";
-import { memberLabel, orgApi } from "../org/api";
+import { orgApi } from "../org/api";
 import { useCurrency } from "../org/workspace";
 import { VigilProposalDocument } from "../quotes/VigilProposalDocument";
 import { VigilSectionEditor } from "../quotes/VigilSectionEditor";
@@ -35,7 +35,9 @@ import {
   PageHeader,
   SelectField,
   Skeleton,
+  AssigneePicker,
 } from "../ui";
+import { memberGroups } from "../org/memberGroups";
 
 /** The linking fields the quote record itself carries. */
 interface Links {
@@ -58,6 +60,9 @@ interface Links {
  * items, so the total on the quotes list, the company financials and any invoice
  * raised later all read the same numbers.
  */
+
+/** Commercial owners first: these records are run by sales. */
+const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 export default function VigilProposalEditor() {
   const { id } = useParams();
   const isNew = !id || id === "new";
@@ -371,22 +376,18 @@ export default function VigilProposalEditor() {
               </option>
             ))}
           </SelectField>
-          <SelectField
+          <AssigneePicker
             label="Owner"
+            groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
             value={links.ownerUserId}
             disabled={!editable}
-            onChange={(e) => {
+            onChange={(id) => {
               setDirty(true);
-              setLinks((p) => ({ ...p, ownerUserId: e.target.value }));
+              setLinks((p) => ({ ...p, ownerUserId: id }));
             }}
-          >
-            <option value="">—</option>
-            {(members.data ?? []).map((member) => (
-              <option key={member.id} value={member.id}>
-                {memberLabel(member)}
-              </option>
-            ))}
-          </SelectField>
+            allowUnassigned
+            placeholder="Unassigned"
+          />
           <Field
             label="Valid until"
             type="date"

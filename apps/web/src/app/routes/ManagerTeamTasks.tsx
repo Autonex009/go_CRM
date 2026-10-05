@@ -21,7 +21,7 @@ import {
 } from "../implementation/api";
 import { STATUS_META, PRIORITY_META } from "../implementation/meta";
 import { memberLabel, orgApi, type Member } from "../org/api";
-import { AssigneePicker, type AssigneeGroup } from "../implementation/AssigneePicker";
+import { AssigneePicker, type AssigneeGroup } from "../ui";
 import {
   Alert,
   Avatar,

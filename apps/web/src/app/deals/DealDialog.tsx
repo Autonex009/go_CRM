@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
 import { AccountSelect } from "../accounts/AccountSelect";
@@ -10,8 +10,9 @@ import { Timeline } from "../activities/Timeline";
 
 import { ApiError } from "../lib/api";
 import { zodResolver } from "../lib/zodResolver";
-import { memberLabel, orgApi } from "../org/api";
-import { Alert, Badge, Button, Field, Modal, SelectField } from "../ui";
+import { orgApi } from "../org/api";
+import { Alert, Badge, Button, Field, Modal, SelectField, AssigneePicker } from "../ui";
+import { memberGroups } from "../org/memberGroups";
 import type { Deal, DealInput } from "./api";
 import { buildQuoteStateFromDeal } from "./quote-utils";
 import { TaskHistory } from "./TaskHistory";
@@ -35,6 +36,9 @@ interface DealDialogProps {
 }
 
 /** Create/edit form. One dialog for both, since the field set is identical. */
+
+/** Commercial owners first: these records are run by sales. */
+const OWNER_ROLE_ORDER = ["account_manager", "sales", "owner", "manager", "engineer"];
 export function DealDialog({
   deal,
   defaultStage,
@@ -275,18 +279,21 @@ export function DealDialog({
             ))}
           </SelectField>
 
-          <SelectField
-            label="Owner"
-            error={errors.ownerUserId?.message}
-            {...register("ownerUserId")}
-          >
-            <option value="">Unassigned</option>
-            {(members.data ?? []).map((m) => (
-              <option key={m.id} value={m.id}>
-                {memberLabel(m)}
-              </option>
-            ))}
-          </SelectField>
+          <Controller
+            control={control}
+            name="ownerUserId"
+            render={({ field }) => (
+              <AssigneePicker
+                label="Owner"
+                groups={memberGroups(members.data ?? [], { order: OWNER_ROLE_ORDER })}
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                allowUnassigned
+                placeholder="Unassigned"
+                error={errors.ownerUserId?.message}
+              />
+            )}
+          />
         </div>
 
         <AccountSelect

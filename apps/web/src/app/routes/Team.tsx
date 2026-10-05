@@ -18,7 +18,9 @@ import {
   PageHeader,
   SelectField,
   Skeleton,
+  AssigneePicker,
 } from "../ui";
+import { memberGroups } from "../org/memberGroups";
 
 export default function Team() {
   const queryClient = useQueryClient();
@@ -248,27 +250,23 @@ export default function Team() {
                               </span>
 
                               {canManageRoles && (
-                                <select
+                                <AssigneePicker
+                                  size="sm"
+                                  className="w-48"
+                                  triggerClassName="h-8 font-medium"
+                                  groups={memberGroups(managers, { exclude: eng.id })}
                                   value={eng.managerId ?? ""}
                                   disabled={assignManager.isPending}
-                                  onChange={(e) =>
+                                  onChange={(id) =>
                                     assignManager.mutate({
                                       memberId: eng.id,
-                                      managerId: e.target.value || null,
+                                      managerId: id || null,
                                     })
                                   }
-                                  aria-label={`Reassign manager for ${memberLabel(eng)}`}
-                                  className="h-8 rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-fg focus:border-accent focus:outline-none"
-                                >
-                                  <option value="">Unassign</option>
-                                  {managers
-                                    .filter((m) => m.id !== eng.id)
-                                    .map((m) => (
-                                      <option key={m.id} value={m.id}>
-                                        Move to: {memberLabel(m)}
-                                      </option>
-                                    ))}
-                                </select>
+                                  ariaLabel={`Reassign manager for ${memberLabel(eng)}`}
+                                  allowUnassigned
+                                  unassignedLabel="No manager"
+                                />
                               )}
                             </div>
                           </li>
@@ -318,31 +316,24 @@ export default function Team() {
                             </span>
 
                             {canManageRoles && (
-                              <select
-                                defaultValue=""
+                              <AssigneePicker
+                                size="sm"
+                                className="w-48"
+                                triggerClassName="h-8 font-semibold !border-amber-500/40"
+                                groups={memberGroups(managers, { exclude: eng.id })}
+                                value=""
                                 disabled={assignManager.isPending}
-                                onChange={(e) => {
-                                  if (e.target.value) {
+                                onChange={(id) => {
+                                  if (id) {
                                     assignManager.mutate({
                                       memberId: eng.id,
-                                      managerId: e.target.value,
+                                      managerId: id,
                                     });
                                   }
                                 }}
-                                aria-label={`Assign manager for ${memberLabel(eng)}`}
-                                className="h-8 rounded-lg border border-amber-500/40 bg-surface px-2.5 text-xs font-bold text-fg focus:border-accent focus:outline-none"
-                              >
-                                <option value="" disabled>
-                                  Assign to Manager…
-                                </option>
-                                {managers
-                                  .filter((m) => m.id !== eng.id)
-                                  .map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                      {memberLabel(m)} ({ROLE_LABEL[m.role ?? "manager"] ?? m.role})
-                                    </option>
-                                  ))}
-                              </select>
+                                ariaLabel={`Assign manager for ${memberLabel(eng)}`}
+                                placeholder="Assign to Manager…"
+                              />
                             )}
                           </div>
                         </li>
@@ -391,28 +382,23 @@ export default function Team() {
                   <div className="flex items-center gap-sm">
                     {m.role === "engineer" && (
                       canManageRoles ? (
-                        <select
+                        <AssigneePicker
+                          size="sm"
+                          className="w-44"
+                          triggerClassName="h-8 font-medium"
+                          groups={memberGroups(managers, { exclude: m.id })}
                           value={m.managerId ?? ""}
                           disabled={assignManager.isPending}
-                          onChange={(e) =>
+                          onChange={(id) =>
                             assignManager.mutate({
                               memberId: m.id,
-                              managerId: e.target.value || null,
+                              managerId: id || null,
                             })
                           }
-                          title="Assigned Manager"
-                          aria-label={`Assigned Manager for ${memberLabel(m)}`}
-                          className="h-8 rounded-md border border-line bg-surface px-2 text-xs font-medium text-fg focus:border-accent focus:outline-none disabled:opacity-60"
-                        >
-                          <option value="">No Manager</option>
-                          {managers
-                            .filter((mgr) => mgr.id !== m.id)
-                            .map((mgr) => (
-                              <option key={mgr.id} value={mgr.id}>
-                                Mgr: {memberLabel(mgr)}
-                              </option>
-                            ))}
-                        </select>
+                          ariaLabel={`Assigned Manager for ${memberLabel(m)}`}
+                          allowUnassigned
+                          unassignedLabel="No manager"
+                        />
                       ) : (
                         m.managerName && (
                           <span className="text-[11px] text-fg-subtle">
@@ -494,19 +480,14 @@ export default function Team() {
                     </SelectField>
 
                     {inviteRole === "engineer" ? (
-                      <SelectField
+                      <AssigneePicker
                         label="Assign Manager (Optional)"
-                        name="inviteManager"
+                        groups={memberGroups(managers)}
                         value={inviteManagerId}
-                        onChange={(e) => setInviteManagerId(e.target.value)}
-                      >
-                        <option value="">No manager pre-assigned</option>
-                        {managers.map((mgr) => (
-                          <option key={mgr.id} value={mgr.id}>
-                            {memberLabel(mgr)} ({ROLE_LABEL[mgr.role ?? "manager"] ?? mgr.role})
-                          </option>
-                        ))}
-                      </SelectField>
+                        onChange={setInviteManagerId}
+                        allowUnassigned
+                        unassignedLabel="No manager pre-assigned"
+                      />
                     ) : (
                       <div className="flex flex-col justify-end pb-1 text-xs text-fg-subtle">
                         Full access to pipeline &amp; commercial deals
