@@ -64,7 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/leads", label: "Leads", icon: TrendingUp, roles: ["owner", "admin", "sales", "account_manager"] },
       { to: "/deals", label: "Deals", icon: Handshake, roles: ["owner", "admin", "sales", "account_manager"] },
       { to: "/implementation", label: "Implementation", icon: Wrench, end: true, roles: ["owner", "admin", "sales", "account_manager", "manager"] },
-      { to: "/implementation/team-tasks", label: "Engineer Tasks", icon: Users, end: true, roles: ["owner", "admin", "manager"] },
+      { to: "/implementation/team-tasks", label: "Engineer Tasks", icon: Users, end: true, roles: ["owner", "admin", "sales", "account_manager", "manager"] },
     ],
   },
   {

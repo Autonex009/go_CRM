@@ -340,5 +340,6 @@ function parentOf(ask: Ask): AskParent {
   return {
     company: company || "Technical Delivery",
     label: company ? `${company} Implementation` : "Technical Task",
+    locations: ask.locations ?? undefined,
   };
 }

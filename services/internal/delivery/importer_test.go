@@ -539,6 +539,12 @@ func TestParseActualAutonexWorkbook(t *testing.T) {
 }
 
 func TestCommitActualAutonexWorkbookToDB(t *testing.T) {
+	// This test writes to (and deletes from) whatever database DATABASE_URL
+	// names, including the one in .env. It must never run by accident as part
+	// of `go test ./...`, so it is opt-in.
+	if os.Getenv("RUN_LIVE_DB_TESTS") != "1" {
+		t.Skip("writes to a real database; set RUN_LIVE_DB_TESTS=1 to run")
+	}
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		if envBytes, err := os.ReadFile("../../../.env"); err == nil {

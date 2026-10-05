@@ -18,6 +18,7 @@ import {
   type AskPriority,
   type EngineerWorkload,
   ASK_PRIORITIES,
+  ENGINEER_TASKS_ROLES,
 } from "../implementation/api";
 import { STATUS_META, PRIORITY_META } from "../implementation/meta";
 import { memberLabel, orgApi, type Member } from "../org/api";
@@ -45,10 +46,7 @@ export default function ManagerTeamTasks() {
     subtask?: Ask;
   }>({ open: false });
 
-  const isManagerOrAdmin =
-    user?.role === "manager" ||
-    user?.role === "owner" ||
-    user?.role === "admin";
+  const isManagerOrAdmin = ENGINEER_TASKS_ROLES.includes(user?.role ?? "");
 
   // Owners and admins can also hand work to engineering managers (e.g. a lead
   // who will split it across their team). Managers keep assigning within

@@ -42,6 +42,8 @@ export interface AskParent {
   label: string;
   /** Company name, for the avatar and the banner. */
   company: string;
+  /** The deal's sites, read from the deal — never typed here. */
+  locations?: string;
 }
 
 export function AskDialog({
@@ -183,7 +185,14 @@ export function AskDialog({
           </span>
           <div className="flex items-center gap-sm rounded-md border border-line bg-surface-muted px-md py-sm">
             <Avatar name={parent.company || parent.label} size="sm" />
-            <span className="min-w-0 truncate text-sm text-fg">{parent.label}</span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-sm text-fg">{parent.label}</span>
+              {parent.locations && (
+                <span className="truncate text-xs text-fg-muted" title={parent.locations}>
+                  {parent.locations}
+                </span>
+              )}
+            </span>
           </div>
         </div>
 

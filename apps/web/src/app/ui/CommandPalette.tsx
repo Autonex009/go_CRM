@@ -15,6 +15,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   const isEngineer = role === 'engineer';
   const isManager = role === 'manager';
   const isAdmin = role === 'owner' || role === 'admin';
+  // Sales and account managers see every ask on the board, so they get the
+  // engineer workload view too (mirrors ENGINEER_TASKS_ROLES).
+  const canSeeEngineerTasks =
+    isAdmin || role === 'sales' || role === 'account_manager';
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -51,13 +55,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       { title: 'View Leads Pipeline', category: 'Leads', path: '/leads' },
       { title: 'Companies & Accounts', category: 'CRM', path: '/accounts' },
       { title: 'Implementation Board', category: 'Engineering', path: '/implementation' },
-      ...(isAdmin ? [{ title: 'Engineer Tasks Matrix', category: 'Management', path: '/implementation/team-tasks' }] : []),
+      ...(canSeeEngineerTasks ? [{ title: 'Engineer Tasks Matrix', category: 'Management', path: '/implementation/team-tasks' }] : []),
       { title: 'Quotes Workbench', category: 'Sales', path: '/quotes' },
       { title: 'GST Tax Invoices', category: 'Finance', path: '/invoices' },
       { title: 'Sales Analytics', category: 'Metrics', path: '/metrics' },
       { title: 'Team & Settings', category: 'Settings', path: '/team' },
     ];
-  }, [isEngineer, isManager, isAdmin]);
+  }, [isEngineer, isManager, canSeeEngineerTasks]);
 
   if (!isOpen) return null;
 

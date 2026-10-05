@@ -25,7 +25,9 @@ const askColumns = `
 	a.assigned_to::text, pa.full_name,
 	a.created_by::text, pc.full_name, pc.role,
 	a.due_at, a.position,
-	a.delivered_at, a.verified_at, a.created_at, a.updated_at`
+	a.delivered_at, a.verified_at, a.created_at, a.updated_at,
+	COALESCE(loc.names, NULLIF(btrim(d.location), ''), NULLIF(btrim(l.location), '')),
+	pl.id::text`
 
 const askFrom = `
 	FROM implementation_asks a
@@ -40,7 +42,22 @@ const askFrom = `
 		       count(*) FILTER (WHERE status IN ('delivered', 'verified')) as done_cnt
 		FROM implementation_asks
 		WHERE parent_ask_id = a.id
-	) sub ON true `
+	) sub ON true
+	LEFT JOIN implementation_pipelines pl
+	       ON pl.org_id = a.org_id AND pl.account_id = a.account_id
+	-- The deal's sites, in the order they were picked: "Plant 1 (Pune); Nashik".
+	-- Only name and city — never the site's address or contact details.
+	LEFT JOIN LATERAL (
+		SELECT string_agg(
+		         al.name || CASE
+		           WHEN NULLIF(btrim(al.city), '') IS NOT NULL
+		            AND lower(btrim(al.city)) <> lower(btrim(al.name))
+		           THEN ' (' || btrim(al.city) || ')' ELSE '' END,
+		         '; ' ORDER BY dl.position) AS names
+		  FROM deal_locations dl
+		  JOIN account_locations al ON al.id = dl.location_id
+		 WHERE dl.deal_id = a.deal_id
+	) loc ON true `
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -56,6 +73,7 @@ func scanAsk(row rowScanner) (Ask, error) {
 		&a.CreatedBy, &a.CreatedByName, &a.CreatedByRole,
 		&a.DueAt, &a.Position,
 		&a.DeliveredAt, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt,
+		&a.Locations, &a.PipelineID,
 	)
 	return a, err
 }

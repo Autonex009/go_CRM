@@ -16,8 +16,8 @@ func TestVisibleClause(t *testing.T) {
 		{role: "admin", wantNone: true},
 		{role: "sales", wantNone: true},
 		{role: "account_manager", wantNone: true},
-		{role: "engineer", contains: []string{"a.assigned_to = $3::uuid"}, excludes: []string{"manager_id", "created_by"}},
-		{role: "manager", contains: []string{"a.assigned_to = $3::uuid", "mp.manager_id = $3::uuid", "a.created_by = $3::uuid"}},
+		{role: "engineer", contains: []string{"a.assigned_to = $3::uuid"}, excludes: []string{"manager_id", "created_by", "implementation_pipelines"}},
+		{role: "manager", contains: []string{"a.assigned_to = $3::uuid", "mp.manager_id = $3::uuid", "a.created_by = $3::uuid", "ip.manager_id = $3::uuid", "ip.archived_at IS NULL"}},
 		// Unknown and client roles fail closed to the engineer rule.
 		{role: "client", contains: []string{"a.assigned_to = $3::uuid"}, excludes: []string{"manager_id"}},
 		{role: "", contains: []string{"a.assigned_to = $3::uuid"}, excludes: []string{"manager_id"}},
