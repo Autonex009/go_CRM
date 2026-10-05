@@ -1,4 +1,4 @@
-import { CalendarClock, Square, Trash2 } from "lucide-react";
+import { CalendarClock, MapPin, Square, Trash2 } from "lucide-react";
 
 import { Avatar } from "../ui";
 import type { Ask } from "./api";
@@ -73,6 +73,16 @@ export function AskCard({
       <p className="whitespace-pre-wrap break-words text-[13px] font-medium leading-snug text-fg">
         {ask.title}
       </p>
+
+      {ask.locations && (
+        <p
+          className="flex min-w-0 items-center gap-1 text-[11px] text-fg-muted"
+          title={ask.locations}
+        >
+          <MapPin className="h-3 w-3 shrink-0 text-fg-subtle" />
+          <span className="truncate">{ask.locations}</span>
+        </p>
+      )}
 
       {blocked && ask.blockedReason && (
         <p

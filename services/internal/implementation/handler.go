@@ -34,6 +34,11 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/manager/roster", h.managerRoster)
 	// The managed list of ask types. Ahead of /{id} so "types" is not read as
 	// an ask id.
+	// Company pipelines. Static segments, so ahead of /{id} like /types.
+	r.Get("/pipelines", h.listPipelines)
+	r.Post("/pipelines", h.createPipeline)
+	r.Patch("/pipelines/{pipelineId}", h.updatePipeline)
+
 	r.Get("/types", h.listTypes)
 	r.Post("/types", h.createType)
 	r.Delete("/types/{typeId}", h.deleteType)
@@ -344,6 +349,45 @@ func (h *Handler) detach(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) listPipelines(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	items, err := h.svc.Pipelines(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), middleware.Role(ctx))
+	if err != nil {
+		httpx.WriteServerError(w, "could not load pipelines", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) createPipeline(w http.ResponseWriter, r *http.Request) {
+	var in PipelineInput
+	if !httpx.DecodeJSON(w, r, &in) {
+		return
+	}
+	ctx := r.Context()
+	p, err := h.svc.CreatePipeline(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), middleware.Role(ctx), in)
+	if err != nil {
+		h.writeErr(w, err, "could not create that pipeline")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, p)
+}
+
+func (h *Handler) updatePipeline(w http.ResponseWriter, r *http.Request) {
+	var in PipelinePatch
+	if !httpx.DecodeJSON(w, r, &in) {
+		return
+	}
+	ctx := r.Context()
+	p, err := h.svc.UpdatePipeline(ctx, middleware.OrgID(ctx), middleware.Role(ctx),
+		chi.URLParam(r, "pipelineId"), in)
+	if err != nil {
+		h.writeErr(w, err, "could not update that pipeline")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, p)
+}
+
 func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 	httpx.WriteDomainError(w, err, fallback,
 		httpx.Rule{Err: ErrNotFound, Status: http.StatusNotFound, Message: "ask not found"},
@@ -353,6 +397,11 @@ func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 		httpx.Rule{Err: ErrAssigneeNotFound, Status: http.StatusBadRequest, Message: "assignee not found"},
 		httpx.Rule{Err: ErrStorageUnconfigured, Status: http.StatusServiceUnavailable, Message: "file attachments are not configured"},
 		httpx.Rule{Err: ErrTypeExists, Status: http.StatusConflict, Message: "that type already exists"},
+		httpx.Rule{Err: ErrPipelineNotFound, Status: http.StatusNotFound, Message: "pipeline not found"},
+		httpx.Rule{Err: ErrPipelineExists, Status: http.StatusConflict, Message: "that company already has a pipeline"},
+		httpx.Rule{Err: ErrPipelineForbidden, Status: http.StatusForbidden, Message: "only admin, sales or account managers can manage pipelines"},
+		httpx.Rule{Err: ErrCompanyNotFound, Status: http.StatusBadRequest, Message: "company not found"},
+		httpx.Rule{Err: ErrManagerNotFound, Status: http.StatusBadRequest, Message: "engineering manager not found"},
 		httpx.Rule{Err: ErrEngineerMustLinkTask, Status: http.StatusBadRequest, Message: "engineers must link their card to an assigned task"},
 		httpx.Rule{Err: ErrEngineerUnassignedParent, Status: http.StatusForbidden, Message: "you can only create cards linked to tasks assigned to you"},
 	)

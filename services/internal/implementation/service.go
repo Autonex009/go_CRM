@@ -256,6 +256,15 @@ func (s *Service) Create(ctx context.Context, orgID, actorID, actorRole string, 
 		return Ask{}, err
 	}
 
+	// Every company with work gets a pipeline. Re-read only when one was just
+	// opened, so the response carries its id.
+	if a.PipelineID == nil && a.AccountID != nil {
+		s.ensurePipelineFor(ctx, orgID, a.ID, actorID)
+		if fresh, err := s.store.get(ctx, orgID, a.ID); err == nil {
+			a = fresh
+		}
+	}
+
 	s.store.record(ctx, Event{
 		AskID: a.ID, orgID: orgID, ActorID: nilIfEmpty(actorID),
 		Kind: kindCreated, ToValue: StatusLabel[a.Status],

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Users } from "lucide-react";
+import { Plus, Search, Users } from "lucide-react";
 
 import { useAuthStore } from "../auth/store";
 import { AskDialog, type AskParent } from "../implementation/AskDialog";
@@ -12,11 +12,20 @@ import {
   type AskInput,
   type AskPriority,
   type AskStatus,
+  type Pipeline,
+  PIPELINE_ADMIN_ROLES,
 } from "../implementation/api";
 import { AskCard } from "../implementation/AskCard";
+import { PipelineDialog } from "../implementation/PipelineDialog";
+import { PipelineSection } from "../implementation/PipelineSection";
+import {
+  groupAsks,
+  groupKeyOf,
+  matchesSearch,
+  type PipelineGroup,
+} from "../implementation/pipelineGroups";
 import { useDeleteAsk } from "../implementation/useDeleteAsk";
 import {
-  BOARD_STATUSES,
   IMPLEMENTATION_COLUMNS,
   PRIORITY_META,
   isOverdue,
@@ -29,7 +38,6 @@ import {
   Button,
   EmptyState,
   Field,
-  KanbanBoard,
   Modal,
   SelectField,
   TextareaField,
@@ -55,6 +63,36 @@ export default function Implementation() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedAskId = searchParams.get("ask");
+  const search = searchParams.get("q") ?? "";
+  const [showArchived, setShowArchived] = useState(false);
+  const [pipelineDialog, setPipelineDialog] = useState<Pipeline | "new" | null>(null);
+  const [expandedOverrides, setExpandedOverrides] = useState<Record<string, boolean>>(
+    readExpanded,
+  );
+  const canManagePipelines = PIPELINE_ADMIN_ROLES.includes(user?.role ?? "");
+
+  const pipelinesQuery = useQuery({
+    queryKey: ["implementationPipelines"],
+    queryFn: () => implementationApi.pipelines(),
+  });
+
+  const setSearch = (value: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set("q", value);
+        else next.delete("q");
+        return next;
+      },
+      { replace: true },
+    );
+
+  const setExpanded = (key: string, value: boolean) =>
+    setExpandedOverrides((prev) => {
+      const next = { ...prev, [key]: value };
+      writeExpanded(next);
+      return next;
+    });
 
   const query = useQuery({
     queryKey: ["implementation"],
@@ -68,7 +106,12 @@ export default function Implementation() {
   useEffect(() => {
     if (!linkedAskId || !query.data) return;
     const target = query.data.asks.find((a) => a.id === linkedAskId);
-    if (target) setDialog(target);
+    if (target) {
+      setDialog(target);
+      // Open its section for this visit only; the saved preference is untouched.
+      const key = groupKeyOf(target);
+      setExpandedOverrides((prev) => ({ ...prev, [key]: true }));
+    }
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -149,16 +192,36 @@ export default function Implementation() {
     }
   }, [board, view, viewerId, dealFilter]);
 
-  // KanbanBoard groups on `stage`, so each ask carries its status under that
-  // name. Verified and Won't do have no column, so they are dropped here rather
-  // than landing in a bucket nothing renders.
-  const items = useMemo(
-    () =>
-      asks
-        .filter((a) => BOARD_STATUSES.includes(a.status))
-        .map((a) => ({ ...a, stage: a.status })),
-    [asks],
+  // One section per company. Empty pipelines only show on the unfiltered view,
+  // so a chip or the deal filter does not fill the page with empty companies.
+  const filtering = view !== "all" || Boolean(dealFilter);
+  const groups = useMemo(
+    () => groupAsks(asks, pipelinesQuery.data ?? [], !filtering),
+    [asks, pipelinesQuery.data, filtering],
   );
+  const archivedCount = (pipelinesQuery.data ?? []).filter((p) => p.archivedAt).length;
+  const visibleGroups = groups.filter(
+    (g) => (showArchived || !g.archived) && matchesSearch(g, search),
+  );
+  const takenAccountIds = useMemo(
+    () => new Set((pipelinesQuery.data ?? []).map((p) => p.accountId)),
+    [pipelinesQuery.data],
+  );
+
+  // Open by default when there are only a few companies, when a search is
+  // narrowing them, or when one has work that is stuck or late. A click on the
+  // header overrides that and is remembered on this device.
+  const isExpanded = (g: PipelineGroup) =>
+    expandedOverrides[g.key] ??
+    (visibleGroups.length <= 5 || Boolean(search.trim()) || g.blocked > 0 || g.overdue > 0);
+
+  const moveAsk = (id: string, status: AskStatus) => {
+    // A blocked ask without a reason is the one card nobody can act on, so
+    // the move asks for it rather than leaving the chip bare.
+    const reason =
+      status === "blocked" ? window.prompt("What is it blocked on?")?.trim() ?? "" : "";
+    move.mutate({ id, status, reason });
+  };
 
   return (
     <section className="flex flex-col gap-4">
@@ -186,7 +249,31 @@ export default function Implementation() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative flex items-center">
+            <span className="sr-only">Search company pipelines</span>
+            <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-fg-subtle" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search company, site or manager…"
+              maxLength={120}
+              className="w-64 rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-xs text-fg placeholder:text-fg-subtle focus:border-accent/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+            />
+          </label>
+
+          {canManagePipelines && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setPipelineDialog("new")}
+            >
+              <Plus className="h-3.5 w-3.5" /> New pipeline
+            </Button>
+          )}
+
           {isEngineer && (
             <Button
               type="button"
@@ -266,6 +353,11 @@ export default function Implementation() {
             ))}
           </select>
         )}
+        {archivedCount > 0 && (
+          <Chip active={showArchived} onClick={() => setShowArchived((v) => !v)}>
+            Archived · {archivedCount}
+          </Chip>
+        )}
       </div>
 
       {query.isError && (
@@ -276,9 +368,17 @@ export default function Implementation() {
         </Alert>
       )}
 
+      {pipelinesQuery.isError && (
+        <Alert>
+          {pipelinesQuery.error instanceof ApiError
+            ? pipelinesQuery.error.message
+            : "Could not load company pipelines — cards are grouped by company without pipeline details."}
+        </Alert>
+      )}
+
       {query.isPending ? (
         <BoardSkeleton columns={IMPLEMENTATION_COLUMNS} />
-      ) : (board?.asks ?? []).length === 0 ? (
+      ) : (board?.asks ?? []).length === 0 && (pipelinesQuery.data ?? []).length === 0 ? (
         <EmptyState
           icon="check"
           title={isEngineer ? "No tasks assigned to you" : "No implementation asks yet"}
@@ -289,29 +389,49 @@ export default function Implementation() {
           }
         />
       ) : (
-        <KanbanBoard
-          columns={IMPLEMENTATION_COLUMNS}
-          items={items}
-          renderCard={(item, overlay) => (
-            <AskCard
-              ask={item}
-              overlay={overlay}
-              onDelete={isEngineer ? undefined : deleteAsk}
-            />
+        <div className="flex flex-col gap-sm">
+          {visibleGroups.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-line px-md py-lg text-center text-sm text-fg-muted">
+              {search ? `No company matches “${search}”.` : "Nothing matches this filter."}
+            </p>
+          ) : (
+            visibleGroups.map((g) => (
+              <PipelineSection
+                key={g.key}
+                group={g}
+                expanded={isExpanded(g)}
+                onToggle={() => setExpanded(g.key, !isExpanded(g))}
+                onEdit={
+                  canManagePipelines && g.pipeline
+                    ? () => setPipelineDialog(g.pipeline)
+                    : undefined
+                }
+                renderCard={(item, overlay) => (
+                  <AskCard
+                    ask={item}
+                    overlay={overlay}
+                    onDelete={isEngineer ? undefined : deleteAsk}
+                  />
+                )}
+                onMove={moveAsk}
+                onOpen={(item) => setDialog(item)}
+              />
+            ))
           )}
-          onMove={(id, stage) => {
-            const status = stage as AskStatus;
-            // A blocked ask without a reason is the one card nobody can act on,
-            // so the move asks for it rather than leaving the chip bare.
-            const reason =
-              status === "blocked"
-                ? window.prompt("What is it blocked on?")?.trim() ?? ""
-                : "";
-            move.mutate({ id, status, reason });
-          }}
-          onOpen={(item) => setDialog(item)}
-          // Every ask belongs to a deal or lead, so it is raised from there.
-          onAdd={undefined}
+        </div>
+      )}
+
+      {pipelineDialog && (
+        <PipelineDialog
+          key={pipelineDialog === "new" ? "new" : pipelineDialog.id}
+          pipeline={pipelineDialog === "new" ? null : pipelineDialog}
+          openAsks={
+            pipelineDialog === "new"
+              ? 0
+              : groups.find((g) => g.key === pipelineDialog.id)?.open ?? 0
+          }
+          takenAccountIds={takenAccountIds}
+          onClose={() => setPipelineDialog(null)}
         />
       )}
 
@@ -492,6 +612,33 @@ function CreateEngineerCardModal({
   );
 }
 
+const EXPANDED_KEY = "implementation.pipelines.expanded";
+
+/** Which company sections this viewer opened or closed. A convenience only:
+ *  storage can be unavailable, and the board falls back to its defaults. */
+function readExpanded(): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(EXPANDED_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (e): e is [string, boolean] => typeof e[1] === "boolean",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeExpanded(value: Record<string, boolean>) {
+  try {
+    window.localStorage.setItem(EXPANDED_KEY, JSON.stringify(value));
+  } catch {
+    // Private mode or blocked storage: the choice just is not remembered.
+  }
+}
+
 function parentOf(ask: Ask): AskParent {
   const company = ask.accountName ?? "";
   const where = ask.dealTitle ?? ask.leadTitle ?? "";
@@ -500,6 +647,7 @@ function parentOf(ask: Ask): AskParent {
     leadId: ask.leadId ?? undefined,
     company: company || where,
     label: [company, where].filter(Boolean).join(" — ") || "Unlinked",
+    locations: ask.locations ?? undefined,
   };
 }
 

@@ -13,6 +13,10 @@ export interface Ask {
   leadTitle: string | null;
   accountName: string | null;
   parentTitle?: string | null;
+  /** Where the work happens — read live from the deal's sites (name, city). */
+  locations?: string | null;
+  /** The company pipeline this ask sits in, when one exists. */
+  pipelineId?: string | null;
 
   subtaskCount?: number;
   subtaskDoneCount?: number;
@@ -38,6 +42,36 @@ export interface Ask {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Mirrors implementation.Pipeline — one company's kanban. */
+export interface Pipeline {
+  id: string;
+  accountId: string;
+  accountName: string;
+  managerId: string | null;
+  managerName: string | null;
+  description: string;
+  locations: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PipelineInput {
+  accountId: string;
+  managerId?: string | null;
+  description?: string;
+}
+
+/** Omitted fields are left as they are; managerId "" clears the manager. */
+export interface PipelinePatch {
+  managerId?: string;
+  description?: string;
+  archived?: boolean;
+}
+
+/** Roles that create, reassign and archive pipelines (mirrors the server). */
+export const PIPELINE_ADMIN_ROLES = ["owner", "admin", "sales", "account_manager"];
 
 export const ASK_STATUSES = [
   "requested",
@@ -203,6 +237,20 @@ export const implementationApi = {
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),
 
   events: (id: string) => apiFetch<AskEvent[]>(`${BASE}/${id}/events`),
+
+  pipelines: () => apiFetch<Pipeline[]>(`${BASE}/pipelines`),
+
+  createPipeline: (input: PipelineInput) =>
+    apiFetch<Pipeline>(`${BASE}/pipelines`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updatePipeline: (id: string, patch: PipelinePatch) =>
+    apiFetch<Pipeline>(`${BASE}/pipelines/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
 
   types: () => apiFetch<AskType[]>(`${BASE}/types`),
 

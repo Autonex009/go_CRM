@@ -67,6 +67,12 @@ type Ask struct {
 	LeadTitle   *string `json:"leadTitle"`
 	AccountName *string `json:"accountName"`
 	ParentTitle *string `json:"parentTitle,omitempty"`
+	// Locations is where the work happens, read live from the deal's sites
+	// (falling back to the deal's or lead's free-text location) — never typed
+	// on the ask, so it cannot drift from the deal card.
+	Locations *string `json:"locations"`
+	// PipelineID is the company pipeline the ask belongs to, if one exists.
+	PipelineID *string `json:"pipelineId"`
 
 	SubtaskCount     int `json:"subtaskCount"`
 	SubtaskDoneCount int `json:"subtaskDoneCount"`

@@ -14,7 +14,8 @@ var fullAccessRoles = map[string]bool{
 //   - an engineer sees only what is assigned to them;
 //   - a manager sees what is assigned to them or to the engineers reporting to
 //     them, plus unassigned asks they raised or whose parent is their
-//     team's — never another manager's or another team's work.
+//     team's, plus every ask in an active company pipeline they manage — never
+//     another manager's or another team's work outside those.
 //
 // Any role not named here gets the engineer rule, so a new or unexpected role
 // fails closed rather than seeing the whole board.
@@ -26,6 +27,10 @@ func VisibleClause(alias, role, ref string) string {
 		team := fmt.Sprintf(`(SELECT mp.id FROM profiles mp WHERE mp.manager_id = %s::uuid)`, ref)
 		return fmt.Sprintf(`(%[1]s.assigned_to = %[2]s::uuid
 		   OR %[1]s.assigned_to IN %[3]s
+		   OR %[1]s.account_id IN (
+		        SELECT ip.account_id FROM implementation_pipelines ip
+		         WHERE ip.org_id = %[1]s.org_id AND ip.manager_id = %[2]s::uuid
+		           AND ip.archived_at IS NULL)
 		   OR (%[1]s.assigned_to IS NULL AND (
 		         %[1]s.created_by = %[2]s::uuid
 		      OR %[1]s.parent_ask_id IN (
