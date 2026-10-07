@@ -70,6 +70,7 @@ export default function ManagerTeamTasks() {
 
   const engineers = roster?.engineers ?? [];
   const unassigned = roster?.unassignedSubtasks ?? [];
+  const managerTasks = roster?.managerTasks ?? [];
 
   // Summary counts
   const totalEngineers = engineers.length;
@@ -283,6 +284,62 @@ export default function ManagerTeamTasks() {
         </div>
       )}
 
+      {/* Manager Tasks to Delegate / Assign */}
+      {managerTasks.length > 0 && (
+        <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <GitFork className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-xs font-semibold text-indigo-900 dark:text-indigo-300">
+                {managerTasks.length} Pipeline / Main Task(s) available to delegate to team engineers
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {managerTasks.map((task) => (
+              <div
+                key={task.id}
+                className="flex flex-col justify-between gap-2 rounded-lg border border-line bg-surface p-2.5 text-xs shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-[10px] font-medium text-fg-subtle truncate">
+                      {task.accountName || "Company Pipeline Task"}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`rounded px-1.5 py-0.2 text-[9px] font-bold ${PRIORITY_META[task.priority].chip}`}>
+                        {PRIORITY_META[task.priority].label}
+                      </span>
+                      <span className={`rounded px-1.5 py-0.2 text-[9px] font-medium ${STATUS_META[task.status].pill}`}>
+                        {STATUS_META[task.status].label}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="font-medium text-fg">{task.title}</p>
+                  {task.detail && (
+                    <p className="text-[11px] text-fg-muted line-clamp-2 mt-1">{task.detail}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-line/60">
+                  <AssigneePicker
+                    size="sm"
+                    groups={assigneeGroups(engineers, managers)}
+                    value={task.assignedTo ?? ""}
+                    placeholder="Assign to engineer…"
+                    disabled={quickAssignMutation.isPending}
+                    onChange={(id) => {
+                      if (id) quickAssignMutation.mutate({ task, assigneeId: id });
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Engineer Roster Grid */}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -469,6 +526,8 @@ function CreateTeamTaskModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const [taskScope, setTaskScope] = useState<"company" | "subtask">("company");
+  const [accountId, setAccountId] = useState("");
   const [title, setTitle] = useState("");
   const [parentAskId, setParentAskId] = useState("");
   const [detail, setDetail] = useState("");
@@ -479,11 +538,18 @@ function CreateTeamTaskModal({
 
   // Fetch top-level asks to connect as parent
   const { data: board } = useQuery({
-    queryKey: ["implementation"],
+    queryKey: ["implementation", { openOnly: true }],
     queryFn: () => implementationApi.board({ openOnly: true }),
   });
 
+  // Fetch company pipelines
+  const { data: pipelines } = useQuery({
+    queryKey: ["implementationPipelines"],
+    queryFn: () => implementationApi.pipelines(),
+  });
+
   const parentAsks = (board?.asks ?? []).filter((a) => !a.parentAskId);
+  const activePipelines = (pipelines ?? []).filter((p) => !p.archivedAt);
 
   const createMutation = useMutation({
     mutationFn: (input: AskInput) => implementationApi.create(input),
@@ -497,13 +563,18 @@ function CreateTeamTaskModal({
       setError("Please provide a task title");
       return;
     }
-    if (!parentAskId) {
+    if (taskScope === "company" && !accountId) {
+      setError("Please select a company pipeline");
+      return;
+    }
+    if (taskScope === "subtask" && !parentAskId) {
       setError("Please connect this sub-task to a main ask");
       return;
     }
 
     createMutation.mutate({
-      parentAskId,
+      accountId: taskScope === "company" ? accountId : undefined,
+      parentAskId: taskScope === "subtask" ? parentAskId : undefined,
       title: title.trim(),
       type: "engineering",
       detail: detail.trim(),
@@ -516,19 +587,65 @@ function CreateTeamTaskModal({
   return (
     <Modal title="Assign Task to Engineer" onClose={onClose} size="lg">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <SelectField
-          label="Connect to Main Ask (Parent)"
-          name="parentAsk"
-          value={parentAskId}
-          onChange={(e) => setParentAskId(e.target.value)}
-        >
-          <option value="">Select a main ask…</option>
-          {parentAsks.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.title} ({a.accountName || "Tech Ask"})
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-fg-muted">Task Scope</span>
+          <div className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-surface-muted/60 p-1">
+            <button
+              type="button"
+              onClick={() => setTaskScope("company")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                taskScope === "company"
+                  ? "bg-surface text-fg shadow-sm"
+                  : "text-fg-muted hover:text-fg"
+              }`}
+            >
+              Company Pipeline Task
+            </button>
+            <button
+              type="button"
+              onClick={() => setTaskScope("subtask")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                taskScope === "subtask"
+                  ? "bg-surface text-fg shadow-sm"
+                  : "text-fg-muted hover:text-fg"
+              }`}
+            >
+              Sub-task under Main Ask
+            </button>
+          </div>
+        </div>
+
+        {taskScope === "company" ? (
+          <SelectField
+            label="Company Pipeline *"
+            name="pipeline"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            required
+          >
+            <option value="">Select a company pipeline…</option>
+            {activePipelines.map((p) => (
+              <option key={p.accountId} value={p.accountId}>
+                {p.accountName} {p.managerName ? `· Managed by ${p.managerName}` : ""}
+              </option>
+            ))}
+          </SelectField>
+        ) : (
+          <SelectField
+            label="Connect to Main Ask (Parent) *"
+            name="parentAsk"
+            value={parentAskId}
+            onChange={(e) => setParentAskId(e.target.value)}
+            required
+          >
+            <option value="">Select a main ask…</option>
+            {parentAsks.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.title} ({a.accountName || "Tech Ask"})
+              </option>
+            ))}
+          </SelectField>
+        )}
 
         <Field
           label="Task / Sub-task Title"

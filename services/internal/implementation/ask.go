@@ -13,8 +13,8 @@ import (
 var (
 	// ErrNotFound means no ask with that id exists in the caller's org.
 	ErrNotFound = errors.New("ask not found")
-	// ErrNoParent means the ask named neither a deal nor a lead.
-	ErrNoParent = errors.New("an ask must belong to a deal or a lead")
+	// ErrNoParent means the ask named neither a deal, a lead, a parent ask, nor a company.
+	ErrNoParent = errors.New("an ask must belong to a deal, a lead, or a company")
 	// ErrDealNotFound means the referenced deal is missing or deleted.
 	ErrDealNotFound = errors.New("deal not found")
 	// ErrLeadNotFound means the referenced lead is missing or deleted.
@@ -111,6 +111,7 @@ type Ask struct {
 type Input struct {
 	DealID      *string `json:"dealId"`
 	LeadID      *string `json:"leadId"`
+	AccountID   *string `json:"accountId"`
 	ParentAskID *string `json:"parentAskId"`
 
 	Title      string  `json:"title"`
@@ -166,6 +167,7 @@ type EngineerWorkload struct {
 type ManagerRoster struct {
 	Engineers          []EngineerWorkload `json:"engineers"`
 	UnassignedSubtasks []Ask              `json:"unassignedSubtasks"`
+	ManagerTasks       []Ask              `json:"managerTasks"`
 }
 
 // Event is one line of an ask's history: who changed what, and when.

@@ -505,6 +505,9 @@ export function ManagerDashboard() {
 function parentOf(ask: Ask): AskParent {
   const company = ask.accountName ?? "";
   return {
+    dealId: ask.dealId ?? undefined,
+    leadId: ask.leadId ?? undefined,
+    accountId: ask.accountId ?? undefined,
     company: company || "Technical Delivery",
     label: company ? `${company} Implementation` : "Technical Task",
     locations: ask.locations ?? undefined,

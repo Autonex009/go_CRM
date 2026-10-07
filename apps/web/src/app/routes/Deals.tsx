@@ -558,6 +558,7 @@ export default function Deals() {
           ask={askDialog.ask}
           parent={{
             dealId: askDialog.deal.id,
+            accountId: askDialog.deal.accountId ?? undefined,
             company: askDialog.deal.accountName ?? askDialog.deal.title,
             label: [askDialog.deal.accountName, askDialog.deal.title, askDialog.deal.products]
               .filter(Boolean)

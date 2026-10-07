@@ -155,6 +155,7 @@ export interface Board {
 export interface AskInput {
   dealId?: string;
   leadId?: string;
+  accountId?: string;
   parentAskId?: string | null;
   title: string;
   type: string;
@@ -191,6 +192,7 @@ export interface EngineerWorkload {
 export interface ManagerRoster {
   engineers: EngineerWorkload[];
   unassignedSubtasks: Ask[];
+  managerTasks: Ask[];
 }
 
 const BASE = "/api/v1/implementation";

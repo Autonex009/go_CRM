@@ -27,15 +27,17 @@ func VisibleClause(alias, role, ref string) string {
 		team := fmt.Sprintf(`(SELECT mp.id FROM profiles mp WHERE mp.manager_id = %s::uuid)`, ref)
 		return fmt.Sprintf(`(%[1]s.assigned_to = %[2]s::uuid
 		   OR %[1]s.assigned_to IN %[3]s
+		   OR %[1]s.created_by = %[2]s::uuid
 		   OR %[1]s.account_id IN (
 		        SELECT ip.account_id FROM implementation_pipelines ip
 		         WHERE ip.org_id = %[1]s.org_id AND ip.manager_id = %[2]s::uuid
 		           AND ip.archived_at IS NULL)
-		   OR (%[1]s.assigned_to IS NULL AND (
-		         %[1]s.created_by = %[2]s::uuid
-		      OR %[1]s.parent_ask_id IN (
-		           SELECT vp.id FROM implementation_asks vp
-		            WHERE vp.assigned_to = %[2]s::uuid OR vp.assigned_to IN %[3]s))))`, alias, ref, team)
+		   OR (%[1]s.assigned_to IS NULL AND %[1]s.parent_ask_id IN (
+		        SELECT vp.id FROM implementation_asks vp
+		         WHERE vp.assigned_to = %[2]s::uuid OR vp.assigned_to IN %[3]s)))`, alias, ref, team)
 	}
-	return fmt.Sprintf("%s.assigned_to = %s::uuid", alias, ref)
+	return fmt.Sprintf(`(%[1]s.assigned_to = %[2]s::uuid
+	   OR %[1]s.id IN (
+	        SELECT vp.parent_ask_id FROM implementation_asks vp
+	         WHERE vp.parent_ask_id IS NOT NULL AND vp.assigned_to = %[2]s::uuid))`, alias, ref)
 }

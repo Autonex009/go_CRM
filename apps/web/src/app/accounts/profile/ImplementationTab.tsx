@@ -99,6 +99,7 @@ export function ImplementationTab({ accountId }: { accountId: string }) {
           parent={{
             dealId: dialog.dealId ?? undefined,
             leadId: dialog.leadId ?? undefined,
+            accountId: dialog.accountId ?? undefined,
             company: dialog.accountName ?? "",
             label: [dialog.accountName, dialog.dealTitle ?? dialog.leadTitle]
               .filter(Boolean)

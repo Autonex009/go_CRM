@@ -50,6 +50,7 @@ export function DealImplementationPanel({ deal }: { deal: Deal }) {
 
   const parent = {
     dealId: deal.id,
+    accountId: deal.accountId ?? undefined,
     company: deal.accountName ?? deal.title,
     label: [deal.accountName, deal.title, deal.products].filter(Boolean).join(" · "),
   };

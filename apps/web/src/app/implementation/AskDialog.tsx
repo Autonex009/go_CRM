@@ -38,6 +38,7 @@ import { PRIORITY_META, STATUS_META } from "./meta";
 export interface AskParent {
   dealId?: string;
   leadId?: string;
+  accountId?: string;
   /** "Hikal — Ankleshwar Plant · VIGIL + Digital" */
   label: string;
   /** Company name, for the avatar and the banner. */
@@ -90,6 +91,7 @@ export function AskDialog({
   const values = (): AskInput => ({
     dealId: parent.dealId,
     leadId: parent.leadId,
+    accountId: parent.accountId,
     parentAskId: ask?.parentAskId ?? undefined,
     title: title.trim(),
     type: type.trim(),

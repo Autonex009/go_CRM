@@ -176,7 +176,27 @@ func (s *Service) ManagerRoster(ctx context.Context, orgID, managerID string) (M
 		roster.Engineers = append(roster.Engineers, w)
 	}
 
-	// Fetch unassigned subtasks
+	managedAccounts := make(map[string]bool)
+	if managerID != "" {
+		pRows, pErr := s.pool.Query(ctx,
+			`SELECT account_id::text FROM implementation_pipelines
+			  WHERE org_id = $1::uuid AND manager_id = $2::uuid AND archived_at IS NULL`,
+			orgID, managerID)
+		if pErr == nil {
+			defer pRows.Close()
+			for pRows.Next() {
+				var accID string
+				if err := pRows.Scan(&accID); err == nil {
+					managedAccounts[accID] = true
+				}
+			}
+		}
+	}
+
+	roster.UnassignedSubtasks = make([]Ask, 0)
+	roster.ManagerTasks = make([]Ask, 0)
+
+	// Fetch unassigned subtasks and manager tasks
 	allOpen, err := s.store.list(ctx, orgID, Filter{OpenOnly: true})
 	if err == nil {
 		for _, a := range allOpen {
@@ -192,6 +212,22 @@ func (s *Service) ManagerRoster(ctx context.Context, orgID, managerID string) (M
 				p, err := s.store.get(ctx, orgID, *a.ParentAskID)
 				if err == nil && ((p.AssignedTo != nil && *p.AssignedTo == managerID) || (p.CreatedBy != nil && *p.CreatedBy == managerID)) {
 					roster.UnassignedSubtasks = append(roster.UnassignedSubtasks, a)
+				}
+				continue
+			}
+
+			// Main/Parent tasks directly assigned to the manager
+			if managerID != "" && a.AssignedTo != nil && *a.AssignedTo == managerID {
+				roster.ManagerTasks = append(roster.ManagerTasks, a)
+				continue
+			}
+
+			// Main/top-level unassigned tasks in the manager's pipelines or created by the manager
+			if a.AssignedTo == nil && a.ParentAskID == nil {
+				if managerID == "" {
+					roster.ManagerTasks = append(roster.ManagerTasks, a)
+				} else if (a.AccountID != nil && managedAccounts[*a.AccountID]) || (a.CreatedBy != nil && *a.CreatedBy == managerID) {
+					roster.ManagerTasks = append(roster.ManagerTasks, a)
 				}
 			}
 		}
@@ -240,9 +276,10 @@ func (s *Service) Create(ctx context.Context, orgID, actorID, actorRole string, 
 				in.Type = "engineering"
 			}
 		}
-		if in.DealID == nil && in.LeadID == nil {
+		if in.DealID == nil && in.LeadID == nil && in.AccountID == nil {
 			in.DealID = parent.DealID
 			in.LeadID = parent.LeadID
+			in.AccountID = parent.AccountID
 		}
 	}
 
@@ -424,6 +461,7 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 	in.Priority = strings.TrimSpace(strings.ToLower(in.Priority))
 	in.DealID = trimPtr(in.DealID)
 	in.LeadID = trimPtr(in.LeadID)
+	in.AccountID = trimPtr(in.AccountID)
 	in.ParentAskID = trimPtr(in.ParentAskID)
 	in.AssignedTo = trimPtr(in.AssignedTo)
 
@@ -447,8 +485,17 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 	}
 
 	if requireParent {
-		if in.DealID == nil && in.LeadID == nil && in.ParentAskID == nil {
+		if in.DealID == nil && in.LeadID == nil && in.ParentAskID == nil && in.AccountID == nil {
 			return Input{}, ErrNoParent
+		}
+		if in.AccountID != nil {
+			ok, err := s.store.companyInOrg(ctx, orgID, *in.AccountID)
+			if err != nil {
+				return Input{}, err
+			}
+			if !ok {
+				return Input{}, ErrCompanyNotFound
+			}
 		}
 		if in.ParentAskID != nil {
 			ok, err := s.store.askExists(ctx, orgID, *in.ParentAskID)
@@ -458,12 +505,13 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 			if !ok {
 				return Input{}, apperr.Invalid("parent ask not found")
 			}
-			// If child subtask does not specify deal/lead, inherit from parent ask
-			if in.DealID == nil && in.LeadID == nil {
-				dID, lID, err := s.store.getParentRefs(ctx, orgID, *in.ParentAskID)
+			// If child subtask does not specify deal/lead/account, inherit from parent ask
+			if in.DealID == nil && in.LeadID == nil && in.AccountID == nil {
+				dID, lID, aID, err := s.store.getParentRefs(ctx, orgID, *in.ParentAskID)
 				if err == nil {
 					in.DealID = dID
 					in.LeadID = lID
+					in.AccountID = aID
 				}
 			}
 		}

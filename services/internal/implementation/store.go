@@ -165,7 +165,7 @@ func (s *store) get(ctx context.Context, orgID, id string) (Ask, error) {
 }
 
 // create inserts at the end of the "requested" column. account_id is derived
-// from the parent in SQL so it cannot drift from it.
+// from in.AccountID or from the parent in SQL so it cannot drift from it.
 func (s *store) create(ctx context.Context, orgID, actorID string, in Input) (Ask, error) {
 	var id string
 	err := s.pool.QueryRow(ctx,
@@ -177,7 +177,8 @@ func (s *store) create(ctx context.Context, orgID, actorID string, in Input) (As
 		     COALESCE(
 		         (SELECT account_id FROM deals WHERE id = $2::uuid),
 		         (SELECT account_id FROM leads WHERE id = $3::uuid),
-		         (SELECT account_id FROM implementation_asks WHERE id = $4::uuid)),
+		         (SELECT account_id FROM implementation_asks WHERE id = $4::uuid),
+		         $12::uuid),
 		     $4::uuid,
 		     $5, $6, $7, $8, $9::uuid, $10::uuid, $11,
 		     COALESCE((SELECT max(position) + 1 FROM implementation_asks
@@ -185,7 +186,7 @@ func (s *store) create(ctx context.Context, orgID, actorID string, in Input) (As
 		 RETURNING id::text`,
 		orgID, in.DealID, in.LeadID, in.ParentAskID,
 		in.Title, in.Type, in.Detail, in.Priority, in.AssignedTo,
-		nilIfEmpty(actorID), in.DueAt).Scan(&id)
+		nilIfEmpty(actorID), in.DueAt, in.AccountID).Scan(&id)
 	if err != nil {
 		return Ask{}, err
 	}
@@ -285,15 +286,15 @@ func (s *store) askExists(ctx context.Context, orgID, id string) (bool, error) {
 	return ok, err
 }
 
-func (s *store) getParentRefs(ctx context.Context, orgID, parentID string) (dealID, leadID *string, err error) {
-	var d, l *string
+func (s *store) getParentRefs(ctx context.Context, orgID, parentID string) (dealID, leadID, accountID *string, err error) {
+	var d, l, a *string
 	err = s.pool.QueryRow(ctx,
-		`SELECT deal_id::text, lead_id::text FROM implementation_asks WHERE id = $1::uuid AND org_id = $2::uuid`,
-		parentID, orgID).Scan(&d, &l)
+		`SELECT deal_id::text, lead_id::text, account_id::text FROM implementation_asks WHERE id = $1::uuid AND org_id = $2::uuid`,
+		parentID, orgID).Scan(&d, &l, &a)
 	if errors.Is(err, pgx.ErrNoRows) || database.IsInvalidTextRepr(err) {
-		return nil, nil, ErrNotFound
+		return nil, nil, nil, ErrNotFound
 	}
-	return d, l, err
+	return d, l, a, err
 }
 
 // visible reports whether a viewer may see one ask. An id that does not parse

@@ -33,8 +33,11 @@ import {
   parentName,
 } from "../implementation/meta";
 import { ApiError } from "../lib/api";
+import { orgApi } from "../org/api";
+import { memberGroups } from "../org/memberGroups";
 import {
   Alert,
+  AssigneePicker,
   BoardSkeleton,
   Button,
   EmptyState,
@@ -60,6 +63,7 @@ export default function Implementation() {
   const [dealFilter, setDealFilter] = useState("");
   const [dialog, setDialog] = useState<Ask | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedAskId = searchParams.get("ask");
   const search = searchParams.get("q") ?? "";
@@ -273,7 +277,7 @@ export default function Implementation() {
             </Button>
           )}
 
-          {isEngineer && (
+          {isEngineer ? (
             <Button
               type="button"
               variant="primary"
@@ -282,6 +286,16 @@ export default function Implementation() {
               onClick={() => setShowCreateModal(true)}
             >
               New Sub-task Card
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              icon="plus"
+              onClick={() => setShowTaskModal(true)}
+            >
+              New Task
             </Button>
           )}
 
@@ -460,6 +474,17 @@ export default function Implementation() {
           }}
         />
       )}
+
+      {showTaskModal && (
+        <CreateTaskModal
+          pipelines={pipelinesQuery.data ?? []}
+          onClose={() => setShowTaskModal(false)}
+          onCreated={() => {
+            setShowTaskModal(false);
+            invalidate();
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -611,6 +636,168 @@ function CreateEngineerCardModal({
   );
 }
 
+function CreateTaskModal({
+  pipelines,
+  onClose,
+  onCreated,
+}: {
+  pipelines: Pipeline[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const activePipelines = pipelines.filter((p) => !p.archivedAt);
+  const [accountId, setAccountId] = useState(activePipelines[0]?.accountId ?? "");
+  const [title, setTitle] = useState("");
+  const [detail, setDetail] = useState("");
+  const [priority, setPriority] = useState<AskPriority>("p1");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const membersQuery = useQuery({
+    queryKey: ["members"],
+    queryFn: orgApi.members,
+    staleTime: 5 * 60_000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (input: AskInput) => implementationApi.create(input),
+    onSuccess: onCreated,
+    onError: (err: any) => setError(err?.message || "Could not create task"),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accountId) {
+      setError("Please select a company pipeline");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Please enter a title for the task");
+      return;
+    }
+    createMutation.mutate({
+      accountId,
+      title: title.trim(),
+      type: "engineering",
+      detail: detail.trim(),
+      priority,
+      assignedTo: assignedTo || undefined,
+      dueAt: dueAt ? `${dueAt}T00:00:00Z` : null,
+    });
+  };
+
+  const groups = memberGroups(membersQuery.data ?? [], {
+    roles: ["manager", "engineer", "owner", "admin"],
+  });
+
+  return (
+    <Modal title="Create Implementation Task" onClose={onClose} size="lg">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        {activePipelines.length === 0 ? (
+          <div className="rounded-lg bg-surface-muted p-4 text-center text-xs text-fg-muted">
+            <p className="font-semibold text-fg">No active company pipelines found</p>
+            <p className="mt-1">
+              Create a pipeline first to organize implementation work for clients.
+            </p>
+          </div>
+        ) : (
+          <>
+            <SelectField
+              label="Company Pipeline *"
+              name="pipeline"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              required
+            >
+              <option value="">Select a company pipeline…</option>
+              {activePipelines.map((p) => (
+                <option key={p.accountId} value={p.accountId}>
+                  {p.accountName} {p.managerName ? `· Managed by ${p.managerName}` : ""}
+                </option>
+              ))}
+            </SelectField>
+
+            <Field
+              label="Task Title *"
+              name="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Deploy Edge Gateway and verify camera streams"
+              autoFocus
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <AssigneePicker
+                label="Assignee"
+                groups={groups}
+                value={assignedTo}
+                onChange={setAssignedTo}
+                placeholder="Unassigned"
+                allowUnassigned
+              />
+
+              <Field
+                label="Due Date"
+                name="dueAt"
+                type="date"
+                value={dueAt}
+                onChange={(e) => setDueAt(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-fg-muted">Priority</span>
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-surface-muted/60 p-1">
+                {ASK_PRIORITIES.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPriority(p)}
+                    className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                      priority === p
+                        ? PRIORITY_META[p].chip
+                        : "text-fg-muted hover:text-fg"
+                    }`}
+                  >
+                    {PRIORITY_META[p].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <TextareaField
+              label="Technical Details / Specifications"
+              name="detail"
+              rows={3}
+              value={detail}
+              onChange={(e) => setDetail(e.target.value)}
+              placeholder="Technical specs, sites, endpoints, acceptance criteria…"
+            />
+          </>
+        )}
+
+        {error && <Alert>{error}</Alert>}
+
+        <div className="flex justify-end gap-2 border-t border-line pt-3">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          {activePipelines.length > 0 && (
+            <Button
+              type="submit"
+              disabled={createMutation.isPending}
+              icon="check"
+            >
+              Create Task
+            </Button>
+          )}
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 const EXPANDED_KEY = "implementation.pipelines.expanded";
 
 /** Which company sections this viewer opened or closed. A convenience only:
@@ -644,6 +831,7 @@ function parentOf(ask: Ask): AskParent {
   return {
     dealId: ask.dealId ?? undefined,
     leadId: ask.leadId ?? undefined,
+    accountId: ask.accountId ?? undefined,
     company: company || where,
     label: [company, where].filter(Boolean).join(" — ") || "Unlinked",
     locations: ask.locations ?? undefined,
