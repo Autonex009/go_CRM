@@ -355,10 +355,56 @@ func (s *Service) Move(ctx context.Context, orgID, actorID, id string, mv Move) 
 
 // Delete removes an ask; history and attachment rows cascade.
 //
-// The stored files do not, so they are read before the delete and swept after
-// it. A failed lookup is not fatal: the delete itself decides whether the id
-// was good, and at worst a file outlives its row, as it would have before.
-func (s *Service) Delete(ctx context.Context, orgID, id string) error {
+// Safeguards:
+// 1. Engineers cannot delete asks.
+// 2. Cannot delete parent asks that have active child sub-tasks.
+// 3. Completed or verified asks can only be deleted by owners and admins.
+// 4. Deletion is logged to the timeline/activity log before removing the row.
+// 5. If it was a sub-task, an event is logged in the parent ask's history.
+func (s *Service) Delete(ctx context.Context, orgID, actorID, actorRole, id string) error {
+	if actorRole == "engineer" {
+		return ErrDeleteForbidden
+	}
+
+	if err := s.CanSee(ctx, orgID, actorID, actorRole, id); err != nil {
+		return err
+	}
+
+	ask, err := s.store.get(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+
+	// Safeguard: Prevent deleting parent asks with active sub-tasks
+	subtasks, err := s.store.list(ctx, orgID, Filter{ParentAskID: id, OpenOnly: true})
+	if err != nil {
+		return err
+	}
+	if len(subtasks) > 0 {
+		return ErrDeleteHasSubtasks
+	}
+
+	// Safeguard: Only owners and admins can delete completed or delivered asks
+	if (ask.Status == "delivered" || ask.Status == "verified") && actorRole != "owner" && actorRole != "admin" {
+		return ErrDeleteDeliveredForbidden
+	}
+
+	// Audit: Record deletion in activities/timeline before removing row
+	s.logTimeline(ctx, orgID, actorID, ask, "Implementation ask deleted", summary(ask))
+
+	// If this ask was a sub-task, record deletion on parent ask's history
+	if ask.ParentAskID != nil && *ask.ParentAskID != "" {
+		s.store.record(ctx, Event{
+			orgID:     orgID,
+			AskID:     *ask.ParentAskID,
+			ActorID:   &actorID,
+			Kind:      kindEdited,
+			Field:     "subtask_deleted",
+			FromValue: ask.Title,
+			Note:      "Sub-task deleted: " + summary(ask),
+		})
+	}
+
 	files, _ := s.store.attachments(ctx, orgID, id)
 	if err := s.store.delete(ctx, orgID, id); err != nil {
 		return err
@@ -484,7 +530,7 @@ func notifyPriority(p string) string {
 	}
 }
 
-// logTimeline writes the deal's or lead's timeline entry. Best effort.
+// logTimeline writes the deal's, lead's or company's timeline entry. Best effort.
 func (s *Service) logTimeline(ctx context.Context, orgID, actorID string, a Ask, subject, body string) {
 	e := activities.Entry{
 		OrgID:   orgID,
@@ -493,10 +539,12 @@ func (s *Service) logTimeline(ctx context.Context, orgID, actorID string, a Ask,
 		Actor:   actorID,
 	}
 	switch {
-	case a.DealID != nil:
+	case a.DealID != nil && *a.DealID != "":
 		e.DealID = *a.DealID
-	case a.LeadID != nil:
+	case a.LeadID != nil && *a.LeadID != "":
 		e.LeadID = *a.LeadID
+	case a.AccountID != nil && *a.AccountID != "":
+		e.AccountID = *a.AccountID
 	default:
 		return
 	}

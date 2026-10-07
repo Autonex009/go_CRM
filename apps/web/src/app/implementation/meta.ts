@@ -141,7 +141,12 @@ export function describeEvent(e: {
     case "detached":
       return `removed ${e.toValue}`;
     case "edited":
+      if (e.field === "subtask_deleted") {
+        return e.note || (e.fromValue ? `deleted sub-task "${e.fromValue}"` : "deleted a sub-task");
+      }
       return `edited the ${e.field}`;
+    case "deleted":
+      return e.note ? `deleted this ask (${e.note})` : "deleted this ask";
     default:
       return e.kind;
   }

@@ -25,6 +25,12 @@ var (
 	ErrEngineerMustLinkTask = errors.New("engineers must link their card to an assigned task")
 	// ErrEngineerUnassignedParent means an engineer tried to link to a task not assigned to them.
 	ErrEngineerUnassignedParent = errors.New("you can only create cards linked to tasks assigned to you")
+	// ErrDeleteHasSubtasks means an ask with active sub-tasks cannot be deleted.
+	ErrDeleteHasSubtasks = errors.New("cannot delete an ask that has active sub-tasks; remove, complete or reassign them first")
+	// ErrDeleteDeliveredForbidden means only owners and admins can delete completed or delivered asks.
+	ErrDeleteDeliveredForbidden = errors.New("only owners and admins can delete delivered or verified asks")
+	// ErrDeleteForbidden means the caller does not have permission to delete this ask.
+	ErrDeleteForbidden = errors.New("you do not have permission to delete this ask")
 )
 
 // Statuses is the flow, in board order: one kanban column each.

@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Wrench } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Wrench } from "lucide-react";
 
 import { KIND_META, relativeTime, type ActivityKind } from "../activities/api";
 import { describeEvent } from "../implementation/meta";
@@ -254,11 +254,21 @@ function Row({
       <span
         className={`mt-[2px] flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md ${
           implementation
-            ? "bg-violet-500/10 text-violet-600 dark:text-violet-300"
+            ? item.kind === "deleted"
+              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+              : "bg-violet-500/10 text-violet-600 dark:text-violet-300"
             : "bg-surface-muted text-fg-muted"
         }`}
       >
-        {implementation ? <Wrench className="h-3 w-3" /> : <Icon name={meta.icon} size={13} />}
+        {implementation ? (
+          item.kind === "deleted" ? (
+            <Trash2 className="h-3 w-3" />
+          ) : (
+            <Wrench className="h-3 w-3" />
+          )
+        ) : (
+          <Icon name={meta.icon} size={13} />
+        )}
       </span>
 
       <span className="min-w-0 flex-1">

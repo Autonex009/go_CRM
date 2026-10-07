@@ -188,28 +188,60 @@ func (h *Handler) implementationActivity(ctx context.Context, orgID, viewerID, r
 
 	var page ActivityPage
 	if err := h.pool.QueryRow(ctx,
-		`SELECT count(*)
-		   FROM ask_events e
-		   JOIN implementation_asks a ON a.id = e.ask_id
-		  WHERE e.org_id = $1::uuid`+countScope, countArgs...).Scan(&page.Total); err != nil {
+		`SELECT (
+		    SELECT count(*)
+		      FROM ask_events e
+		      JOIN implementation_asks a ON a.id = e.ask_id
+		     WHERE e.org_id = $1::uuid`+countScope+`
+		 ) + (
+		    SELECT count(*)
+		      FROM activities act
+		      JOIN users au ON au.id = act.author_id AND au.org_id = $1::uuid
+		     WHERE act.body LIKE 'Implementation ask deleted%'
+		 )`, countArgs...).Scan(&page.Total); err != nil {
 		return ActivityPage{}, err
 	}
 
 	rows, err := h.pool.Query(ctx, `
-		SELECT e.kind,
-		       a.title,
-		       CASE WHEN $4 THEN coalesce(ac.name, '') ELSE coalesce(ac.name, d.title, l.title, '') END,
-		       coalesce(p.full_name, ''),
-		       e.field, e.from_value, e.to_value, coalesce(e.note, ''),
-		       e.occurred_at
-		  FROM ask_events e
-		  JOIN implementation_asks a ON a.id = e.ask_id
-		  LEFT JOIN accounts ac ON ac.id = a.account_id
-		  LEFT JOIN deals    d  ON d.id  = a.deal_id
-		  LEFT JOIN leads    l  ON l.id  = a.lead_id
-		  LEFT JOIN profiles p  ON p.id  = e.actor_id
-		 WHERE e.org_id = $1::uuid`+listScope+`
-		 ORDER BY e.occurred_at DESC
+		WITH combined AS (
+		    SELECT e.kind,
+		           a.title,
+		           CASE WHEN $4 THEN coalesce(ac.name, '') ELSE coalesce(ac.name, d.title, l.title, '') END AS context,
+		           coalesce(p.full_name, '') AS actor,
+		           e.field, e.from_value, e.to_value, coalesce(e.note, '') AS note,
+		           e.occurred_at
+		      FROM ask_events e
+		      JOIN implementation_asks a ON a.id = e.ask_id
+		      LEFT JOIN accounts ac ON ac.id = a.account_id
+		      LEFT JOIN deals    d  ON d.id  = a.deal_id
+		      LEFT JOIN leads    l  ON l.id  = a.lead_id
+		      LEFT JOIN profiles p  ON p.id  = e.actor_id
+		     WHERE e.org_id = $1::uuid`+listScope+`
+		    UNION ALL
+		    SELECT 'deleted' AS kind,
+		           coalesce(nullif(split_part(split_part(act.body, chr(10)||chr(10), 2), ' · ', 1), ''), 'Implementation ask') AS title,
+		           CASE WHEN $4 THEN coalesce(ac.name, '') ELSE coalesce(ac.name, d.title, l.title, '') END AS context,
+		           coalesce(p.full_name, '') AS actor,
+		           'ask' AS field,
+		           '' AS from_value,
+		           '' AS to_value,
+		           coalesce(nullif(split_part(act.body, chr(10)||chr(10), 2), ''), act.body) AS note,
+		           act.occurred_at
+		      FROM activities act
+		      JOIN users au ON au.id = act.author_id AND au.org_id = $1::uuid
+		      LEFT JOIN deals    d  ON (act.entity_type = 'deal'    AND d.id = act.entity_id)
+		      LEFT JOIN leads    l  ON (act.entity_type = 'lead'    AND l.id = act.entity_id)
+		      LEFT JOIN accounts ac ON (
+		          (act.entity_type = 'company' AND ac.id = act.entity_id)
+		       OR (act.entity_type = 'deal'    AND ac.id = d.account_id)
+		       OR (act.entity_type = 'lead'    AND ac.id = l.account_id)
+		      )
+		      LEFT JOIN profiles p  ON p.id = act.author_id
+		     WHERE act.body LIKE 'Implementation ask deleted%'
+		)
+		SELECT kind, title, context, actor, field, from_value, to_value, note, occurred_at
+		  FROM combined
+		 ORDER BY occurred_at DESC
 		 LIMIT $2 OFFSET $3`, listArgs...)
 	if err != nil {
 		return ActivityPage{}, err

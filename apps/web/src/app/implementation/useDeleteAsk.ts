@@ -31,6 +31,7 @@ export function useDeleteAsk(onDeleted?: (id: string) => void): (ask: Pick<Ask, 
       void queryClient.invalidateQueries({ queryKey: ["implementation"] });
       void queryClient.invalidateQueries({ queryKey: ["dealAsks"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboardActivity"] });
+      void queryClient.invalidateQueries({ queryKey: ["activities"] });
       onDeletedRef.current?.(id);
     },
     onError: (err) => {
@@ -40,7 +41,10 @@ export function useDeleteAsk(onDeleted?: (id: string) => void): (ask: Pick<Ask, 
 
   return useCallback(
     (ask: Pick<Ask, "id" | "title">) => {
-      if (!window.confirm(`Delete "${ask.title}"? Its history and files go with it.`)) return;
+      const confirmed = window.confirm(
+        `Are you sure you want to permanently delete "${ask.title}"?\n\nThis will remove the task, all associated files, and record the deletion in the audit timeline. This action cannot be undone.`
+      );
+      if (!confirmed) return;
       mutate(ask.id);
     },
     [mutate],

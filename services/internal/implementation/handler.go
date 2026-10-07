@@ -228,11 +228,12 @@ func (h *Handler) managerRoster(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) remove(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if middleware.Role(ctx) == "engineer" {
+	role := middleware.Role(ctx)
+	if role == "engineer" {
 		httpx.WriteError(w, http.StatusForbidden, "engineers cannot delete asks")
 		return
 	}
-	if err := h.svc.Delete(ctx, middleware.OrgID(ctx), chi.URLParam(r, "id")); err != nil {
+	if err := h.svc.Delete(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), role, chi.URLParam(r, "id")); err != nil {
 		h.writeErr(w, err, "could not delete that ask")
 		return
 	}
@@ -406,5 +407,8 @@ func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 		httpx.Rule{Err: ErrManagerNotFound, Status: http.StatusBadRequest, Message: "engineering manager not found"},
 		httpx.Rule{Err: ErrEngineerMustLinkTask, Status: http.StatusBadRequest, Message: "engineers must link their card to an assigned task"},
 		httpx.Rule{Err: ErrEngineerUnassignedParent, Status: http.StatusForbidden, Message: "you can only create cards linked to tasks assigned to you"},
+		httpx.Rule{Err: ErrDeleteHasSubtasks, Status: http.StatusBadRequest, Message: "cannot delete an ask that has active sub-tasks; remove, complete or reassign them first"},
+		httpx.Rule{Err: ErrDeleteDeliveredForbidden, Status: http.StatusForbidden, Message: "only owners and admins can delete delivered or verified asks"},
+		httpx.Rule{Err: ErrDeleteForbidden, Status: http.StatusForbidden, Message: "you do not have permission to delete this ask"},
 	)
 }
