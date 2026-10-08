@@ -127,6 +127,11 @@ export default function AppLayout() {
     return segment.charAt(0).toUpperCase() + segment.slice(1);
   };
 
+  useEffect(() => {
+    const pageTitle = getPageTitle();
+    document.title = `${pageTitle} · DealBridge`;
+  }, [pathname]);
+
   const navigate = useNavigate();
 
   return (

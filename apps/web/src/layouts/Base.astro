@@ -17,10 +17,10 @@ const { title } = Astro.props;
     <title>{title}</title>
 
     {/*
-      Without this the browser asks for /favicon.ico, gets a 404, and falls back
-      to a generated letter tile — which is what showed in the tab during a
-      reload. An SVG is one file for every density and can follow the theme.
+      Favicon: modern browsers prefer SVG which adapts to light/dark system themes,
+      while fallback PNG ensures universal compatibility.
     */}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.png" type="image/png" />
 
     {/*
