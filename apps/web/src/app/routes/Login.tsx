@@ -73,7 +73,7 @@ export default function Login() {
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setFormError(null);
     try {
-      const { token, user } = await authApi.login(email, password);
+      const { token, user } = await authApi.login(email, password, portal);
       setSession(token, user);
       navigate(destination, { replace: true });
     } catch (err) {
@@ -234,7 +234,7 @@ export default function Login() {
       <div className="my-6">
         <Divider>or continue with</Divider>
       </div>
-      <SsoButtons />
+      <SsoButtons portal={portal} />
 
       {/* Only shown when the deployment actually accepts sign-ups. With access
           granted per person, a permanent "create one" link is a dead end: the

@@ -42,7 +42,7 @@ export default function Register() {
   });
 
   return (
-    <AuthLayout title="Create account" subtitle="Start using go-CRM">
+    <AuthLayout title="Create account" subtitle="Start using DealBridge">
       <form onSubmit={onSubmit} className="flex flex-col gap-md" noValidate>
         {displayError && <Alert>{displayError}</Alert>}
         <Field

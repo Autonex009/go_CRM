@@ -28,6 +28,7 @@ func NewHandler(pool *pgxpool.Pool, secret string) *Handler {
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireJWT(h.secret))
+	r.Use(middleware.RequireRole("owner", "admin", "sales", "account_manager"))
 
 	r.Get("/", h.list)
 	r.Post("/", h.create)

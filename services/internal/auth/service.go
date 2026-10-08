@@ -131,7 +131,7 @@ func defaultOrgName(email string) string {
 }
 
 // Login verifies an email/password pair and starts a session.
-func (s *Service) Login(ctx context.Context, email, password string) (Session, error) {
+func (s *Service) Login(ctx context.Context, email, password, portal string) (Session, error) {
 	u, err := s.store.userByEmail(ctx, email)
 	if errors.Is(err, ErrUserNotFound) {
 		return Session{}, ErrInvalidCredentials
@@ -147,6 +147,10 @@ func (s *Service) Login(ctx context.Context, email, password string) (Session, e
 	if err != nil || !ok {
 		return Session{}, ErrInvalidCredentials
 	}
+	// After the password check, so the tab can't be used to probe roles.
+	if err := checkPortal(portal, u.Role); err != nil {
+		return Session{}, err
+	}
 	return IssueSession(ctx, s.pool, s.cfg, u)
 }
 
@@ -161,7 +165,7 @@ func (s *Service) AuthCodeURL(provider, state string) (string, error) {
 
 // CompleteSSO exchanges an authorization code, resolves (or provisions) the
 // user, and returns an access token.
-func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Session, error) {
+func (s *Service) CompleteSSO(ctx context.Context, provider, code, portal string) (Session, error) {
 	p, ok := s.providers[provider]
 	if !ok {
 		return Session{}, ErrUnknownProvider
@@ -189,7 +193,7 @@ func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Sessi
 	// 1. Known SSO identity → log in.
 	u, err := s.store.userByProvider(ctx, provider, id.ProviderUserID)
 	if err == nil {
-		return IssueSession(ctx, s.pool, s.cfg, u)
+		return s.ssoSession(ctx, u, portal)
 	}
 	if !errors.Is(err, ErrUserNotFound) {
 		return Session{}, err
@@ -201,7 +205,7 @@ func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Sessi
 			if existing.ProviderUserID == nil || *existing.ProviderUserID == "" {
 				_ = s.store.updateUserProviderID(ctx, existing.ID, id.ProviderUserID)
 			}
-			return IssueSession(ctx, s.pool, s.cfg, existing)
+			return s.ssoSession(ctx, existing, portal)
 		}
 		return Session{}, ErrEmailTaken
 	} else if !errors.Is(e, ErrUserNotFound) {
@@ -216,6 +220,10 @@ func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Sessi
 	if err != nil {
 		return Session{}, err
 	}
+	// Refuse a wrong tab before anything is provisioned.
+	if err := checkPortal(portal, firstRole(adm, s.cfg.SSODefaultOrgID)); err != nil {
+		return Session{}, err
+	}
 
 	var namePtr *string
 	if id.Name != "" {
@@ -227,6 +235,8 @@ func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Sessi
 		OrgName:        defaultOrgName(id.Email),
 		AuthProvider:   provider,
 		ProviderUserID: &id.ProviderUserID,
+		Role:           adm.role,
+		ManagerID:      adm.managerID,
 	}
 
 	// The invitation's own organization wins over the configured default: someone
@@ -250,6 +260,25 @@ func (s *Service) CompleteSSO(ctx context.Context, provider, code string) (Sessi
 			log.Printf("auth: could not mark invitation %s accepted: %v",
 				adm.invitationID, cerr)
 		}
+	}
+	return s.ssoSession(ctx, u, portal)
+}
+
+// firstRole is the role a first-time SSO user is about to be created with.
+func firstRole(adm admission, defaultOrg string) string {
+	switch {
+	case adm.role != "":
+		return adm.role
+	case adm.orgID == "" && defaultOrg == "":
+		return "owner"
+	default:
+		return "sales"
+	}
+}
+
+func (s *Service) ssoSession(ctx context.Context, u User, portal string) (Session, error) {
+	if err := checkPortal(portal, u.Role); err != nil {
+		return Session{}, err
 	}
 	return IssueSession(ctx, s.pool, s.cfg, u)
 }

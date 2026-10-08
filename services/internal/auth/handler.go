@@ -17,7 +17,10 @@ import (
 	"github.com/go-crm/services/pkg/middleware"
 )
 
-const ssoStateCookie = "sso_state"
+const (
+	ssoStateCookie  = "sso_state"
+	ssoPortalCookie = "sso_portal"
+)
 
 // Handler exposes the auth module's HTTP API.
 type Handler struct {
@@ -56,6 +59,7 @@ type credentials struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Portal   string `json:"portal"` // sign-in tab, login only
 }
 
 type authResponse struct {
@@ -113,9 +117,13 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	session, err := h.svc.Login(r.Context(), in.Email, in.Password)
+	session, err := h.svc.Login(r.Context(), in.Email, in.Password, in.Portal)
 	if errors.Is(err, ErrInvalidCredentials) {
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid email or password")
+		return
+	}
+	if errors.Is(err, ErrWrongPortal) {
+		httpx.WriteError(w, http.StatusForbidden, err.Error())
 		return
 	}
 	if err != nil {
@@ -154,6 +162,16 @@ func (h *Handler) ssoStart(w http.ResponseWriter, r *http.Request) {
 		Secure:   h.secureCookies(),
 		SameSite: http.SameSiteLaxMode,
 	})
+	// Carries the sign-in tab across the provider round-trip.
+	http.SetCookie(w, &http.Cookie{
+		Name:     ssoPortalCookie,
+		Value:    normalizePortal(r.URL.Query().Get("portal")),
+		Path:     "/",
+		MaxAge:   300,
+		HttpOnly: true,
+		Secure:   h.secureCookies(),
+		SameSite: http.SameSiteLaxMode,
+	})
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
@@ -171,8 +189,13 @@ func (h *Handler) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		redirectError("Invalid security state token during SSO login. Please try again.")
 		return
 	}
-	// Consume the state cookie.
+	// Consume the state and portal cookies.
 	http.SetCookie(w, &http.Cookie{Name: ssoStateCookie, Path: "/", MaxAge: -1})
+	portal := ""
+	if c, err := r.Cookie(ssoPortalCookie); err == nil {
+		portal = c.Value
+	}
+	http.SetCookie(w, &http.Cookie{Name: ssoPortalCookie, Path: "/", MaxAge: -1})
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -180,8 +203,11 @@ func (h *Handler) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.svc.CompleteSSO(r.Context(), provider, code)
+	session, err := h.svc.CompleteSSO(r.Context(), provider, code, portal)
 	switch {
+	case errors.Is(err, ErrWrongPortal):
+		redirectError(err.Error())
+		return
 	case errors.Is(err, ErrUnknownProvider):
 		redirectError("SSO provider '" + provider + "' is not configured.")
 		return
