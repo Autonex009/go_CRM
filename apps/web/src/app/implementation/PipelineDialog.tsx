@@ -43,7 +43,7 @@ export function PipelineDialog({
 
   const companies = useQuery({
     queryKey: ["pipelineCompanyPicker", debounced],
-    queryFn: () => accountsApi.list(0, 25, debounced),
+    queryFn: () => allCompanies(debounced),
     enabled: !pipeline,
   });
 
@@ -102,7 +102,9 @@ export function PipelineDialog({
     create.mutate();
   };
 
-  const options = (companies.data?.items ?? []).filter((c) => !takenAccountIds.has(c.id));
+  const all = companies.data ?? [];
+  const options = all.filter((c) => !takenAccountIds.has(c.id));
+  const hidden = all.length - options.length;
 
   return (
     <Modal title={pipeline ? `${pipeline.accountName} pipeline` : "New company pipeline"} onClose={onClose}>
@@ -142,6 +144,12 @@ export function PipelineDialog({
                 </option>
               ))}
             </SelectField>
+            {!companies.isPending && (
+              <p className="-mt-2 text-xs text-fg-subtle">
+                {options.length} {options.length === 1 ? "company" : "companies"} available
+                {hidden > 0 && ` · ${hidden} already ${hidden === 1 ? "has a pipeline" : "have pipelines"}`}
+              </p>
+            )}
           </>
         )}
 
@@ -212,4 +220,18 @@ export function PipelineDialog({
       </form>
     </Modal>
   );
+}
+
+const PAGE = 100; // the server's per-request cap
+const MAX_COMPANIES = 5000;
+
+/** Every company matching search, across pages, sorted by name. */
+async function allCompanies(search: string) {
+  const out: Awaited<ReturnType<typeof accountsApi.list>>["items"] = [];
+  for (let offset = 0; offset < MAX_COMPANIES; offset += PAGE) {
+    const page = await accountsApi.list(offset, PAGE, search);
+    out.push(...page.items);
+    if (page.items.length < PAGE || out.length >= page.total) break;
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
