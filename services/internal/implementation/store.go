@@ -290,8 +290,8 @@ func (s *store) leadExists(ctx context.Context, orgID, id string) (bool, error) 
 		`SELECT EXISTS (
 		     SELECT 1 FROM leads l
 		      WHERE l.id = $2::uuid AND l.deleted_at IS NULL
-		        AND (l.org_id = $1::uuid
-		             OR EXISTS (SELECT 1 FROM users u WHERE u.id = l.owner_user_id AND u.org_id = $1::uuid)))`,
+		        AND (l.assigned_to IS NULL
+		             OR EXISTS (SELECT 1 FROM users u WHERE u.id = l.assigned_to AND u.org_id = $1::uuid)))`,
 		orgID, id)
 }
 

@@ -264,11 +264,12 @@ func (s *Service) notifyRequester(ctx context.Context, orgID, actorID string, a 
 
 // --- store ---
 
-// dealInOrg mirrors companyInOrg: deals may carry no org_id of their own.
+// dealInOrgSQL scopes through the owner, like companyInOrg: the production
+// deals table has no org_id column. Unowned deals stay reachable, as before.
 const dealInOrgSQL = `
 	SELECT d.account_id::text FROM deals d
 	 WHERE d.id = $2::uuid AND d.deleted_at IS NULL
-	   AND (d.org_id = $1::uuid
+	   AND (d.owner_id IS NULL
 	        OR EXISTS (SELECT 1 FROM users u WHERE u.id = d.owner_id AND u.org_id = $1::uuid))`
 
 func (s *store) approveRequest(ctx context.Context, orgID, id, dealID, actorID, note string) error {

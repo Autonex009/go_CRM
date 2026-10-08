@@ -48,9 +48,10 @@ type NoteRevision struct {
 	EditedAt     *time.Time `json:"editedAt"`
 }
 
-// dealInOrg mirrors the implementation module: deals may carry no org_id.
+// dealInOrg scopes through the owner: the production deals table has no
+// org_id column. Unowned deals stay reachable, as elsewhere in this module.
 const dealInOrg = `d.id = $2::uuid AND d.deleted_at IS NULL
-	AND (d.org_id = $1::uuid
+	AND (d.owner_id IS NULL
 	     OR EXISTS (SELECT 1 FROM users u WHERE u.id = d.owner_id AND u.org_id = $1::uuid))`
 
 func (s *store) notes(ctx context.Context, orgID, id string) (Notes, error) {
