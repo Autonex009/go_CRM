@@ -373,6 +373,13 @@ func (s *Service) Move(ctx context.Context, orgID, actorID, id string, mv Move) 
 		return Ask{}, err
 	}
 	if previous == status {
+		if status == "blocked" && reason != "" && reason != current.BlockedReason {
+			s.store.record(ctx, Event{
+				AskID: a.ID, orgID: orgID, ActorID: nilIfEmpty(actorID),
+				Kind: kindBlocked, ToValue: a.BlockedReason,
+				Note: "Blockage reason updated",
+			})
+		}
 		return a, nil // a reorder inside a column is not a transition
 	}
 
@@ -472,6 +479,7 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 	in.AccountID = trimPtr(in.AccountID)
 	in.ParentAskID = trimPtr(in.ParentAskID)
 	in.AssignedTo = trimPtr(in.AssignedTo)
+	in.BlockedReason = trimPtr(in.BlockedReason)
 
 	if in.Title == "" {
 		return Input{}, apperr.Invalid("a title is required")

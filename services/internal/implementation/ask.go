@@ -119,6 +119,8 @@ type Input struct {
 	Detail     string  `json:"detail"`
 	Priority   string  `json:"priority"`
 	AssignedTo *string `json:"assignedTo"`
+	// BlockedReason is editable when an ask is in the blocked stage.
+	BlockedReason *string `json:"blockedReason"`
 
 	DueAt *time.Time `json:"dueAt"`
 }

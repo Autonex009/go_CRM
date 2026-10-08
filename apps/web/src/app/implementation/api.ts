@@ -162,6 +162,7 @@ export interface AskInput {
   detail: string;
   priority: AskPriority;
   assignedTo?: string;
+  blockedReason?: string;
   /** ISO 8601, or omitted for no due date. */
   dueAt?: string | null;
 }

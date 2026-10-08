@@ -1,4 +1,4 @@
-import { AlertCircle, CalendarClock, MapPin, Square, Trash2 } from "lucide-react";
+import { AlertCircle, CalendarClock, MapPin, Pencil, Square, Trash2 } from "lucide-react";
 
 import { Avatar } from "../ui";
 import type { Ask } from "./api";
@@ -13,10 +13,12 @@ export function AskCard({
   ask,
   overlay = false,
   onDelete,
+  onEditBlockReason,
 }: {
   ask: Ask;
   overlay?: boolean;
   onDelete?: (ask: Ask) => void;
+  onEditBlockReason?: (ask: Ask) => void;
 }) {
   const due = dueLabel(ask);
   const blocked = ask.status === "blocked";
@@ -86,14 +88,40 @@ export function AskCard({
 
       {blocked && (
         <div
-          className="flex items-start gap-1.5 rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-600 dark:text-rose-400"
-          title={ask.blockedReason || undefined}
+          className={`flex items-start gap-1.5 rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-600 dark:text-rose-400 ${
+            onEditBlockReason && !overlay
+              ? "group/block cursor-pointer hover:border-rose-500/40 hover:bg-rose-500/15 transition-colors"
+              : ""
+          }`}
+          title={
+            onEditBlockReason && !overlay
+              ? ask.blockedReason
+                ? "Click to edit blockage reason"
+                : "Click to add blockage reason"
+              : ask.blockedReason || undefined
+          }
+          onClick={(e) => {
+            if (onEditBlockReason && !overlay) {
+              e.stopPropagation();
+              onEditBlockReason(ask);
+            }
+          }}
         >
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
           <div className="min-w-0 flex-1 break-words leading-tight">
             <span className="font-semibold">Blockage reason: </span>
-            <span>{ask.blockedReason || "No reason specified"}</span>
+            <span className={!ask.blockedReason ? "italic opacity-85" : ""}>
+              {ask.blockedReason || "No reason specified (click to edit)"}
+            </span>
           </div>
+          {onEditBlockReason && !overlay && (
+            <span
+              className="opacity-70 group-hover/block:opacity-100 transition-opacity p-0.5 hover:text-rose-700 dark:hover:text-rose-300"
+              title="Edit blockage reason"
+            >
+              <Pencil className="h-3 w-3 shrink-0" />
+            </span>
+          )}
         </div>
       )}
 

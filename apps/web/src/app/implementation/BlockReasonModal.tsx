@@ -30,11 +30,13 @@ export function BlockReasonModal({
     return () => window.removeEventListener("keydown", handleKey, true);
   }, [onCancel]);
 
+  const isAlreadyBlocked = ask.status === "blocked";
+
   const handleSubmit = (e?: FormEvent) => {
     if (e) e.preventDefault();
     const trimmed = reason.trim();
     if (!trimmed) {
-      setError("A blockage reason is mandatory to move this card to Blocked.");
+      setError("A blockage reason is mandatory.");
       return;
     }
     onConfirm(trimmed);
@@ -48,7 +50,12 @@ export function BlockReasonModal({
   };
 
   return (
-    <Modal title="Block Task" onClose={onCancel} size="sm" zIndex="z-[60]">
+    <Modal
+      title={isAlreadyBlocked ? "Edit Blockage Reason" : "Block Task"}
+      onClose={onCancel}
+      size="sm"
+      zIndex="z-[60]"
+    >
       <form onSubmit={handleSubmit} className="flex flex-col gap-md">
         <div className="flex flex-col gap-1 rounded-lg border border-line bg-surface-muted/60 p-3">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-subtle">
@@ -77,7 +84,7 @@ export function BlockReasonModal({
             Cancel
           </Button>
           <Button type="submit" variant="primary">
-            Confirm Block
+            {isAlreadyBlocked ? "Save Reason" : "Confirm Block"}
           </Button>
         </div>
       </form>

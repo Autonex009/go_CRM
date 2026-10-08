@@ -86,6 +86,9 @@ func diff(before, after Ask, actorID string) []Event {
 	add(kindAssigned, "assignee", label(before.AssignedToName, before.AssignedTo),
 		label(after.AssignedToName, after.AssignedTo))
 	add(kindDue, "dueAt", stamp(before.DueAt), stamp(after.DueAt))
+	if before.Status == "blocked" && after.Status == "blocked" && before.BlockedReason != after.BlockedReason {
+		add(kindBlocked, "blockedReason", before.BlockedReason, after.BlockedReason)
+	}
 
 	return out
 }

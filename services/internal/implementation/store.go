@@ -198,9 +198,11 @@ func (s *store) update(ctx context.Context, orgID, id string, in Input) (Ask, er
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE implementation_asks
 		    SET title = $3, type = $4, detail = $5, priority = $6,
-		        assigned_to = $7::uuid, due_at = $8, updated_at = now()
+		        assigned_to = $7::uuid, due_at = $8,
+		        blocked_reason = CASE WHEN status = 'blocked' AND $9::text IS NOT NULL AND $9::text <> '' THEN $9::text ELSE blocked_reason END,
+		        updated_at = now()
 		  WHERE org_id = $1::uuid AND id = $2::uuid`,
-		orgID, id, in.Title, in.Type, in.Detail, in.Priority, in.AssignedTo, in.DueAt)
+		orgID, id, in.Title, in.Type, in.Detail, in.Priority, in.AssignedTo, in.DueAt, in.BlockedReason)
 	if err != nil {
 		if database.IsInvalidTextRepr(err) {
 			return Ask{}, ErrNotFound

@@ -227,8 +227,12 @@ export default function Implementation() {
   const moveAsk = (id: string, status: AskStatus) => {
     const targetAsk = board?.asks.find((a) => a.id === id);
     if (status === "blocked") {
-      // Reordering within the blocked column does not require a new reason
+      // Reordering within the blocked column does not require a new reason if one already exists
       if (targetAsk && targetAsk.status === "blocked") {
+        if (!targetAsk.blockedReason.trim()) {
+          setPendingBlock({ id, ask: targetAsk });
+          return;
+        }
         move.mutate({ id, status, reason: targetAsk.blockedReason });
         return;
       }
@@ -446,6 +450,7 @@ export default function Implementation() {
                     ask={item}
                     overlay={overlay}
                     onDelete={isEngineer ? undefined : deleteAsk}
+                    onEditBlockReason={(ask) => setPendingBlock({ id: ask.id, ask })}
                   />
                 )}
                 onMove={moveAsk}

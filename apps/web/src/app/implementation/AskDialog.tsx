@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { AlertCircle, Check } from "lucide-react";
+import { AlertCircle, Check, Pencil } from "lucide-react";
 
 import { ApiError } from "../lib/api";
 import { orgApi } from "../org/api";
@@ -218,12 +218,27 @@ export function AskDialog({
         />
 
         {ask && ask.status === "blocked" && (
-          <div className="flex items-start gap-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-md py-sm text-xs text-rose-600 dark:text-rose-400">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <span className="font-semibold">Blockage reason: </span>
-              <span>{ask.blockedReason || "No reason specified"}</span>
+          <div className="flex items-start justify-between gap-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-md py-sm text-xs text-rose-600 dark:text-rose-400">
+            <div className="flex items-start gap-2 min-w-0 flex-1">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <div className="min-w-0 flex-1 break-words">
+                <span className="font-semibold">Blockage reason: </span>
+                <span className={!ask.blockedReason ? "italic opacity-85" : ""}>
+                  {ask.blockedReason || "No reason specified"}
+                </span>
+              </div>
             </div>
+            {onStatusChange && (
+              <button
+                type="button"
+                onClick={() => setShowBlockPrompt(true)}
+                className="shrink-0 flex items-center gap-1 font-semibold text-xs rounded border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-2 py-0.5 transition-colors"
+                title="Edit blockage reason"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </button>
+            )}
           </div>
         )}
 
