@@ -42,6 +42,10 @@ func (h *Handler) Routes() chi.Router {
 	r.Delete("/{id}", h.remove)
 	// Separate from PUT: a drag-and-drop is a reorder, not a field edit.
 	r.Patch("/{id}/move", h.move)
+	// Card notes autosave on their own route, so PUT never touches them.
+	r.Get("/{id}/notes", h.getNotes)
+	r.Put("/{id}/notes", h.saveNotes)
+	r.Get("/{id}/notes/revisions", h.noteRevisions)
 	return r
 }
 

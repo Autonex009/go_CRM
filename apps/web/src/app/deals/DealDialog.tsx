@@ -14,6 +14,7 @@ import { orgApi } from "../org/api";
 import { Alert, Badge, Button, Field, Modal, SelectField, AssigneePicker } from "../ui";
 import { COMMERCIAL_ROLES, memberGroups } from "../org/memberGroups";
 import type { Deal, DealInput } from "./api";
+import { DealNotesPanel } from "./DealNotesPanel";
 import { buildQuoteStateFromDeal } from "./quote-utils";
 import { TaskHistory } from "./TaskHistory";
 import { dealFormSchema, toPayload, type DealFormValues } from "./schemas";
@@ -187,6 +188,9 @@ export function DealDialog({
             </span>
           </div>
         )}
+
+        {/* Autosaves on its own; not part of this form's Save. */}
+        {deal && <DealNotesPanel key={deal.id} dealId={deal.id} />}
 
         <Field
           label="Title"
