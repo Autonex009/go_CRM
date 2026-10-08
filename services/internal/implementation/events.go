@@ -15,6 +15,12 @@ const (
 	kindDue      = "due_changed"
 	kindEdited   = "edited"
 	kindBlocked  = "blocked"
+
+	kindCommentDeleted = "comment_deleted"
+	kindSubmitted      = "submitted"
+	kindApproved       = "approved"
+	kindRejected       = "rejected"
+	kindDealLinked     = "deal_linked"
 )
 
 // record writes one line of history. Best effort, like activities.Log: it runs

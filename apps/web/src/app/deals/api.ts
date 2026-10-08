@@ -34,6 +34,20 @@ export interface Deal {
   updatedAt: string;
 }
 
+/** Mirrors deals.Notes. */
+export interface DealNotes {
+  notes: string;
+  updatedAt: string | null;
+  updatedByName: string | null;
+}
+
+export interface DealNoteRevision {
+  id: string;
+  content: string;
+  editedByName: string | null;
+  editedAt: string | null;
+}
+
 /** Mirrors deals.Board. */
 export interface Board {
   stages: DealStage[];
@@ -103,6 +117,18 @@ export const dealsApi = {
       method: "PUT",
       body: JSON.stringify(input),
     }),
+
+  notes: (id: string) => apiFetch<DealNotes>(`${BASE}/${id}/notes`),
+
+  /** Rejected with 409 if someone else saved since baseUpdatedAt. */
+  saveNotes: (id: string, notes: string, baseUpdatedAt: string | null) =>
+    apiFetch<DealNotes>(`${BASE}/${id}/notes`, {
+      method: "PUT",
+      body: JSON.stringify({ notes, baseUpdatedAt }),
+    }),
+
+  noteRevisions: (id: string) =>
+    apiFetch<DealNoteRevision[]>(`${BASE}/${id}/notes/revisions`),
 
   remove: (id: string) => apiFetch<void>(`${BASE}/${id}`, { method: "DELETE" }),
 

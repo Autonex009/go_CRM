@@ -27,7 +27,8 @@ const askColumns = `
 	a.due_at, a.position,
 	a.delivered_at, a.verified_at, a.created_at, a.updated_at,
 	COALESCE(loc.names, NULLIF(btrim(d.location), ''), NULLIF(btrim(l.location), '')),
-	pl.id::text`
+	pl.id::text,
+	a.comment_count, a.review_status, a.review_note, a.submitted_at, a.reviewed_at`
 
 const askFrom = `
 	FROM implementation_asks a
@@ -74,6 +75,7 @@ func scanAsk(row rowScanner) (Ask, error) {
 		&a.DueAt, &a.Position,
 		&a.DeliveredAt, &a.VerifiedAt, &a.CreatedAt, &a.UpdatedAt,
 		&a.Locations, &a.PipelineID,
+		&a.CommentCount, &a.ReviewStatus, &a.ReviewNote, &a.SubmittedAt, &a.ReviewedAt,
 	)
 	return a, err
 }
@@ -119,6 +121,9 @@ func where(orgID string, f Filter) (string, []any) {
 	}
 	if f.OpenOnly {
 		sql += ` AND a.status NOT IN ('verified', 'wont_do')`
+	}
+	if f.ReviewStatus != "" {
+		add(" AND a.review_status = ", f.ReviewStatus, "")
 	}
 	if f.ViewerID != "" {
 		if clause := VisibleClause("a", f.ViewerRole, "$"+strconv.Itoa(len(args)+1)); clause != "" {
@@ -166,12 +171,14 @@ func (s *store) get(ctx context.Context, orgID, id string) (Ask, error) {
 
 // create inserts at the end of the "requested" column. account_id is derived
 // from in.AccountID or from the parent in SQL so it cannot drift from it.
-func (s *store) create(ctx context.Context, orgID, actorID string, in Input) (Ask, error) {
+// request marks it a pending manager request.
+func (s *store) create(ctx context.Context, orgID, actorID string, in Input, request bool) (Ask, error) {
 	var id string
 	err := s.pool.QueryRow(ctx,
 		`INSERT INTO implementation_asks (
 		     org_id, deal_id, lead_id, account_id, parent_ask_id,
-		     title, type, detail, priority, assigned_to, created_by, due_at, position)
+		     title, type, detail, priority, assigned_to, created_by, due_at, position,
+		     review_status, submitted_by, submitted_at)
 		 VALUES (
 		     $1::uuid, $2::uuid, $3::uuid,
 		     COALESCE(
@@ -182,11 +189,14 @@ func (s *store) create(ctx context.Context, orgID, actorID string, in Input) (As
 		     $4::uuid,
 		     $5, $6, $7, $8, $9::uuid, $10::uuid, $11,
 		     COALESCE((SELECT max(position) + 1 FROM implementation_asks
-		                WHERE org_id = $1::uuid AND status = 'requested'), 0))
+		                WHERE org_id = $1::uuid AND status = 'requested'), 0),
+		     CASE WHEN $13 THEN 'pending' END,
+		     CASE WHEN $13 THEN $10::uuid END,
+		     CASE WHEN $13 THEN now() END)
 		 RETURNING id::text`,
 		orgID, in.DealID, in.LeadID, in.ParentAskID,
 		in.Title, in.Type, in.Detail, in.Priority, in.AssignedTo,
-		nilIfEmpty(actorID), in.DueAt, in.AccountID).Scan(&id)
+		nilIfEmpty(actorID), in.DueAt, in.AccountID, request).Scan(&id)
 	if err != nil {
 		return Ask{}, err
 	}
@@ -271,12 +281,29 @@ func (s *store) delete(ctx context.Context, orgID, id string) error {
 }
 
 // Confirm a parent exists, so a bad id is a 400 not a foreign-key 500.
-func (s *store) dealExists(ctx context.Context, id string) (bool, error) {
-	return s.exists(ctx, `SELECT EXISTS (SELECT 1 FROM deals WHERE id = $1::uuid AND deleted_at IS NULL)`, id)
+func (s *store) dealExists(ctx context.Context, orgID, id string) (bool, error) {
+	return s.existsInOrg(ctx, `SELECT EXISTS (`+dealInOrgSQL+`)`, orgID, id)
 }
 
-func (s *store) leadExists(ctx context.Context, id string) (bool, error) {
-	return s.exists(ctx, `SELECT EXISTS (SELECT 1 FROM leads WHERE id = $1::uuid AND deleted_at IS NULL)`, id)
+func (s *store) leadExists(ctx context.Context, orgID, id string) (bool, error) {
+	return s.existsInOrg(ctx,
+		`SELECT EXISTS (
+		     SELECT 1 FROM leads l
+		      WHERE l.id = $2::uuid AND l.deleted_at IS NULL
+		        AND (l.org_id = $1::uuid
+		             OR EXISTS (SELECT 1 FROM users u WHERE u.id = l.owner_user_id AND u.org_id = $1::uuid)))`,
+		orgID, id)
+}
+
+func (s *store) existsInOrg(ctx context.Context, query, orgID, id string) (bool, error) {
+	var ok bool
+	if err := s.pool.QueryRow(ctx, query, orgID, id).Scan(&ok); err != nil {
+		if database.IsInvalidTextRepr(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return ok, nil
 }
 
 func (s *store) askExists(ctx context.Context, orgID, id string) (bool, error) {
@@ -334,17 +361,6 @@ func (s *store) assigneeInOrg(ctx context.Context, orgID, userID string) (bool, 
 		return false, nil
 	}
 	return ok, err
-}
-
-func (s *store) exists(ctx context.Context, query, id string) (bool, error) {
-	var ok bool
-	if err := s.pool.QueryRow(ctx, query, id).Scan(&ok); err != nil {
-		if database.IsInvalidTextRepr(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return ok, nil
 }
 
 func nilIfEmpty(s string) *string {

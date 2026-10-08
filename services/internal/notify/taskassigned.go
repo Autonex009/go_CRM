@@ -107,10 +107,15 @@ func (n *Notifier) TaskAssigned(ctx context.Context, orgID string, t TaskAssignm
 	go func() {
 		defer cancel()
 
-		deal, company := n.taskContext(sendCtx, orgID, t)
+		role := n.userRole(sendCtx, t.AssigneeID)
+		ctxTask := t
+		if !commercialRoles[role] {
+			// Deals and leads stay with the GTM team; name only the company.
+			ctxTask.DealID, ctxTask.LeadID = "", ""
+		}
+		deal, company := n.taskContext(sendCtx, orgID, ctxTask)
 		actor := n.actorName(sendCtx, t.ActorID)
-
-		appPath := taskLink(t, n.userRole(sendCtx, t.AssigneeID))
+		appPath := taskLink(t, role)
 
 		if err := n.deliver(sendCtx, NotificationItem{
 			OrgID:     orgID,
@@ -137,7 +142,7 @@ func (n *Notifier) TaskAssigned(ctx context.Context, orgID string, t TaskAssignm
 		}
 		if err := n.mail.Send(sendCtx, mailer.Message{
 			To:      []string{to},
-			Subject: taskSubject(t, deal),
+			Subject: taskSubject(deal),
 			Body:    n.taskEmailBody(t, deal, company, actor, appPath),
 		}); err != nil {
 			log.Printf("notify: task %s assignment email failed: %v", t.TaskID, err)
@@ -264,7 +269,7 @@ func taskBody(t TaskAssignment, deal, company, actor string) string {
 	return text + where
 }
 
-func taskSubject(t TaskAssignment, deal string) string {
+func taskSubject(deal string) string {
 	if deal != "" {
 		return fmt.Sprintf("Task assigned to you on %s", deal)
 	}

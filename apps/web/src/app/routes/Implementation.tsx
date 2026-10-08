@@ -17,6 +17,7 @@ import {
   PIPELINE_ADMIN_ROLES,
 } from "../implementation/api";
 import { AskCard } from "../implementation/AskCard";
+import { RequestAskModal } from "../implementation/RequestAskModal";
 import { BlockReasonModal } from "../implementation/BlockReasonModal";
 import { PipelineDialog } from "../implementation/PipelineDialog";
 import { PipelineSection } from "../implementation/PipelineSection";
@@ -60,13 +61,19 @@ export default function Implementation() {
   const user = useAuthStore((s) => s.user);
   const viewerId = user?.id;
   const isEngineer = user?.role === "engineer";
+  const isManager = user?.role === "manager";
   const [view, setView] = useState<View>("all");
   const [dealFilter, setDealFilter] = useState("");
   const [dialog, setDialog] = useState<Ask | null>(null);
+  const [dialogFocus, setDialogFocus] = useState<{
+    tab: "details" | "discussion";
+    commentId: string | null;
+  }>({ tab: "details", commentId: null });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedAskId = searchParams.get("ask");
+  const linkedCommentId = searchParams.get("comment");
   const search = searchParams.get("q") ?? "";
   const [showArchived, setShowArchived] = useState(false);
   const [pipelineDialog, setPipelineDialog] = useState<Pipeline | "new" | null>(null);
@@ -105,32 +112,46 @@ export default function Implementation() {
     queryFn: () => implementationApi.board(),
   });
 
-  // ?ask=<id> comes from a notification or email link: open that card once the
-  // board loads. The board is already scoped by the server to what this viewer
-  // may see, so an ask outside their scope is simply not found and nothing
-  // opens. The param is cleared either way so closing the dialog sticks.
+  // ?ask=<id>[&comment=<id>] comes from a notification or email link: open
+  // that card once the board loads. An ask not on the board (a sub-task, or
+  // filtered out) is fetched directly; one the viewer may not see 404s and
+  // nothing opens. The params are cleared either way so closing sticks.
   useEffect(() => {
     if (!linkedAskId || !query.data) return;
-    const target = query.data.asks.find((a) => a.id === linkedAskId);
-    if (target) {
+    const open = (target: Ask) => {
+      setDialogFocus({
+        tab: linkedCommentId ? "discussion" : "details",
+        commentId: linkedCommentId,
+      });
       setDialog(target);
       // Open its section for this visit only; the saved preference is untouched.
       const key = groupKeyOf(target);
       setExpandedOverrides((prev) => ({ ...prev, [key]: true }));
-    }
+    };
+    const target = query.data.asks.find((a) => a.id === linkedAskId);
+    if (target) open(target);
+    else implementationApi.get(linkedAskId).then(open, () => undefined);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         next.delete("ask");
+        next.delete("comment");
         return next;
       },
       { replace: true },
     );
-  }, [linkedAskId, query.data, setSearchParams]);
+  }, [linkedAskId, linkedCommentId, query.data, setSearchParams]);
+
+  const openAsk = (ask: Ask, tab: "details" | "discussion" = "details") => {
+    setDialogFocus({ tab, commentId: null });
+    setDialog(ask);
+  };
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["implementation"] });
     void queryClient.invalidateQueries({ queryKey: ["dealAsks"] });
+    void queryClient.invalidateQueries({ queryKey: ["askRequests"] });
+    void queryClient.invalidateQueries({ queryKey: ["implementationPipelines"] });
   };
 
   const move = useMutation({
@@ -313,7 +334,7 @@ export default function Implementation() {
               icon="plus"
               onClick={() => setShowTaskModal(true)}
             >
-              New Task
+              {isManager ? "New Request" : "New Task"}
             </Button>
           )}
 
@@ -364,8 +385,8 @@ export default function Implementation() {
           Overdue {counts?.overdue ? `· ${counts.overdue}` : ""}
         </Chip>
 
-        {/* "By deal" narrows the board to one deal's asks. Hidden for engineers (commercial data shielding) */}
-        {!isEngineer && (
+        {/* "By deal" narrows the board to one deal's asks. Deals are GTM-only. */}
+        {PIPELINE_ADMIN_ROLES.includes(user?.role ?? "") && (
           <select
             value={dealFilter}
             onChange={(e) => setDealFilter(e.target.value)}
@@ -451,10 +472,11 @@ export default function Implementation() {
                     overlay={overlay}
                     onDelete={isEngineer ? undefined : deleteAsk}
                     onEditBlockReason={(ask) => setPendingBlock({ id: ask.id, ask })}
+                    onOpenComments={(ask) => openAsk(ask, "discussion")}
                   />
                 )}
                 onMove={moveAsk}
-                onOpen={(item) => setDialog(item)}
+                onOpen={(item) => openAsk(item)}
               />
             ))
           )}
@@ -487,7 +509,9 @@ export default function Implementation() {
             setDialog(null);
           }}
           onDelete={() => deleteAsk(dialog)}
-          onSelectSubtask={(st) => setDialog(st)}
+          onSelectSubtask={(st) => openAsk(st)}
+          initialTab={dialogFocus.tab}
+          focusCommentId={dialogFocus.commentId}
         />
       )}
 
@@ -502,7 +526,18 @@ export default function Implementation() {
         />
       )}
 
-      {showTaskModal && (
+      {showTaskModal && isManager && (
+        <RequestAskModal
+          pipelines={pipelinesQuery.data ?? []}
+          onClose={() => setShowTaskModal(false)}
+          onCreated={() => {
+            setShowTaskModal(false);
+            invalidate();
+          }}
+        />
+      )}
+
+      {showTaskModal && !isManager && (
         <CreateTaskModal
           pipelines={pipelinesQuery.data ?? []}
           onClose={() => setShowTaskModal(false)}

@@ -97,8 +97,8 @@ export interface AuthMethods {
 }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    postJSON<AuthResponse>("/login", { email, password }),
+  login: (email: string, password: string, portal?: string) =>
+    postJSON<AuthResponse>("/login", { email, password, portal }),
   register: (email: string, password: string, name?: string) =>
     postJSON<AuthResponse>("/register", { email, password, name }),
 
@@ -126,6 +126,7 @@ export const authApi = {
  * `/app#token=<jwt>` (captured by captureTokenFromHash) with the refresh cookie
  * already set.
  */
-export function ssoUrl(provider: "google" | "github"): string {
-  return `${AUTH_BASE}/sso/${provider}`;
+export function ssoUrl(provider: "google" | "github", portal?: string): string {
+  const q = portal ? `?portal=${encodeURIComponent(portal)}` : "";
+  return `${AUTH_BASE}/sso/${provider}${q}`;
 }

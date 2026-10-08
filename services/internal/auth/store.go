@@ -36,6 +36,9 @@ type newUser struct {
 	PasswordHash   *string
 	AuthProvider   string
 	ProviderUserID *string
+	// createUserInOrg only; empty Role means "sales".
+	Role      string
+	ManagerID *string
 }
 
 // store is a thin, hand-written pgx repository for the users table.
@@ -118,12 +121,15 @@ func (s *store) createUserInOrg(ctx context.Context, orgID string, in newUser) (
 		fullName = *in.Name
 	}
 	// A joiner is not the owner of a workspace that already has one.
-	const role = "sales"
+	role := in.Role
+	if role == "" {
+		role = "sales"
+	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO profiles (id, full_name, role)
-		 VALUES ($1, $2, $3)
+		`INSERT INTO profiles (id, full_name, role, manager_id)
+		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name`,
-		u.ID, fullName, role,
+		u.ID, fullName, role, in.ManagerID,
 	); err != nil {
 		return User{}, err
 	}

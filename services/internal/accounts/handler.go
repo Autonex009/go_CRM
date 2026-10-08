@@ -27,6 +27,10 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireJWT(h.secret))
 
+	// Company records carry owners, client contacts and deal counts: GTM only.
+	// The implementation board gets company names from the asks themselves.
+	r.Use(middleware.RequireRole("owner", "admin", "sales", "account_manager"))
+
 	r.Get("/", h.list)
 	r.Post("/", h.create)
 	r.Get("/{id}", h.get)

@@ -43,6 +43,9 @@ type admission struct {
 	// invitationID is set when an invitation was consumed, so the caller can
 	// attribute it once the user row exists.
 	invitationID string
+	// From the invitation; empty role means the default.
+	role      string
+	managerID *string
 }
 
 // invitationFor finds an open invitation for an address.
@@ -53,13 +56,13 @@ type admission struct {
 func (s *store) invitationFor(ctx context.Context, email string) (admission, error) {
 	var a admission
 	err := s.pool.QueryRow(ctx,
-		`SELECT id::text, org_id::text
+		`SELECT id::text, org_id::text, coalesce(role, ''), manager_id::text
 		   FROM invitations
 		  WHERE lower(btrim(email)) = $1
 		    AND accepted_at IS NULL
 		    AND expires_at > now()
 		  ORDER BY created_at DESC
-		  LIMIT 1`, email).Scan(&a.invitationID, &a.orgID)
+		  LIMIT 1`, email).Scan(&a.invitationID, &a.orgID, &a.role, &a.managerID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return admission{}, ErrNotInvited
 	}

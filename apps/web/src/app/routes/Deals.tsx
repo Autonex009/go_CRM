@@ -10,6 +10,7 @@ import { dealsApi, type Deal, type DealInput } from "../deals/api";
 import { dealTasksApi, type DealTask } from "../deals/tasks";
 import { implementationApi, type Ask, type AskInput } from "../implementation/api";
 import { AskDialog } from "../implementation/AskDialog";
+import { AskRequestsInbox } from "../implementation/AskRequestsInbox";
 import { useDeleteAsk } from "../implementation/useDeleteAsk";
 import { memberLabel, orgApi } from "../org/api";
 import { buildQuoteStateFromDeal } from "../deals/quote-utils";
@@ -410,6 +411,8 @@ export default function Deals() {
           </Button>
         }
       />
+
+      <AskRequestsInbox />
 
       {moveError && <Alert>{moveError}</Alert>}
       {actionError && <Alert>{actionError}</Alert>}

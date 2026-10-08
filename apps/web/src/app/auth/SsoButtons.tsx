@@ -9,14 +9,14 @@ import { buttonClass } from "../ui";
  * Both providers always render; one without server-side credentials answers 404
  * rather than redirecting.
  */
-export function SsoButtons() {
+export function SsoButtons({ portal }: { portal?: string }) {
   return (
     <div className="flex flex-col gap-sm">
-      <a href={ssoUrl("google")} className={buttonClass({ variant: "secondary" })}>
+      <a href={ssoUrl("google", portal)} className={buttonClass({ variant: "secondary" })}>
         <GoogleIcon />
         Continue with Google
       </a>
-      <a href={ssoUrl("github")} className={buttonClass({ variant: "secondary" })}>
+      <a href={ssoUrl("github", portal)} className={buttonClass({ variant: "secondary" })}>
         <GitHubIcon />
         Continue with GitHub
       </a>

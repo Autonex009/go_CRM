@@ -15,6 +15,8 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [toast, setToast] = useState<NotificationItem | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   // Fetch notification list & count
   const query = useQuery({
@@ -38,13 +40,35 @@ export function NotificationBell() {
     },
   });
 
-  // Connect real-time SSE stream
+  // Real-time SSE stream, reconnecting with backoff when it drops.
   useEffect(() => {
     if (!token) return;
 
-    // Use EventSource or standard SSE stream fetch with Bearer token
     const controller = new AbortController();
     const streamUrl = `${API_URL}/api/v1/notifications/stream`;
+    let retryMs = 1000;
+    let retryTimer: number | undefined;
+
+    const onItem = (item: NotificationItem) => {
+      setToast(item);
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      refreshFor(item);
+      window.clearTimeout(toastTimer.current);
+      toastTimer.current = window.setTimeout(() => setToast(null), 5000);
+    };
+
+    // Comment and request alerts mean data on screen may be stale.
+    const refreshFor = (item: NotificationItem) => {
+      if (item.type.startsWith("ask_comment")) {
+        const askId = new URLSearchParams((item.actionUrl ?? "").split("?")[1] ?? "").get("ask");
+        if (askId) void queryClient.invalidateQueries({ queryKey: ["askComments", askId] });
+        void queryClient.invalidateQueries({ queryKey: ["implementation"] });
+      }
+      if (item.type.startsWith("ask_request")) {
+        void queryClient.invalidateQueries({ queryKey: ["askRequests"] });
+        void queryClient.invalidateQueries({ queryKey: ["implementation"] });
+      }
+    };
 
     async function startSSE() {
       try {
@@ -56,7 +80,8 @@ export function NotificationBell() {
           signal: controller.signal,
         });
 
-        if (!response.ok || !response.body) return;
+        if (response.status === 401 || response.status === 403) return;
+        if (!response.ok || !response.body) throw new Error(`stream ${response.status}`);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -65,37 +90,36 @@ export function NotificationBell() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          retryMs = 1000; // the stream is delivering, so back off from scratch next time
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n\n");
           buffer = lines.pop() || "";
 
           for (const chunk of lines) {
-            if (chunk.includes("event: notification")) {
-              const dataLine = chunk.split("\n").find((l) => l.startsWith("data: "));
-              if (dataLine) {
-                const rawJson = dataLine.replace("data: ", "").trim();
-                const item: NotificationItem = JSON.parse(rawJson);
-
-                // Show toast & refresh list query
-                setToast(item);
-                void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-                setTimeout(() => setToast(null), 5000);
-              }
+            if (!chunk.includes("event: notification")) continue;
+            const dataLine = chunk.split("\n").find((l) => l.startsWith("data: "));
+            if (!dataLine) continue;
+            try {
+              onItem(JSON.parse(dataLine.slice("data: ".length).trim()) as NotificationItem);
+            } catch {
+              // Malformed frame: skip it, keep the stream.
             }
           }
         }
       } catch (err: unknown) {
-        if ((err as Error)?.name !== "AbortError") {
-          console.debug("SSE disconnected, will reconnect automatically");
-        }
+        if ((err as Error)?.name === "AbortError") return;
       }
+      if (controller.signal.aborted) return;
+      retryTimer = window.setTimeout(() => void startSSE(), retryMs);
+      retryMs = Math.min(retryMs * 2, 30_000);
     }
 
     void startSSE();
 
     return () => {
       controller.abort();
+      window.clearTimeout(retryTimer);
     };
   }, [token, queryClient]);
 
