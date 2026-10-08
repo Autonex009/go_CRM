@@ -17,6 +17,7 @@ import {
   PIPELINE_ADMIN_ROLES,
 } from "../implementation/api";
 import { AskCard } from "../implementation/AskCard";
+import { BlockReasonModal } from "../implementation/BlockReasonModal";
 import { PipelineDialog } from "../implementation/PipelineDialog";
 import { PipelineSection } from "../implementation/PipelineSection";
 import {
@@ -72,6 +73,8 @@ export default function Implementation() {
   const [expandedOverrides, setExpandedOverrides] = useState<Record<string, boolean>>(
     readExpanded,
   );
+  const [pendingBlock, setPendingBlock] = useState<{ id: string; ask: Ask } | null>(null);
+  const [boardResetKey, setBoardResetKey] = useState(0);
   const canManagePipelines = PIPELINE_ADMIN_ROLES.includes(user?.role ?? "");
 
   const pipelinesQuery = useQuery({
@@ -141,6 +144,9 @@ export default function Implementation() {
       reason?: string;
     }) => implementationApi.move(id, status, reason ?? ""),
     onSuccess: invalidate,
+    onError: () => {
+      setBoardResetKey((k) => k + 1);
+    },
   });
 
   const save = useMutation({
@@ -219,11 +225,19 @@ export default function Implementation() {
     (visibleGroups.length <= 5 || Boolean(search.trim()) || g.blocked > 0 || g.overdue > 0);
 
   const moveAsk = (id: string, status: AskStatus) => {
-    // A blocked ask without a reason is the one card nobody can act on, so
-    // the move asks for it rather than leaving the chip bare.
-    const reason =
-      status === "blocked" ? window.prompt("What is it blocked on?")?.trim() ?? "" : "";
-    move.mutate({ id, status, reason });
+    const targetAsk = board?.asks.find((a) => a.id === id);
+    if (status === "blocked") {
+      // Reordering within the blocked column does not require a new reason
+      if (targetAsk && targetAsk.status === "blocked") {
+        move.mutate({ id, status, reason: targetAsk.blockedReason });
+        return;
+      }
+      // Moving to Blocked: require a blockage reason before moving
+      const askToBlock = targetAsk ?? ({ id, title: "Selected Task" } as Ask);
+      setPendingBlock({ id, ask: askToBlock });
+      return;
+    }
+    move.mutate({ id, status, reason: "" });
   };
 
   return (
@@ -381,6 +395,14 @@ export default function Implementation() {
         </Alert>
       )}
 
+      {move.isError && (
+        <Alert>
+          {move.error instanceof ApiError
+            ? move.error.message
+            : "Could not move that ask"}
+        </Alert>
+      )}
+
       {pipelinesQuery.isError && (
         <Alert>
           {pipelinesQuery.error instanceof ApiError
@@ -410,7 +432,7 @@ export default function Implementation() {
           ) : (
             visibleGroups.map((g) => (
               <PipelineSection
-                key={g.key}
+                key={`${g.key}-${boardResetKey}`}
                 group={g}
                 expanded={isExpanded(g)}
                 onToggle={() => setExpanded(g.key, !isExpanded(g))}
@@ -482,6 +504,19 @@ export default function Implementation() {
           onCreated={() => {
             setShowTaskModal(false);
             invalidate();
+          }}
+        />
+      )}
+      {pendingBlock && (
+        <BlockReasonModal
+          ask={pendingBlock.ask}
+          onConfirm={(reason) => {
+            move.mutate({ id: pendingBlock.id, status: "blocked", reason });
+            setPendingBlock(null);
+          }}
+          onCancel={() => {
+            setPendingBlock(null);
+            setBoardResetKey((k) => k + 1);
           }}
         />
       )}

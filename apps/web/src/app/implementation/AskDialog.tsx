@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { Check } from "lucide-react";
+import { AlertCircle, Check } from "lucide-react";
 
 import { ApiError } from "../lib/api";
 import { orgApi } from "../org/api";
@@ -23,6 +23,7 @@ import {
   type AskPriority,
   type AskStatus,
 } from "./api";
+import { BlockReasonModal } from "./BlockReasonModal";
 import { AskHistory } from "./AskHistory";
 import { TypeSelect } from "./TypeSelect";
 import {
@@ -81,6 +82,7 @@ export function AskDialog({
   const [staged, setStaged] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showBlockPrompt, setShowBlockPrompt] = useState(false);
 
   const members = useQuery({
     queryKey: ["members"],
@@ -107,18 +109,18 @@ export function AskDialog({
    * Without the save, picking a status threw away anything typed since the
    * dialog opened — the move closed it and the edits went with it.
    */
-  const changeStatus = async (next: AskStatus) => {
+  const changeStatus = async (next: AskStatus, customReason = "") => {
     if (!onStatusChange || !title.trim()) return;
-    const reason =
-      next === "blocked"
-        ? window.prompt("What is it blocked on?")?.trim() ?? ""
-        : "";
+    if (next === "blocked" && !customReason) {
+      setShowBlockPrompt(true);
+      return;
+    }
 
     setBusy(true);
     setError(null);
     try {
       await onSubmit(values());
-      await onStatusChange(next, reason);
+      await onStatusChange(next, customReason);
     } catch (err) {
       setError(
         err instanceof ApiError || err instanceof Error
@@ -214,6 +216,16 @@ export function AskDialog({
           placeholder="Build the 3 Hikal use-cases (spill, PPE, zone-intrusion)"
           autoFocus
         />
+
+        {ask && ask.status === "blocked" && (
+          <div className="flex items-start gap-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-md py-sm text-xs text-rose-600 dark:text-rose-400">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <span className="font-semibold">Blockage reason: </span>
+              <span>{ask.blockedReason || "No reason specified"}</span>
+            </div>
+          </div>
+        )}
 
         {ask && onStatusChange && (
           <SelectField
@@ -319,6 +331,16 @@ export function AskDialog({
           </div>
         </div>
       </form>
+      {showBlockPrompt && ask && (
+        <BlockReasonModal
+          ask={ask}
+          onConfirm={(reason) => {
+            setShowBlockPrompt(false);
+            void changeStatus("blocked", reason);
+          }}
+          onCancel={() => setShowBlockPrompt(false)}
+        />
+      )}
     </Modal>
   );
 }

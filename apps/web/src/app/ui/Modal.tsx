@@ -16,6 +16,8 @@ interface ModalProps {
    * scroller around the whole body cannot do.
    */
   flush?: boolean;
+  /** Custom z-index class, defaults to z-50. Useful for nested modals. */
+  zIndex?: string;
 }
 
 const SIZES = {
@@ -47,6 +49,7 @@ export function Modal({
   headerAction,
   size = "lg",
   flush = false,
+  zIndex = "z-50",
 }: ModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -65,7 +68,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center overflow-hidden bg-overlay/40 p-md backdrop-blur-[2px] sm:items-center sm:p-xl"
+      className={`fixed inset-0 ${zIndex} flex animate-fade-in items-start justify-center overflow-hidden bg-overlay/40 p-md backdrop-blur-[2px] sm:items-center sm:p-xl`}
       onClick={onClose}
     >
       <div

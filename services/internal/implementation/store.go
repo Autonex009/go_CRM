@@ -231,7 +231,9 @@ func (s *store) move(ctx context.Context, orgID, id, status, reason string) (Ask
 		                            THEN COALESCE(a.verified_at, now())
 		                            ELSE a.verified_at END,
 		        -- Cleared on leaving blocked, so it cannot outlive the block.
-		        blocked_reason = CASE WHEN $3 = 'blocked' THEN $4 ELSE '' END,
+		        blocked_reason = CASE WHEN $3 = 'blocked'
+		                              THEN CASE WHEN $4 <> '' THEN $4 ELSE a.blocked_reason END
+		                              ELSE '' END,
 		        position = COALESCE(
 		            (SELECT max(position) + 1 FROM implementation_asks
 		              WHERE org_id = $1::uuid AND status = $3), 0),

@@ -1,4 +1,4 @@
-import { CalendarClock, MapPin, Square, Trash2 } from "lucide-react";
+import { AlertCircle, CalendarClock, MapPin, Square, Trash2 } from "lucide-react";
 
 import { Avatar } from "../ui";
 import type { Ask } from "./api";
@@ -84,13 +84,17 @@ export function AskCard({
         </p>
       )}
 
-      {blocked && ask.blockedReason && (
-        <p
-          className="truncate rounded bg-rose-500/10 px-1.5 py-1 text-[11px] text-rose-600 dark:text-rose-400"
-          title={ask.blockedReason}
+      {blocked && (
+        <div
+          className="flex items-start gap-1.5 rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-600 dark:text-rose-400"
+          title={ask.blockedReason || undefined}
         >
-          {ask.blockedReason}
-        </p>
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+          <div className="min-w-0 flex-1 break-words leading-tight">
+            <span className="font-semibold">Blockage reason: </span>
+            <span>{ask.blockedReason || "No reason specified"}</span>
+          </div>
+        </div>
       )}
 
       <footer className="flex items-center gap-2">

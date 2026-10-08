@@ -360,6 +360,14 @@ func (s *Service) Move(ctx context.Context, orgID, actorID, id string, mv Move) 
 		reason = reason[:maxTitle]
 	}
 
+	current, err := s.store.get(ctx, orgID, id)
+	if err != nil {
+		return Ask{}, err
+	}
+	if status == "blocked" && current.Status != "blocked" && reason == "" {
+		return Ask{}, apperr.Invalid("a blockage reason is mandatory to move to blocked")
+	}
+
 	a, previous, err := s.store.move(ctx, orgID, id, status, reason)
 	if err != nil {
 		return Ask{}, err
@@ -375,10 +383,10 @@ func (s *Service) Move(ctx context.Context, orgID, actorID, id string, mv Move) 
 		ToValue:   StatusLabel[status],
 		Note:      reason,
 	})
-	if status == "blocked" && reason != "" {
+	if status == "blocked" && a.BlockedReason != "" {
 		s.store.record(ctx, Event{
 			AskID: a.ID, orgID: orgID, ActorID: nilIfEmpty(actorID),
-			Kind: kindBlocked, ToValue: reason,
+			Kind: kindBlocked, ToValue: a.BlockedReason,
 		})
 	}
 
