@@ -100,6 +100,15 @@ type Ask struct {
 	DueAt    *time.Time `json:"dueAt"`
 	Position float64    `json:"position"`
 
+	CommentCount      int  `json:"commentCount"`
+	HasUnreadComments bool `json:"hasUnreadComments"`
+
+	// Set only on manager-raised requests: pending, approved or rejected.
+	ReviewStatus *string    `json:"reviewStatus"`
+	ReviewNote   string     `json:"reviewNote"`
+	SubmittedAt  *time.Time `json:"submittedAt"`
+	ReviewedAt   *time.Time `json:"reviewedAt"`
+
 	DeliveredAt *time.Time `json:"deliveredAt"`
 	VerifiedAt  *time.Time `json:"verifiedAt"`
 	CreatedAt   time.Time  `json:"createdAt"`
@@ -150,6 +159,8 @@ type Filter struct {
 	ViewerRole string
 	// OpenOnly drops the terminal states.
 	OpenOnly bool
+	// ReviewStatus keeps manager requests in that review state.
+	ReviewStatus string
 	// Overdue keeps asks past their due date and not closed.
 	Overdue bool
 }

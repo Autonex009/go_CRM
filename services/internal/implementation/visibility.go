@@ -41,3 +41,39 @@ func VisibleClause(alias, role, ref string) string {
 	        SELECT vp.parent_ask_id FROM implementation_asks vp
 	         WHERE vp.parent_ask_id IS NOT NULL AND vp.assigned_to = %[2]s::uuid))`, alias, ref)
 }
+
+// shieldAsk hides commercial links (deal, lead) from roles outside the GTM
+// team; engineers and engineering managers see the work, not the deal.
+func shieldAsk(a Ask, role string) Ask {
+	if fullAccessRoles[role] {
+		return a
+	}
+	a.DealID, a.LeadID, a.DealTitle, a.LeadTitle = nil, nil, nil, nil
+	return a
+}
+
+func shieldAsks(asks []Ask, role string) []Ask {
+	if fullAccessRoles[role] {
+		return asks
+	}
+	out := make([]Ask, len(asks))
+	for i, a := range asks {
+		out[i] = shieldAsk(a, role)
+	}
+	return out
+}
+
+// shieldEvents blanks deal names recorded in history for the same roles.
+func shieldEvents(events []Event, role string) []Event {
+	if fullAccessRoles[role] {
+		return events
+	}
+	out := make([]Event, len(events))
+	for i, e := range events {
+		if e.Kind == kindDealLinked {
+			e.FromValue, e.ToValue = "", ""
+		}
+		out[i] = e
+	}
+	return out
+}

@@ -37,6 +37,15 @@ export interface Ask {
   dueAt: string | null;
   position: number;
 
+  commentCount?: number;
+  hasUnreadComments?: boolean;
+
+  /** Set only on manager requests. */
+  reviewStatus?: ReviewStatus | null;
+  reviewNote?: string;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+
   deliveredAt: string | null;
   verifiedAt: string | null;
   createdAt: string;
@@ -106,13 +115,53 @@ export interface AskEvent {
     | "edited"
     | "blocked"
     | "attached"
-    | "detached";
+    | "detached"
+    | "comment_deleted"
+    | "submitted"
+    | "approved"
+    | "rejected"
+    | "deal_linked";
   field: string;
   fromValue: string;
   toValue: string;
   note: string;
   occurredAt: string;
 }
+
+export type ReviewStatus = "pending" | "approved" | "rejected";
+
+/** Mirrors implementation.Comment. Deleted comments carry no content or author. */
+export interface AskComment {
+  id: string;
+  askId: string;
+  parentCommentId: string | null;
+  authorId: string | null;
+  authorName: string;
+  authorRole: string;
+  authorAvatarUrl: string | null;
+  content: string;
+  mentions: { userId: string; userName: string }[];
+  editedAt: string | null;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommentPage {
+  comments: AskComment[];
+  nextCursor: string | null;
+  totalCount: number;
+}
+
+export interface Mentionable {
+  id: string;
+  name: string;
+  role: string;
+  avatarUrl: string | null;
+}
+
+/** Roles that review manager requests (mirrors the server). */
+export const REVIEWER_ROLES = PIPELINE_ADMIN_ROLES;
 
 /** Mirrors implementation.Attachment. */
 export interface Attachment {
@@ -286,5 +335,44 @@ export const implementationApi = {
   detach: (id: string, attachmentId: string) =>
     apiFetch<void>(`${BASE}/${id}/attachments/${attachmentId}`, {
       method: "DELETE",
+    }),
+
+  comments: (id: string, cursor?: string) =>
+    apiFetch<CommentPage>(
+      `${BASE}/${id}/comments${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    ),
+
+  addComment: (id: string, content: string, parentCommentId?: string | null) =>
+    apiFetch<AskComment>(`${BASE}/${id}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ content, parentCommentId: parentCommentId ?? null }),
+    }),
+
+  editComment: (id: string, commentId: string, content: string) =>
+    apiFetch<AskComment>(`${BASE}/${id}/comments/${commentId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    }),
+
+  deleteComment: (id: string, commentId: string) =>
+    apiFetch<void>(`${BASE}/${id}/comments/${commentId}`, { method: "DELETE" }),
+
+  mentionable: (id: string) => apiFetch<Mentionable[]>(`${BASE}/${id}/mentionable`),
+
+  requests: (status: ReviewStatus = "pending") =>
+    apiFetch<Ask[]>(`${BASE}/requests?status=${status}`),
+
+  review: (id: string, action: "approve" | "reject", dealId?: string, note = "") =>
+    apiFetch<Ask>(`${BASE}/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify({ action, dealId: dealId ?? null, note }),
+    }),
+
+  resubmit: (id: string) => apiFetch<Ask>(`${BASE}/${id}/resubmit`, { method: "POST" }),
+
+  linkDeal: (id: string, dealId: string) =>
+    apiFetch<Ask>(`${BASE}/${id}/link-deal`, {
+      method: "POST",
+      body: JSON.stringify({ dealId }),
     }),
 };

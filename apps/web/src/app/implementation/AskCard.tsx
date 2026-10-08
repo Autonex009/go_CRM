@@ -1,8 +1,8 @@
-import { AlertCircle, CalendarClock, MapPin, Pencil, Square, Trash2 } from "lucide-react";
+import { AlertCircle, CalendarClock, MapPin, MessageSquare, Pencil, Square, Trash2 } from "lucide-react";
 
 import { Avatar } from "../ui";
 import type { Ask } from "./api";
-import { PRIORITY_META, companyTint, dueLabel, parentName } from "./meta";
+import { PRIORITY_META, REVIEW_META, companyTint, dueLabel, parentName } from "./meta";
 
 /**
  * One card on the implementation board: the company it belongs to, what was
@@ -14,11 +14,13 @@ export function AskCard({
   overlay = false,
   onDelete,
   onEditBlockReason,
+  onOpenComments,
 }: {
   ask: Ask;
   overlay?: boolean;
   onDelete?: (ask: Ask) => void;
   onEditBlockReason?: (ask: Ask) => void;
+  onOpenComments?: (ask: Ask) => void;
 }) {
   const due = dueLabel(ask);
   const blocked = ask.status === "blocked";
@@ -64,6 +66,15 @@ export function AskCard({
         )}
         {onDelete && !overlay && <DeleteAskButton ask={ask} onDelete={onDelete} />}
       </header>
+
+      {ask.reviewStatus && ask.reviewStatus !== "approved" && (
+        <span
+          className={`self-start rounded px-1.5 py-0.5 text-[10px] font-semibold ${REVIEW_META[ask.reviewStatus].chip}`}
+          title={ask.reviewNote || undefined}
+        >
+          {REVIEW_META[ask.reviewStatus].label}
+        </span>
+      )}
 
       {ask.parentAskId && (
         <div className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium truncate">
@@ -141,6 +152,8 @@ export function AskCard({
           </span>
         )}
 
+        <CommentChip ask={ask} onOpen={overlay ? undefined : onOpenComments} />
+
         <span
           className={`inline-flex items-center gap-1 text-[11px] tabular-nums ${
             due.overdue
@@ -169,6 +182,47 @@ export function AskCard({
         </span>
       </footer>
     </article>
+  );
+}
+
+function CommentChip({ ask, onOpen }: { ask: Ask; onOpen?: (ask: Ask) => void }) {
+  const count = ask.commentCount ?? 0;
+  if (count === 0 && !onOpen) return null;
+  const unread = !!ask.hasUnreadComments;
+  const tone = unread
+    ? "bg-accent-soft text-accent-on font-semibold"
+    : "text-fg-muted hover:text-fg";
+  const label = `${count} comment${count === 1 ? "" : "s"}${unread ? ", new activity" : ""}`;
+  const body = (
+    <>
+      <MessageSquare className="h-3 w-3" />
+      {count > 0 && count}
+      {unread && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+    </>
+  );
+  if (!onOpen) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] tabular-nums ${tone}`} title={label}>
+        {body}
+      </span>
+    );
+  }
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <button
+      type="button"
+      onPointerDown={stop}
+      onKeyDown={stop}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(ask);
+      }}
+      aria-label={`Open discussion: ${label}`}
+      title={label}
+      className={`inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] tabular-nums transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${tone}`}
+    >
+      {body}
+    </button>
   );
 }
 

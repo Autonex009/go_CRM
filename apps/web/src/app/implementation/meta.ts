@@ -1,5 +1,5 @@
 import type { KanbanColumnDef, Tone } from "../ui";
-import { type Ask, type AskPriority, type AskStatus } from "./api";
+import { type Ask, type AskPriority, type AskStatus, type ReviewStatus } from "./api";
 
 interface StatusMeta {
   label: string;
@@ -75,6 +75,12 @@ export const PRIORITY_META: Record<AskPriority, PriorityMeta> = {
   p2: { label: "P2", chip: "bg-sky-500/15 text-sky-700 dark:text-sky-400" },
 };
 
+export const REVIEW_META: Record<ReviewStatus, { label: string; chip: string }> = {
+  pending: { label: "Pending review", chip: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  approved: { label: "Approved", chip: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+  rejected: { label: "Sent back", chip: "bg-rose-500/15 text-rose-600 dark:text-rose-400" },
+};
+
 /** Terminal states: still columns, but not outstanding work. */
 export function isClosed(status: AskStatus): boolean {
   return status === "verified" || status === "wont_do";
@@ -147,6 +153,16 @@ export function describeEvent(e: {
       return `edited the ${e.field}`;
     case "deleted":
       return e.note ? `deleted this ask (${e.note})` : "deleted this ask";
+    case "comment_deleted":
+      return e.note ? e.note.charAt(0).toLowerCase() + e.note.slice(1) : "deleted a comment";
+    case "submitted":
+      return e.note === "Resubmitted" ? "resubmitted the request for review" : "submitted this request for review";
+    case "approved":
+      return e.note ? `approved the request: ${e.note}` : "approved the request";
+    case "rejected":
+      return `sent the request back: ${e.note}`;
+    case "deal_linked":
+      return e.toValue ? `linked it to the deal ${e.toValue}` : "linked it to a deal";
     default:
       return e.kind;
   }

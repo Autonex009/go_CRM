@@ -65,13 +65,9 @@ func (s *Service) Board(ctx context.Context, orgID, viewerID, viewerRole string,
 		return Board{}, err
 	}
 
-	// Commercial data shielding: if viewer is engineer, hide deal commercial linkage
-	if viewerRole == "engineer" {
-		for i := range asks {
-			asks[i].DealID = nil
-			asks[i].LeadID = nil
-		}
-	}
+	asks = shieldAsks(asks, viewerRole)
+
+	s.flagUnread(ctx, orgID, viewerID, asks)
 
 	types, err := s.store.askTypes(ctx, orgID)
 	if err != nil {
@@ -92,11 +88,33 @@ func (s *Service) Board(ctx context.Context, orgID, viewerID, viewerRole string,
 
 // Subtasks returns child asks connected to a parent ask.
 func (s *Service) Subtasks(ctx context.Context, orgID, viewerID, viewerRole, parentAskID string) ([]Ask, error) {
-	return s.store.list(ctx, orgID, Filter{
+	asks, err := s.store.list(ctx, orgID, Filter{
 		ParentAskID: parentAskID,
 		ViewerID:    viewerID,
 		ViewerRole:  viewerRole,
 	})
+	if err != nil {
+		return nil, err
+	}
+	s.flagUnread(ctx, orgID, viewerID, asks)
+	return shieldAsks(asks, viewerRole), nil
+}
+
+// flagUnread sets HasUnreadComments; a failed lookup just leaves them false.
+func (s *Service) flagUnread(ctx context.Context, orgID, viewerID string, asks []Ask) {
+	ids := make([]string, 0, len(asks))
+	for _, a := range asks {
+		if a.CommentCount > 0 {
+			ids = append(ids, a.ID)
+		}
+	}
+	unread, err := s.store.unreadAsks(ctx, orgID, viewerID, ids)
+	if err != nil {
+		return
+	}
+	for i := range asks {
+		asks[i].HasUnreadComments = unread[asks[i].ID]
+	}
 }
 
 // CanSee returns ErrNotFound when the viewer may not see the ask, so a hidden
@@ -256,6 +274,18 @@ func (s *Service) Events(ctx context.Context, orgID, id string) ([]Event, error)
 // Create raises an ask at "requested", then opens its history, logs the parent
 // deal's timeline and notifies the assignee. None of those can fail the create.
 func (s *Service) Create(ctx context.Context, orgID, actorID, actorRole string, in Input) (Ask, error) {
+	if isRequestCreate(actorRole, in) {
+		return s.createRequest(ctx, orgID, actorID, in)
+	}
+	if !fullAccessRoles[actorRole] {
+		// Deals and leads are GTM-only: other roles inherit them from the parent.
+		in.DealID, in.LeadID = nil, nil
+		if p := trimPtr(in.ParentAskID); p != nil {
+			if err := s.CanSee(ctx, orgID, actorID, actorRole, *p); err != nil {
+				return Ask{}, apperr.Invalid("parent task not found")
+			}
+		}
+	}
 	if actorRole == "engineer" {
 		if in.ParentAskID == nil || *in.ParentAskID == "" {
 			return Ask{}, ErrEngineerMustLinkTask
@@ -288,19 +318,13 @@ func (s *Service) Create(ctx context.Context, orgID, actorID, actorRole string, 
 		return Ask{}, err
 	}
 
-	a, err := s.store.create(ctx, orgID, actorID, in)
+	a, err := s.store.create(ctx, orgID, actorID, in, false)
 	if err != nil {
 		return Ask{}, err
 	}
 
-	// Every company with work gets a pipeline. Re-read only when one was just
-	// opened, so the response carries its id.
-	if a.PipelineID == nil && a.AccountID != nil {
-		s.ensurePipelineFor(ctx, orgID, a.ID, actorID)
-		if fresh, err := s.store.get(ctx, orgID, a.ID); err == nil {
-			a = fresh
-		}
-	}
+	// Every company with work gets an open pipeline.
+	a = s.placeInPipeline(ctx, orgID, actorID, a)
 
 	s.store.record(ctx, Event{
 		AskID: a.ID, orgID: orgID, ActorID: nilIfEmpty(actorID),
@@ -532,7 +556,7 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 			}
 		}
 		if in.DealID != nil {
-			ok, err := s.store.dealExists(ctx, *in.DealID)
+			ok, err := s.store.dealExists(ctx, orgID, *in.DealID)
 			if err != nil {
 				return Input{}, err
 			}
@@ -541,7 +565,7 @@ func (s *Service) prepare(ctx context.Context, orgID string, in Input, requirePa
 			}
 		}
 		if in.LeadID != nil {
-			ok, err := s.store.leadExists(ctx, *in.LeadID)
+			ok, err := s.store.leadExists(ctx, orgID, *in.LeadID)
 			if err != nil {
 				return Input{}, err
 			}

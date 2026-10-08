@@ -32,6 +32,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/", h.board)
 	r.Post("/", h.create)
 	r.Get("/manager/roster", h.managerRoster)
+	r.Get("/requests", h.listRequests)
 	// The managed list of ask types. Ahead of /{id} so "types" is not read as
 	// an ask id.
 	// Company pipelines. Static segments, so ahead of /{id} like /types.
@@ -61,6 +62,16 @@ func (h *Handler) Routes() chi.Router {
 		r.Get("/{id}/attachments/{fileId}", h.attachmentURL)
 		r.Patch("/{id}/attachments/{fileId}", h.renameAttachment)
 		r.Delete("/{id}/attachments/{fileId}", h.detach)
+
+		r.Get("/{id}/comments", h.listComments)
+		r.Post("/{id}/comments", h.addComment)
+		r.Patch("/{id}/comments/{commentId}", h.editComment)
+		r.Delete("/{id}/comments/{commentId}", h.deleteComment)
+		r.Get("/{id}/mentionable", h.mentionable)
+
+		r.Post("/{id}/review", h.review)
+		r.Post("/{id}/resubmit", h.resubmit)
+		r.Post("/{id}/link-deal", h.linkDeal)
 	})
 
 	return r
@@ -87,6 +98,9 @@ func (h *Handler) board(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	if !fullAccessRoles[middleware.Role(ctx)] {
+		f.DealID, f.LeadID = "", "" // deals are GTM-only; no probing by id
+	}
 	b, err := h.svc.Board(ctx, middleware.OrgID(ctx), middleware.UserID(ctx), middleware.Role(ctx), f)
 	if err != nil {
 		httpx.WriteServerError(w, "could not load the implementation board", err)
@@ -136,7 +150,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, err, "could not load that ask")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, a)
+	httpx.WriteJSON(w, http.StatusOK, shieldAsk(a, middleware.Role(ctx)))
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +164,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, err, "could not create that ask")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, a)
+	httpx.WriteJSON(w, http.StatusCreated, shieldAsk(a, middleware.Role(ctx)))
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +179,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, err, "could not update that ask")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, a)
+	httpx.WriteJSON(w, http.StatusOK, shieldAsk(a, middleware.Role(ctx)))
 }
 
 func (h *Handler) move(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +194,7 @@ func (h *Handler) move(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, err, "could not move that ask")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, a)
+	httpx.WriteJSON(w, http.StatusOK, shieldAsk(a, middleware.Role(ctx)))
 }
 
 func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
@@ -190,7 +204,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, err, "could not load that ask's history")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, items)
+	httpx.WriteJSON(w, http.StatusOK, shieldEvents(items, middleware.Role(ctx)))
 }
 
 func (h *Handler) subtasks(w http.ResponseWriter, r *http.Request) {
@@ -223,6 +237,11 @@ func (h *Handler) managerRoster(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteServerError(w, "could not load manager team roster", err)
 		return
 	}
+	for i := range roster.Engineers {
+		roster.Engineers[i].ActiveTasks = shieldAsks(roster.Engineers[i].ActiveTasks, role)
+	}
+	roster.UnassignedSubtasks = shieldAsks(roster.UnassignedSubtasks, role)
+	roster.ManagerTasks = shieldAsks(roster.ManagerTasks, role)
 	httpx.WriteJSON(w, http.StatusOK, roster)
 }
 
@@ -394,7 +413,7 @@ func (h *Handler) updatePipeline(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 	httpx.WriteDomainError(w, err, fallback,
 		httpx.Rule{Err: ErrNotFound, Status: http.StatusNotFound, Message: "ask not found"},
-		httpx.Rule{Err: ErrNoParent, Status: http.StatusBadRequest, Message: "an ask must belong to a deal or a lead"},
+		httpx.Rule{Err: ErrNoParent, Status: http.StatusBadRequest, Message: "an ask must belong to a deal, a lead or a company"},
 		httpx.Rule{Err: ErrDealNotFound, Status: http.StatusBadRequest, Message: "deal not found"},
 		httpx.Rule{Err: ErrLeadNotFound, Status: http.StatusBadRequest, Message: "lead not found"},
 		httpx.Rule{Err: ErrAssigneeNotFound, Status: http.StatusBadRequest, Message: "assignee not found"},
@@ -410,5 +429,17 @@ func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 		httpx.Rule{Err: ErrDeleteHasSubtasks, Status: http.StatusBadRequest, Message: "cannot delete an ask that has active sub-tasks; remove, complete or reassign them first"},
 		httpx.Rule{Err: ErrDeleteDeliveredForbidden, Status: http.StatusForbidden, Message: "only owners and admins can delete delivered or verified asks"},
 		httpx.Rule{Err: ErrDeleteForbidden, Status: http.StatusForbidden, Message: "you do not have permission to delete this ask"},
+		httpx.Rule{Err: ErrCommentNotFound, Status: http.StatusNotFound, Message: "comment not found"},
+		httpx.Rule{Err: ErrCommentForbidden, Status: http.StatusForbidden, Message: ErrCommentForbidden.Error()},
+		httpx.Rule{Err: ErrCommentTooOld, Status: http.StatusForbidden, Message: ErrCommentTooOld.Error()},
+		httpx.Rule{Err: ErrCommentRate, Status: http.StatusTooManyRequests, Message: ErrCommentRate.Error()},
+		httpx.Rule{Err: ErrClientNoComments, Status: http.StatusForbidden, Message: ErrClientNoComments.Error()},
+		httpx.Rule{Err: ErrReviewForbidden, Status: http.StatusForbidden, Message: ErrReviewForbidden.Error()},
+		httpx.Rule{Err: ErrNotPending, Status: http.StatusConflict, Message: ErrNotPending.Error()},
+		httpx.Rule{Err: ErrNotRejected, Status: http.StatusConflict, Message: ErrNotRejected.Error()},
+		httpx.Rule{Err: ErrNotARequest, Status: http.StatusBadRequest, Message: ErrNotARequest.Error()},
+		httpx.Rule{Err: ErrResubmitForbidden, Status: http.StatusForbidden, Message: ErrResubmitForbidden.Error()},
+		httpx.Rule{Err: ErrLinkPending, Status: http.StatusConflict, Message: ErrLinkPending.Error()},
+		httpx.Rule{Err: ErrDealNoCompany, Status: http.StatusBadRequest, Message: ErrDealNoCompany.Error()},
 	)
 }

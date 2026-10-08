@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { AlertCircle, Check, Pencil } from "lucide-react";
 
 import { ApiError } from "../lib/api";
@@ -34,6 +34,8 @@ import {
 import { useAuthStore } from "../auth/store";
 import { SubTaskList } from "./SubTaskList";
 import { PRIORITY_META, STATUS_META } from "./meta";
+import { DiscussionPanel } from "./comments/DiscussionPanel";
+import { RequestBanner } from "./RequestBanner";
 
 /** What the deal or lead already knows, shown read-only at the top. */
 export interface AskParent {
@@ -56,6 +58,9 @@ export function AskDialog({
   onStatusChange,
   onDelete,
   onSelectSubtask,
+  initialTab = "details",
+  focusCommentId,
+  extra,
 }: {
   parent: AskParent;
   /** Null when raising a new ask. */
@@ -69,6 +74,13 @@ export function AskDialog({
   onStatusChange?: (status: AskStatus, reason: string) => Promise<unknown>;
   onDelete?: () => void;
   onSelectSubtask?: (subtask: Ask) => void;
+  /** Narrow screens show one pane at a time; this picks the first. */
+  initialTab?: "details" | "discussion";
+  /** Deep-linked comment to scroll to and highlight. */
+  focusCommentId?: string | null;
+  /** Rendered above the form, e.g. the request review controls. A function
+   *  gets a save() that persists the form as it stands. */
+  extra?: ReactNode | ((ctx: { save: () => Promise<Ask> }) => ReactNode);
 }) {
   const user = useAuthStore((s) => s.user);
   const isEngineer = user?.role === "engineer";
@@ -83,6 +95,7 @@ export function AskDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showBlockPrompt, setShowBlockPrompt] = useState(false);
+  const [tab, setTab] = useState<"details" | "discussion">(initialTab);
 
   const members = useQuery({
     queryKey: ["members"],
@@ -163,13 +176,11 @@ export function AskDialog({
   const assigneeName =
     (members.data ?? []).find((m) => m.id === assignedTo)?.name ?? "";
 
-  return (
-    <Modal
-      title={ask ? "Implementation ask" : "New implementation ask"}
-      onClose={onClose}
-      size="lg"
-    >
+  const form = (
       <form onSubmit={submit} className="flex flex-col gap-md">
+        {typeof extra === "function" ? extra({ save: () => onSubmit(values()) }) : extra}
+        {ask?.reviewStatus && <RequestBanner ask={ask} />}
+
         <p className="flex items-start gap-sm rounded-md bg-ok-soft px-md py-sm text-xs text-ok-fg">
           <Check className="mt-[1px] h-3.5 w-3.5 shrink-0" />
           <span>
@@ -263,7 +274,10 @@ export function AskDialog({
 
           <AssigneePicker
             label="Assign to"
-            groups={memberGroups(members.data ?? [])}
+            groups={memberGroups(members.data ?? [], {
+              roles: ["manager", "engineer", "owner", "admin"],
+              keep: ask?.assignedTo ?? undefined,
+            })}
             value={assignedTo}
             onChange={setAssignedTo}
             // Engineers cannot reassign work; the server keeps the assignee too.
@@ -346,7 +360,9 @@ export function AskDialog({
           </div>
         </div>
       </form>
-      {showBlockPrompt && ask && (
+  );
+
+  const blockPrompt = showBlockPrompt && ask && (
         <BlockReasonModal
           ask={ask}
           onConfirm={(reason) => {
@@ -355,7 +371,49 @@ export function AskDialog({
           }}
           onCancel={() => setShowBlockPrompt(false)}
         />
-      )}
+  );
+
+  if (!ask) {
+    return (
+      <Modal title="New implementation ask" onClose={onClose} size="lg">
+        {form}
+        {blockPrompt}
+      </Modal>
+    );
+  }
+
+  const tabClass = (t: typeof tab) =>
+    `flex-1 border-b-2 py-2 text-xs font-semibold transition-colors ${
+      tab === t ? "border-accent text-fg" : "border-transparent text-fg-muted hover:text-fg"
+    }`;
+
+  return (
+    <Modal title="Implementation ask" onClose={onClose} size="xl" flush>
+      <div className="flex h-full min-h-0 flex-col lg:flex-row">
+        <div role="tablist" className="flex shrink-0 border-b border-line px-lg lg:hidden">
+          <button type="button" role="tab" aria-selected={tab === "details"} className={tabClass("details")} onClick={() => setTab("details")}>
+            Details
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "discussion"} className={tabClass("discussion")} onClick={() => setTab("discussion")}>
+            Discussion{ask.commentCount ? ` · ${ask.commentCount}` : ""}
+          </button>
+        </div>
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-lg lg:block lg:basis-[58%] ${
+            tab === "details" ? "block" : "hidden"
+          }`}
+        >
+          {form}
+        </div>
+        <div
+          className={`min-h-0 flex-1 flex-col border-line bg-surface-muted/30 p-lg lg:flex lg:basis-[42%] lg:border-l ${
+            tab === "discussion" ? "flex" : "hidden"
+          }`}
+        >
+          <DiscussionPanel key={ask.id} askId={ask.id} focusCommentId={focusCommentId} />
+        </div>
+      </div>
+      {blockPrompt}
     </Modal>
   );
 }
