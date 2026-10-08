@@ -25,6 +25,7 @@ var (
 	ErrResubmitForbidden = errors.New("only the manager who raised this request can resubmit it")
 	ErrLinkPending       = errors.New("approve the request to link its deal")
 	ErrDealNoCompany     = errors.New("that deal has no company; set the deal's company first")
+	ErrDealInactive      = errors.New("only active deals can be linked")
 )
 
 // Review is a reviewer's decision on a pending request.
@@ -238,7 +239,7 @@ func (s *Service) notifyReviewers(ctx context.Context, orgID, actorID string, a 
 			UserID: id, Type: "ask_request_submitted",
 			Title:     who + " requested an implementation ask",
 			Body:      a.Title,
-			ActionURL: "/deals?request=" + url.QueryEscape(a.ID),
+			ActionURL: "/requests?request=" + url.QueryEscape(a.ID),
 			Priority:  "warning",
 		})
 	}
@@ -320,6 +321,24 @@ func linkDealTx(ctx context.Context, tx pgx.Tx, orgID, id, dealID string) error 
 	if err != nil {
 		return err
 	}
+	var lost bool
+	if err := tx.QueryRow(ctx, `SELECT stage = 'lost' FROM deals WHERE id = $1::uuid`, dealID).Scan(&lost); err != nil {
+		return err
+	}
+	if lost {
+		return ErrDealInactive
+	}
+	// Sub-tasks still on the ask's previous deal follow it to the new one.
+	var oldDeal *string
+	if err := tx.QueryRow(ctx,
+		`SELECT deal_id::text FROM implementation_asks WHERE org_id = $1::uuid AND id = $2::uuid`,
+		orgID, id).Scan(&oldDeal); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+
 	var company *string
 	err = tx.QueryRow(ctx,
 		`UPDATE implementation_asks
@@ -337,11 +356,14 @@ func linkDealTx(ctx context.Context, tx pgx.Tx, orgID, id, dealID string) error 
 	if company == nil {
 		return ErrDealNoCompany
 	}
+	// Sub-tasks always move with the parent's company; their deal follows when
+	// they had none or shared the parent's old one.
 	_, err = tx.Exec(ctx,
 		`UPDATE implementation_asks
-		    SET deal_id = $3::uuid, account_id = COALESCE($4::uuid, account_id), updated_at = now()
-		  WHERE org_id = $1::uuid AND parent_ask_id = $2::uuid AND deal_id IS NULL`,
-		orgID, id, dealID, account)
+		    SET deal_id = CASE WHEN deal_id IS NULL OR deal_id = $5::uuid THEN $3::uuid ELSE deal_id END,
+		        account_id = COALESCE($4::uuid, account_id), updated_at = now()
+		  WHERE org_id = $1::uuid AND parent_ask_id = $2::uuid`,
+		orgID, id, dealID, account, oldDeal)
 	return err
 }
 
@@ -377,13 +399,15 @@ func (s *store) resubmit(ctx context.Context, orgID, id, actorID string) error {
 	return nil
 }
 
-// reviewers: the org's owners and admins, plus the company's owner.
+// reviewers: the org's owners and admins, plus the company's owner when they
+// are on the GTM team (only GTM can open the requests page).
 func (s *store) reviewers(ctx context.Context, orgID string, accountID *string) ([]string, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT u.id::text FROM users u JOIN profiles p ON p.id = u.id
 		  WHERE u.org_id = $1::uuid
 		    AND (p.role IN ('owner', 'admin')
-		         OR u.id = (SELECT owner_id FROM accounts WHERE id = $2::uuid))`,
+		         OR (p.role IN ('sales', 'account_manager')
+		             AND u.id = (SELECT owner_id FROM accounts WHERE id = $2::uuid)))`,
 		orgID, accountID)
 	if err != nil {
 		return nil, err

@@ -10,7 +10,7 @@ import { dealsApi, type Deal, type DealInput } from "../deals/api";
 import { dealTasksApi, type DealTask } from "../deals/tasks";
 import { implementationApi, type Ask, type AskInput } from "../implementation/api";
 import { AskDialog } from "../implementation/AskDialog";
-import { AskRequestsInbox } from "../implementation/AskRequestsInbox";
+import { usePendingRequestCount } from "../implementation/useRequestCounts";
 import { useDeleteAsk } from "../implementation/useDeleteAsk";
 import { memberLabel, orgApi } from "../org/api";
 import { buildQuoteStateFromDeal } from "../deals/quote-utils";
@@ -153,6 +153,13 @@ export default function Deals() {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, location.pathname, navigate]);
+
+  // Old notification links pointed here; requests now have their own page.
+  useEffect(() => {
+    const request = new URLSearchParams(location.search).get("request");
+    if (request) navigate(`/requests?request=${encodeURIComponent(request)}`, { replace: true });
+  }, [location.search, navigate]);
+  const pendingRequests = usePendingRequestCount();
 
   const allDeals = query.data?.deals ?? [];
 
@@ -403,16 +410,24 @@ export default function Deals() {
               )} open · ${formatMoneyCompact(totals.won, currency)} won`
         }
         action={
-          <Button
-            icon="plus"
-            onClick={() => setDialog({ deal: null, stage: "discovery" })}
-          >
-            New deal
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => navigate("/requests")}>
+              Ask requests
+              {pendingRequests > 0 && (
+                <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 text-[11px] font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                  {pendingRequests}
+                </span>
+              )}
+            </Button>
+            <Button
+              icon="plus"
+              onClick={() => setDialog({ deal: null, stage: "discovery" })}
+            >
+              New deal
+            </Button>
+          </div>
         }
       />
-
-      <AskRequestsInbox />
 
       {moveError && <Alert>{moveError}</Alert>}
       {actionError && <Alert>{actionError}</Alert>}

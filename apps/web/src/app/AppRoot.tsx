@@ -16,6 +16,7 @@ import { DocumentPreview } from "./documents/DocumentPreview";
 
 import Dashboard from "./routes/Dashboard";
 import Deals from "./routes/Deals";
+import AskRequests from "./routes/AskRequests";
 import InvoiceEditor from "./routes/InvoiceEditor";
 import Invoices from "./routes/Invoices";
 import Leads from "./routes/Leads";
@@ -88,6 +89,7 @@ export default function AppRoot() {
               >
                 <Route path="/leads" element={<Leads />} />
                 <Route path="/deals" element={<Deals />} />
+                <Route path="/requests" element={<AskRequests />} />
                 <Route path="/quotes" element={<Quotes />} />
                 {/* new + :id share one editor; the route decides which */}
                 <Route path="/quotes/new" element={<QuoteEditor />} />

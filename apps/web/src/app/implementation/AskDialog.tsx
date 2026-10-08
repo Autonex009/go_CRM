@@ -179,7 +179,8 @@ export function AskDialog({
   const form = (
       <form onSubmit={submit} className="flex flex-col gap-md">
         {typeof extra === "function" ? extra({ save: () => onSubmit(values()) }) : extra}
-        {ask?.reviewStatus && <RequestBanner ask={ask} />}
+        {/* The review dialog brings its own controls in `extra`. */}
+        {ask?.reviewStatus && !extra && <RequestBanner ask={ask} />}
 
         <p className="flex items-start gap-sm rounded-md bg-ok-soft px-md py-sm text-xs text-ok-fg">
           <Check className="mt-[1px] h-3.5 w-3.5 shrink-0" />

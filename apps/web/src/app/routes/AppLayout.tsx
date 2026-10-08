@@ -21,11 +21,13 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Inbox,
 } from "lucide-react";
 
 import { endSession } from "../auth/session";
 import { useAuthStore } from "../auth/store";
 import { NotificationBell } from "../notifications/NotificationBell";
+import { usePendingRequestCount } from "../implementation/useRequestCounts";
 import { useWorkspaceStore, useWorkspaceSync } from "../org/workspace";
 
 import { useAppStore } from "../store";
@@ -41,6 +43,8 @@ interface NavGroup {
     end?: boolean;
     /** Omitted for everyone; set to restrict to specific profiles.role values. */
     roles?: string[];
+    /** Shows a count beside the label, e.g. pending requests. */
+    badge?: "pendingRequests";
   }[];
 }
 
@@ -63,6 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/accounts", label: "Companies", icon: Building2, roles: ["owner", "admin", "sales", "account_manager"] },
       { to: "/leads", label: "Leads", icon: TrendingUp, roles: ["owner", "admin", "sales", "account_manager"] },
       { to: "/deals", label: "Deals", icon: Handshake, roles: ["owner", "admin", "sales", "account_manager"] },
+      { to: "/requests", label: "Ask Requests", icon: Inbox, roles: ["owner", "admin", "sales", "account_manager"], badge: "pendingRequests" },
       { to: "/implementation", label: "Implementation", icon: Wrench, end: true, roles: ["owner", "admin", "sales", "account_manager", "manager"] },
       { to: "/implementation/team-tasks", label: "Engineer Tasks", icon: Users, end: true, roles: ["owner", "admin", "sales", "account_manager", "manager"] },
     ],
@@ -88,6 +93,7 @@ const TITLES: Record<string, string> = {
   "/accounts": "Companies",
   "/leads": "Leads",
   "/deals": "Deals",
+  "/requests": "Ask Requests",
   "/implementation": "Implementation",
   "/implementation/team-tasks": "Engineer Task Allocations",
   "/quotes": "Quotes Workbench",
@@ -200,6 +206,7 @@ const Sidebar = memo(function Sidebar({
 }) {
   const location = useLocation();
   const role = useAuthStore((s) => s.user?.role);
+  const pendingRequests = usePendingRequestCount();
   const workspaceName = useWorkspaceStore((s) => s.name);
 
   return (
@@ -239,6 +246,7 @@ const Sidebar = memo(function Sidebar({
       {/* Navigation */}
       <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3.5">
         {NAV_GROUPS.map((group, idx) => {
+          const badgeCount = (b?: string) => (b === "pendingRequests" ? pendingRequests : 0);
           const items = group.items.filter((item) => !item.roles || (!!role && item.roles.includes(role)));
           if (items.length === 0) return null;
 
@@ -291,6 +299,14 @@ const Sidebar = memo(function Sidebar({
                       }`}
                     />
                     {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                    {badgeCount(item.badge) > 0 &&
+                      (collapsed ? (
+                        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500" aria-label={`${badgeCount(item.badge)} pending`} />
+                      ) : (
+                        <span className="rounded-full bg-amber-500/15 px-1.5 text-[11px] font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                          {badgeCount(item.badge)}
+                        </span>
+                      ))}
 
                     {/* Collapsed Tooltip on Hover */}
                     {collapsed && (

@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Hourglass, RotateCcw, ShieldCheck, Undo2 } from "lucide-react";
 
 import { useAuthStore } from "../auth/store";
 import { relativeTime } from "../activities/api";
 import { Button } from "../ui";
-import { implementationApi, type Ask } from "./api";
+import { REVIEWER_ROLES, implementationApi, type Ask } from "./api";
 
 /** Where a manager request stands, and the resubmit action once sent back. */
 export function RequestBanner({ ask }: { ask: Ask }) {
@@ -38,6 +39,17 @@ export function RequestBanner({ ask }: { ask: Ask }) {
   }
 
   if (status === "pending") {
+    if (REVIEWER_ROLES.includes(user?.role ?? "")) {
+      return (
+        <p className="flex items-center gap-2 rounded-md bg-warn-soft px-md py-sm text-xs text-warn-fg">
+          <Hourglass className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1">Manager request awaiting your review.</span>
+          <Link to={`/requests?request=${encodeURIComponent(ask.id)}`} className="font-semibold underline">
+            Review it
+          </Link>
+        </p>
+      );
+    }
     return (
       <p className="flex items-center gap-2 rounded-md bg-warn-soft px-md py-sm text-xs text-warn-fg">
         <Hourglass className="h-3.5 w-3.5 shrink-0" />

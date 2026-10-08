@@ -441,5 +441,6 @@ func (h *Handler) writeErr(w http.ResponseWriter, err error, fallback string) {
 		httpx.Rule{Err: ErrResubmitForbidden, Status: http.StatusForbidden, Message: ErrResubmitForbidden.Error()},
 		httpx.Rule{Err: ErrLinkPending, Status: http.StatusConflict, Message: ErrLinkPending.Error()},
 		httpx.Rule{Err: ErrDealNoCompany, Status: http.StatusBadRequest, Message: ErrDealNoCompany.Error()},
+		httpx.Rule{Err: ErrDealInactive, Status: http.StatusBadRequest, Message: ErrDealInactive.Error()},
 	)
 }
