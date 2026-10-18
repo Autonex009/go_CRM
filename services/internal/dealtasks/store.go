@@ -202,6 +202,10 @@ func (s *store) dealExists(ctx context.Context, orgID, dealID string) (bool, err
 			  AND ($2 = '' OR EXISTS (
 			      SELECT 1 FROM users u
 			      WHERE u.id = d.owner_id AND u.org_id = NULLIF($2, '')::uuid
+			  ) OR EXISTS (
+			      SELECT 1 FROM deal_tasks dt
+			      JOIN users u ON (u.id = dt.created_by OR u.id = dt.assigned_to)
+			      WHERE dt.deal_id = d.id AND u.org_id = NULLIF($2, '')::uuid
 			  ))
 		)`,
 		dealID, orgID).Scan(&exists)
