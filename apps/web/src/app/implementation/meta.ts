@@ -86,6 +86,11 @@ export function isClosed(status: AskStatus): boolean {
   return status === "verified" || status === "wont_do";
 }
 
+/** Still needs engineering work; delivered asks live only in the Implementation tab. */
+export function isActive(status: AskStatus): boolean {
+  return status !== "delivered" && !isClosed(status);
+}
+
 export function isOverdue(ask: Ask): boolean {
   if (!ask.dueAt || isClosed(ask.status)) return false;
   return new Date(ask.dueAt).getTime() < Date.now();

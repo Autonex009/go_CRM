@@ -14,6 +14,7 @@ import {
 
 import type { Ask } from "../implementation/api";
 import { ImplementationBlock, techSummary } from "../implementation/ImplementationBlock";
+import { isActive } from "../implementation/meta";
 import { formatMoneyCompact } from "../lib/money";
 import { useCurrency } from "../org/workspace";
 import { Avatar } from "../ui";
@@ -124,9 +125,7 @@ export const DealCard = memo(function DealCard({
   const pending = byPriority(allTasks.filter((t) => !t.done));
   const doneCount = allTasks.length - pending.length;
   const dealAsks = asks ?? [];
-  const openAsks = dealAsks.filter(
-    (a) => a.status !== "verified" && a.status !== "wont_do",
-  );
+  const openAsks = dealAsks.filter((a) => isActive(a.status));
   const techChip = techSummary(dealAsks);
   const blockedAsks = openAsks.filter((a) => a.status === "blocked").length;
   const late = days !== null && days < 0;

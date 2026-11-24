@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { Avatar } from "../ui";
 import { DeleteAskButton } from "./AskCard";
 import type { Ask } from "./api";
-import { PRIORITY_META, STATUS_META, isClosed } from "./meta";
+import { PRIORITY_META, STATUS_META, isActive } from "./meta";
 
 /**
  * The Implementation section on a deal card.
@@ -23,7 +23,7 @@ export function ImplementationBlock({
   onOpen?: (ask: Ask) => void;
   onDelete?: (ask: Ask) => void;
 }) {
-  const open = asks.filter((a) => !isClosed(a.status));
+  const open = asks.filter((a) => isActive(a.status));
   if (open.length === 0 && !onAdd) return null;
 
   return (
@@ -137,7 +137,7 @@ function statusChip(status: Ask["status"]): string {
 
 /** "2 tech · 1 blocked" — the card's header chip. */
 export function techSummary(asks: Ask[]): string | null {
-  const open = asks.filter((a) => !isClosed(a.status));
+  const open = asks.filter((a) => isActive(a.status));
   if (open.length === 0) return null;
   const blocked = open.filter((a) => a.status === "blocked").length;
   return blocked > 0
